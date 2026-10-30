@@ -10,11 +10,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@kepler.gl/actions": "3.3.0-alpha.18",
+    "@kepler.gl/components": "3.3.0-alpha.18",
+    "@kepler.gl/reducers": "3.3.0-alpha.18",
     "framer-motion": "^14.8.0",
     "lucide-react": "^1.64.0",
+    "maplibre-gl": "4.7.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "recharts": "^3.10.1"
+    "react-redux": "9.3.1",
+    "recharts": "^3.10.1",
+    "redux": "5.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -25,5 +31,24 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@deck.gl/core": "9.3.11",
+    "@deck.gl/layers": "9.3.11",
+    "@deck.gl/aggregation-layers": "9.3.11",
+    "@deck.gl/extensions": "9.3.11",
+    "@deck.gl/geo-layers": "9.3.11",
+    "@deck.gl/mesh-layers": "9.3.11",
+    "@deck.gl/react": "9.3.11",
+    "@deck.gl/widgets": "9.3.11",
+    "@deck.gl/mapbox": "9.3.11",
+    "@luma.gl/core": "9.3.6",
+    "@luma.gl/engine": "9.3.6",
+    "@luma.gl/shadertools": "9.3.6",
+    "@luma.gl/webgl": "9.3.6",
+    "@luma.gl/constants": "9.3.6",
+    "@luma.gl/gltf": "9.3.6",
+    "@luma.gl/effects": "9.3.6",
+    "@luma.gl/webgpu": "9.3.6"
   }
 }

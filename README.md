@@ -52,8 +52,12 @@ edge-simulator/         Python 3.9+ edge collector
   agrisense_edge/       queue_store.py (SQLite), uploader.py, hardware.py, simulated.py
   deploy/               agrisense-edge.service (systemd)
   tests/test_edge.py    unittest (no hardware/network needed)
-supabase/schema.sql     idempotent schema v2 (also upgrades v1 installs)
+frontend/src/map/       Pest Surveillance Map: PestMapPage (no kepler imports), KeplerView (lazy),
+                        store.js (Redux for this page only), keplerConfig.js, shims/assert.js
+demo/seed.py            simulated 14-day whitefly outbreak for the map (18 SIM traps)
+supabase/schema.sql     idempotent schema v3 (also upgrades v1/v2 installs)
 docs/REPORT.md          audit, verification results, security notes, readiness
+DECISIONS.md            architecture/engineering decisions (kepler.gl choices, npm audit, etc.)
 ```
 
 ## Prerequisites
@@ -109,6 +113,54 @@ No Python? **Admin & Hardware Control → Edge Capture Simulator** in the dashbo
 captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
+
+## Pest Surveillance Map
+
+The **Pest Surveillance Map** page (sidebar → *Pest Surveillance Map*) shows every trap on a kepler.gl map:
+- **Colour** shows the decision: red **SPRAY**, amber **BIOCONTROL**, green **WAIT**.
+- **Size** shows the pest count.
+- **Time filter:** a one-day filter on `date`; press ▷ on the timeline to replay an outbreak day by day.
+- **Trap list:** a table under the map lists every trap for any day, with or without the map.
+
+To load the simulated demo outbreak (18 `SIM ·` traps around Bengaluru Rural and Kolar, 14 days), with the backend running:
+
+```bash
+python demo/seed.py --dry-run
+```
+```bash
+python demo/seed.py --admin-key <ADMIN_API_KEY>
+```
+```bash
+python demo/seed.py --reset --admin-key <ADMIN_API_KEY>
+```
+```bash
+python demo/seed.py --remove --admin-key <ADMIN_API_KEY>
+```
+
+The first prints the traps and a few rows without sending anything. The second loads the data
+(re-running it is safe). `--reset` replaces previous simulated traps, and `--remove` deletes them.
+The admin key can also come from `AGRISENSE_ADMIN_KEY`, and you can leave it out when the backend
+runs in demo mode without keys.
+
+How the map behaves:
+- **Simulated data** is labelled everywhere: trap names start with `SIM ·`, every row carries
+  `simulated: true`, and the page shows a **Simulated data** badge. Simulated traps are kept out
+  of the main dashboard's trap picker.
+- **Real traps** appear once they have coordinates:
+  `PATCH /api/device/location {device_id, latitude, longitude}` (admin).
+  Their captures are rolled up per day automatically.
+- **Supabase:** re-run `supabase/schema.sql` (v3 adds the coordinates and the
+  `trap_daily_observations` table). Until then the map shows real data plus a warning, and
+  seeding returns 503.
+- **Basemap:** the default CARTO / MapLibre basemap needs **no token**. Set `VITE_MAPBOX_TOKEN`
+  in `frontend/.env` (a public, URL-restricted `pk.` token) to add a satellite style.
+- **No map available:** with no internet for tiles, or no WebGL, the page explains why and still
+  lists all trap data. kepler.gl isn't even downloaded in that case.
+- **Bundle size:** the map code (about 2 MB gzipped) is a separate lazy chunk, so the rest of the
+  dashboard loads as before.
+
+Why kepler.gl is pinned to a pre-release, the deck.gl version overrides, the CSP additions and
+the `npm audit` findings are all in [DECISIONS.md](DECISIONS.md).
 
 ## Environment variables
 
@@ -265,6 +317,10 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |
+| POST | `/api/admin/map-seed` | admin | `{traps, observations}`. Simulated data only; decisions computed server-side |
+| DELETE | `/api/admin/map-seed` | admin | Removes all simulated traps and their observations |
+| PATCH | `/api/device/location` | admin | `{device_id, latitude, longitude}` (both `null` to clear) puts a real trap on the map |
 
 Example `POST /api/telemetry` request:
 
@@ -345,9 +401,9 @@ Example response, abridged:
 ## Automated tests
 
 ```bash
-cd backend && npm test               # node:test, 42 tests, all providers mocked
+cd backend && npm test               # node:test, 51 tests, all providers mocked
 cd backend && npm run check          # syntax check of every backend file
-cd frontend && npm test              # Vitest + Testing Library (jsdom), 13 tests
+cd frontend && npm test              # Vitest + Testing Library (jsdom), 22 tests
 cd frontend && npm run build         # production build
 cd edge-simulator && python -m unittest discover -s tests -v
 ```
@@ -458,4 +514,10 @@ Do these in order, each on its own. Use a Supabase **test** project.
 - Battery level is set manually. No battery or UPS sensor is integrated.
 - The in-memory demo store keeps uploaded images as data URLs and loses everything on restart.
 - The rate limiter is per-instance and the dashboard updates by polling (every 5 s).
+- **Map:**
+  - It runs on kepler.gl **3.3.0-alpha.18**, a pre-release (the stable 3.2.x needs React 18).
+  - kepler.gl adds **14 critical and 19 high** `npm audit` findings that can't be fixed from
+    this project. Exposure and mitigations are in DECISIONS.md (D12).
+  - The SPRAY / BIOCONTROL / WAIT thresholds are illustrative, not validated.
+  - The Mapbox satellite style hasn't been tested with a real token.
 - There are no per-user dashboard accounts.

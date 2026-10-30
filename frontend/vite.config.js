@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -10,11 +11,14 @@ import tailwindcss from '@tailwindcss/vite';
 const csp = (extra = '') =>
   [
     "default-src 'self'",
-    "script-src 'self'",
+    // kepler.gl compiles a WebAssembly module; 'wasm-unsafe-eval' allows that but NOT JS eval()
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: https:${extra}`,
     `connect-src 'self' https:${extra}`,
     "font-src 'self'",
+    // MapLibre / deck.gl (map page) run web workers from blob: URLs
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -23,6 +27,10 @@ const csp = (extra = '') =>
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // kepler.gl imports Node's `assert`; Vite stubs Node built-ins in the browser (see src/map/shims/assert.js)
+    alias: [{ find: /^assert$/, replacement: fileURLToPath(new URL('./src/map/shims/assert.js', import.meta.url)) }],
+  },
   preview: {
     port: 4173,
     headers: {

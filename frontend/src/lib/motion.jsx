@@ -41,7 +41,9 @@ export function Item({ as = 'div', className, children, ...rest }) {
 /** Page-level transition between dashboard views. */
 export const pageTransition = {
   initial: { opacity: 0, y: 12, filter: 'blur(4px)' },
-  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.4, ease: EASE } },
+  // transitionEnd clears the filter: any CSS filter changes how position:fixed children
+  // (e.g. map popovers) are laid out, so none may remain once the page has settled.
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.4, ease: EASE }, transitionEnd: { filter: 'none' } },
   exit: { opacity: 0, y: -8, filter: 'blur(4px)', transition: { duration: 0.2, ease: EASE } },
 };
 
