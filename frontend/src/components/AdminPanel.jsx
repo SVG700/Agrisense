@@ -423,10 +423,16 @@ function Slider({ label, unit, min, max, step, value, onChange }) {
     <label className="flex flex-col gap-2 rounded-xl bg-slate-950/40 p-3 text-sm ring-1 ring-slate-800 transition-colors duration-200 hover:ring-emerald-500/30">
       <span className="flex justify-between text-slate-400">
         {label}
-        <span className="tabular-nums text-slate-100">
+        <motion.span
+          key={value}
+          initial={{ scale: 1.25, color: '#6ee7b7' }}
+          animate={{ scale: 1, color: '#f1f5f9' }}
+          transition={{ duration: 0.35, ease: EASE }}
+          className="inline-block tabular-nums"
+        >
           {value}
           {unit}
-        </span>
+        </motion.span>
       </span>
       <input
         type="range"
