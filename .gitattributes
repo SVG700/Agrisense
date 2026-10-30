@@ -1,0 +1,6 @@
+# Keep LF everywhere: the Raspberry Pi (systemd unit, Python, shell) needs Unix line endings.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

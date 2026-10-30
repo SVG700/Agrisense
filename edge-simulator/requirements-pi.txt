@@ -1,0 +1,11 @@
+# Hardware mode on Raspberry Pi 5 (Raspberry Pi OS Bookworm, Python 3.11).
+# Camera: install from apt, NOT pip:   sudo apt install -y python3-picamera2
+# and create the virtualenv with --system-site-packages so it can see picamera2.
+-r requirements.txt
+
+# BME280 over I2C (default, AGRISENSE_SENSOR=bme280). Enable I2C: sudo raspi-config -> Interface Options -> I2C
+smbus2>=0.4
+RPi.bme280>=0.2.4
+
+# DHT22 over GPIO (AGRISENSE_SENSOR=dht22). Uncomment if you use a DHT22 instead:
+# adafruit-circuitpython-dht>=4.0

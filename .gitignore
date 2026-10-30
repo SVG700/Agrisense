@@ -1,0 +1,31 @@
+# Dependencies / builds
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Secrets - only *.example templates are committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Edge collector local data (queue DB + captured images)
+edge-data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Logs / OS
+*.log
+logs/
+.DS_Store
+Thumbs.db

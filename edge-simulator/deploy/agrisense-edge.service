@@ -1,0 +1,44 @@
+# systemd unit for the Agrisense edge collector on Raspberry Pi OS (Bookworm).
+#
+# Install (see README "Raspberry Pi deployment"):
+#   sudo cp deploy/agrisense-edge.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now agrisense-edge
+# Logs:
+#   journalctl -u agrisense-edge -f
+
+[Unit]
+Description=Agrisense AI edge collector (camera + sensor + offline upload queue)
+Wants=network-online.target
+After=network-online.target time-sync.target
+# Don't restart forever if the hardware is missing (5 failures in 10 min -> give up)
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=agrisense
+Group=agrisense
+# camera + I2C/GPIO access
+SupplementaryGroups=video i2c gpio
+WorkingDirectory=/opt/agrisense/edge-simulator
+# Secrets and settings live outside the repository
+EnvironmentFile=/etc/agrisense/edge.env
+Environment=PYTHONUNBUFFERED=1
+Environment=AGRISENSE_DATA_DIR=/var/lib/agrisense
+# Startup check: confirms the camera and sensor respond before the service starts
+ExecStartPre=/opt/agrisense/venv/bin/python simulator.py --mode hardware --probe --env-file /dev/null
+ExecStart=/opt/agrisense/venv/bin/python simulator.py --mode hardware --env-file /dev/null
+# Graceful shutdown: SIGTERM finishes the current upload, then exits
+KillSignal=SIGTERM
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=30
+
+StateDirectory=agrisense
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

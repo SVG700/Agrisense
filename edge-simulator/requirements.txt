@@ -1,0 +1,2 @@
+# Simulator mode (any computer, Python 3.9+)
+requests>=2.31,<3

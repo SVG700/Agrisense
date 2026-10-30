@@ -1,0 +1,67 @@
+/** Display metadata per detectable species (colors double as chart series colors). */
+export const PESTS = {
+  aphid: { name: 'Aphid', color: '#22c55e' },
+  whitefly: { name: 'Whitefly', color: '#38bdf8' },
+  thrips: { name: 'Thrips', color: '#f97316' },
+  fungus_gnat: { name: 'Fungus gnat', color: '#e879f9' },
+};
+
+export const pestMeta = (label) =>
+  PESTS[label] ?? { name: String(label).replace(/_/g, ' '), color: '#facc15' };
+
+export const RISK_STYLES = {
+  Low: { text: 'text-emerald-300', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', dot: 'bg-emerald-400' },
+  Medium: { text: 'text-amber-300', bg: 'bg-amber-500/15', ring: 'ring-amber-500/40', dot: 'bg-amber-400' },
+  High: { text: 'text-rose-300', bg: 'bg-rose-500/15', ring: 'ring-rose-500/50', dot: 'bg-rose-400' },
+};
+
+export const totalOf = (counts) => Object.values(counts ?? {}).reduce((a, b) => a + Number(b || 0), 0);
+
+/** Must match the backend's LOW_BATTERY_THRESHOLD (also reported by /api/health). */
+export const LOW_BATTERY = 15;
+
+/** A capture older than this is shown as stale. */
+export const STALE_AFTER_MS = 15 * 60 * 1000;
+
+/** How a detection was produced (backend vision_meta.status). */
+export const VISION_STATES = {
+  ok: { label: 'Model inference', tone: 'good', help: 'Detections from the configured vision model.' },
+  simulated: { label: 'Simulated', tone: 'warn', help: 'Synthetic trap image with generated detections (demo data).' },
+  failed: { label: 'Detection failed', tone: 'bad', help: 'The vision provider failed; insects were not counted.' },
+  not_configured: { label: 'Not analysed', tone: 'muted', help: 'No vision provider configured; insects were not counted.' },
+  skipped: { label: 'No image', tone: 'muted', help: 'This capture had no image.' },
+  legacy: { label: 'Unlabelled', tone: 'muted', help: 'Recorded before detection sources were tracked.' },
+};
+
+export const visionStatus = (det) => (det ? det.vision_meta?.status ?? 'legacy' : null);
+
+/** True when the detection's counts are meaningful (real, simulated or legacy). */
+export const hasCounts = (det) => ['ok', 'simulated', 'legacy'].includes(visionStatus(det));
+
+/** Who produced the sensor readings. */
+export const DATA_SOURCES = {
+  hardware: { label: 'Sensor', tone: 'good' },
+  simulator: { label: 'Simulated readings', tone: 'warn' },
+  dashboard: { label: 'Simulated readings', tone: 'warn' },
+  unknown: { label: 'Source unknown', tone: 'muted' },
+};
+
+/** Formats a possibly-missing reading. */
+export const fmtReading = (n, digits, unit) =>
+  n === null || n === undefined || Number.isNaN(n) ? '—' : `${Number(n).toFixed(digits)}${unit}`;
+
+export const TONES = {
+  good: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40',
+  warn: 'bg-amber-500/15 text-amber-300 ring-amber-500/40',
+  bad: 'bg-rose-500/15 text-rose-300 ring-rose-500/40',
+  muted: 'bg-slate-700/40 text-slate-300 ring-slate-600',
+};
+
+export function timeAgo(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} d ago`;
+}
