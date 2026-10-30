@@ -102,6 +102,37 @@ create unique index if not exists pest_detections_telemetry_id_key
   on public.pest_detections (telemetry_id);
 
 -- -----------------------------------------------------------------------------
+-- v3: Pest Surveillance Map
+--   * trap coordinates (WGS84) + a simulated flag on devices
+--   * trap_daily_observations: one row per trap per day (seeded demo history;
+--     real captures are aggregated by the API at query time)
+-- -----------------------------------------------------------------------------
+alter table public.devices add column if not exists latitude double precision;
+alter table public.devices add column if not exists longitude double precision;
+alter table public.devices add column if not exists simulated boolean not null default false;
+
+do $$ begin
+  alter table public.devices add constraint devices_coordinates_check
+    check ((latitude is null and longitude is null)
+        or (latitude between -90 and 90 and longitude between -180 and 180));
+exception when duplicate_object then null; end $$;
+
+create table if not exists public.trap_daily_observations (
+  id             bigint generated always as identity primary key,
+  device_id      uuid not null references public.devices (id) on delete cascade,
+  date           date not null,
+  pest_count     integer not null check (pest_count >= 0),
+  predator_count integer not null default 0 check (predator_count >= 0),
+  dominant_pest  text,
+  decision       text not null check (decision in ('SPRAY', 'BIOCONTROL', 'WAIT')),
+  simulated      boolean not null default false,
+  created_at     timestamptz not null default now(),
+  unique (device_id, date)
+);
+create index if not exists trap_daily_observations_date_idx on public.trap_daily_observations (date);
+alter table public.trap_daily_observations enable row level security;
+
+-- -----------------------------------------------------------------------------
 -- Atomic, idempotent ingestion. Called by the backend with the service role.
 -- Returns {telemetry, detection, duplicate}.
 -- -----------------------------------------------------------------------------

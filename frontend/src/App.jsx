@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'framer-motion';
 import {
   BrainCircuit,
@@ -7,6 +7,7 @@ import {
   Cpu,
   Database,
   LineChart,
+  Map as MapIcon,
   RefreshCw,
   Sprout,
   TriangleAlert,
@@ -20,10 +21,14 @@ import AdminPanel from './components/AdminPanel.jsx';
 import AmbientBackground from './components/AmbientBackground.jsx';
 import { DashboardSkeleton } from './components/Skeletons.jsx';
 
+// The map page (and everything kepler.gl pulls in) is a separate chunk, loaded on first visit
+const PestMapPage = lazy(() => import('./map/PestMapPage.jsx'));
+
 const POLL_MS = Number(import.meta.env.VITE_POLL_MS) || 5000;
 
 const TABS = [
   { id: 'farmer', label: 'Farmer Analytics', short: 'Analytics', icon: LineChart, blurb: 'Trap insights & advisory' },
+  { id: 'map', label: 'Pest Surveillance Map', short: 'Map', icon: MapIcon, blurb: 'Trap network & outbreak replay' },
   { id: 'admin', label: 'Admin & Hardware Control', short: 'Hardware', icon: Cpu, blurb: 'Devices, battery & capture' },
 ];
 
@@ -189,7 +194,7 @@ export default function App() {
             {/* Mobile / tablet: segmented nav + device picker + compact status */}
             <div className="flex flex-col gap-3 lg:hidden">
               <LayoutGroup id="top-nav">
-                <nav className="relative grid grid-cols-2 rounded-2xl bg-slate-900/70 p-1 ring-1 ring-emerald-900/40" aria-label="Main">
+                <nav className="relative grid grid-cols-3 rounded-2xl bg-slate-900/70 p-1 ring-1 ring-emerald-900/40" aria-label="Main">
                   {TABS.map(({ id, short, icon: Icon }) => (
                     <button
                       key={id}
@@ -244,6 +249,10 @@ export default function App() {
               <motion.div key={tab} {...pageTransition}>
                 {tab === 'farmer' ? (
                   <FarmerDashboard device={device} telemetry={telemetry} onGoAdmin={() => setTab('admin')} />
+                ) : tab === 'map' ? (
+                  <Suspense fallback={<DashboardSkeleton />}>
+                    <PestMapPage />
+                  </Suspense>
                 ) : (
                   <AdminPanel
                     devices={devices}
