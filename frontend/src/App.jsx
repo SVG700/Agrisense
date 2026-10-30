@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { api } from './api.js';
 import { LOW_BATTERY } from './lib/pests.js';
-import { EASE, pageTransition } from './lib/motion.jsx';
+import { EASE, WordReveal, pageTransition } from './lib/motion.jsx';
+import { BackToTop, InteractionEffects, ScrollProgress } from './components/InteractionEffects.jsx';
 import FarmerDashboard from './components/FarmerDashboard.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
 import AmbientBackground from './components/AmbientBackground.jsx';
@@ -109,6 +110,9 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <AmbientBackground />
+      <InteractionEffects />
+      <ScrollProgress />
+      <BackToTop />
       <div className="relative z-10 mx-auto flex max-w-[1480px] gap-6 px-4 sm:px-6 lg:px-8">
         {/* ---------- Sidebar (desktop) ---------- */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 py-6 lg:flex">
@@ -153,7 +157,8 @@ export default function App() {
                 className="hidden lg:block"
               >
                 <p className="text-xs font-medium text-emerald-400/80">Agrisense / {current.short}</p>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">{current.label}</h1>
+                <WordReveal as="h1" text={current.label} className="title-underline text-2xl font-semibold tracking-tight text-white" />
+
               </motion.div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
@@ -281,10 +286,14 @@ function Brand({ compact = false }) {
       transition={{ duration: 0.5, ease: EASE }}
       className={`flex items-center gap-3 ${compact ? '' : 'px-2'}`}
     >
-      <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-lime-500 text-slate-950 shadow-lg shadow-emerald-500/30">
+      <motion.div
+        whileHover={{ rotate: -8, scale: 1.06 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+        className="relative grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-400 to-lime-500 text-slate-950 shadow-lg shadow-emerald-500/30"
+      >
         <Sprout className="h-5 w-5" />
-        <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-lime-300 ring-2 ring-slate-950" />
-      </div>
+        <span className="live-dot absolute! -right-0.5 -top-0.5 h-2.5! w-2.5! text-lime-300 ring-2 ring-slate-950" />
+      </motion.div>
       <div className="leading-tight">
         <div className="text-lg font-bold tracking-tight text-white">
           Agrisense <span className="bg-gradient-to-r from-emerald-300 to-lime-300 bg-clip-text text-transparent">AI</span>
@@ -316,7 +325,7 @@ function SideNavItem({ item, active, onClick }) {
       )}
       <span
         className={`relative grid h-8 w-8 place-items-center rounded-lg transition-all duration-300 ${
-          active ? 'bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/30' : 'bg-slate-800/60 group-hover:bg-slate-700/60'
+          active ? 'bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/30' : 'bg-slate-800/60 group-hover:-rotate-6 group-hover:scale-110 group-hover:bg-slate-700/60'
         }`}
       >
         <Icon className="h-4 w-4" />
@@ -378,7 +387,7 @@ function SystemStatus({ health }) {
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">System</span>
         {health.mode === 'demo' && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-500/40">DEMO</span>
+          <span className="shine rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-amber-500/40">DEMO</span>
         )}
       </div>
       <ul className="flex flex-col gap-2.5">
@@ -387,7 +396,7 @@ function SystemStatus({ health }) {
             <Icon className="h-4 w-4 text-slate-500" />
             <span className="text-slate-400">{label}</span>
             <span className={`ml-auto flex items-center gap-1.5 text-xs font-medium ${ok ? 'text-emerald-300' : 'text-slate-400'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+              <span className={ok ? 'live-dot h-1.5! w-1.5! text-emerald-400' : 'h-1.5 w-1.5 rounded-full bg-slate-500'} />
               {value}
             </span>
           </li>

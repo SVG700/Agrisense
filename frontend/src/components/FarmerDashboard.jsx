@@ -18,7 +18,7 @@ import TrapCanvas from './TrapCanvas.jsx';
 import AdvisoryCard from './AdvisoryCard.jsx';
 import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
-import { AnimatedNumber, EASE, Item, Stagger } from '../lib/motion.jsx';
+import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
   DATA_SOURCES,
   LOW_BATTERY,
@@ -59,6 +59,15 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
   const counted = telemetry.filter((t) => hasCounts(t.detection));
   const prevCounted = counted.length >= 2 && capture?.id === counted.at(-1)?.id ? counted.at(-2) : null;
   const delta = prevCounted ? total - totalOf(prevCounted.detection.pest_counts) : null;
+
+  // Real history for the KPI sparklines (most recent 20 points)
+  const RISK_SCORE = { Low: 1, Medium: 2, High: 3 };
+  const trends = {
+    total: counted.map((t) => totalOf(t.detection.pest_counts)),
+    temperature: telemetry.map((t) => t.temperature),
+    humidity: telemetry.map((t) => t.humidity),
+    risk: telemetry.map((t) => RISK_SCORE[t.detection?.ai_advisory?.risk_level]),
+  };
 
   const stale = latest && Date.now() - new Date(latest.timestamp).getTime() > STALE_AFTER_MS;
   const vState = VISION_STATES[visionStatus(det)] ?? null;
@@ -131,6 +140,8 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         <Stat
           icon={Bug}
           label="Insects trapped"
+          trend={trends.total}
+          trendColor="#a3e635"
           value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : 'Not counted'}
           sub={
             delta !== null ? (
@@ -145,14 +156,18 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         <Stat
           icon={Thermometer}
           label="Temperature"
+          trend={trends.temperature}
+          trendColor="#fb923c"
           value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
         />
         <Stat
           icon={Droplets}
           label="Humidity"
+          trend={trends.humidity}
+          trendColor="#38bdf8"
           value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
         />
-        <Stat icon={ShieldAlert} label="Risk level" value={<span className={RISK_STYLES[risk]?.text}>{risk ?? '—'}</span>} />
+        <Stat icon={ShieldAlert} label="Risk level" trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ?? '—'}</span>} />
       </Stagger>
 
       <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.2}>
@@ -168,9 +183,9 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         </Item>
       </Stagger>
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE, delay: 0.35 }}>
+      <Reveal>
         <MicroclimateChart telemetry={telemetry} />
-      </motion.div>
+      </Reveal>
     </div>
   );
 }
@@ -188,7 +203,7 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: EASE }}
-      className="card relative overflow-hidden p-6! sm:p-8!"
+      className="card aurora-border relative overflow-hidden p-6! sm:p-8!"
     >
       {/* soft brand wash */}
       <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-500/15 blur-3xl" />
@@ -204,7 +219,7 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
             {latest && <span className="text-slate-500">Last capture {timeAgo(latest.timestamp)}</span>}
           </Item>
           <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
-            {headline}
+            <WordReveal text={headline} className="text-shine" delay={0.15} />
             {style && <span className={`ml-2 inline-block h-3 w-3 translate-y-[-0.35em] rounded-full ${style.dot}`} />}
           </Item>
           <Item as="p" className="text-sm leading-relaxed text-slate-400 sm:text-base">
@@ -240,7 +255,7 @@ function TrapRadar({ boxes }) {
       className="relative hidden h-44 w-44 shrink-0 md:block lg:h-52 lg:w-52"
       aria-hidden="true"
     >
-      <svg viewBox="0 0 200 200" className="h-full w-full">
+      <svg viewBox="0 0 200 200" className="float-slow h-full w-full">
         <defs>
           <radialGradient id="radar-bg" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgb(16 185 129 / 0.18)" />
@@ -284,9 +299,10 @@ function TrapRadar({ boxes }) {
   );
 }
 
-function Stat({ icon: Icon, label, value, sub }) {
+function Stat({ icon: Icon, label, value, sub, trend = [], trendColor }) {
+  const tilt = useTilt(5);
   return (
-    <Item className="card card-hover flex flex-col gap-3 p-4! sm:p-5!">
+    <Item className="card card-hover flex flex-col gap-3 p-4! sm:p-5!" {...tilt}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-slate-400">{label}</span>
         <span className="icon-chip h-8! w-8! rounded-lg!">
@@ -301,6 +317,8 @@ function Stat({ icon: Icon, label, value, sub }) {
         {value}
       </div>
       {sub && <div className="text-xs">{sub}</div>}
+      {/* Trend of this metric over recent captures (real data) */}
+      <Sparkline values={trend} color={trendColor} height={28} className="-mx-1 mt-auto opacity-90" />
     </Item>
   );
 }
@@ -332,7 +350,7 @@ function PestBreakdown({ counts, total, known, reason }) {
                     {meta.name}
                   </span>
                   <span className="tabular-nums text-slate-400">
-                    {n} <span className="text-xs">({pct.toFixed(0)}%)</span>
+                    <AnimatedNumber value={n} /> <span className="text-xs">({pct.toFixed(0)}%)</span>
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-slate-800/80">
