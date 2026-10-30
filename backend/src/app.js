@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { LOW_BATTERY_THRESHOLD, SENSOR_LIMITS, integrationFlags } from './config.js';
 import { telemetryRouter } from './routes/telemetry.js';
 import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
+import { mapRouter } from './routes/map.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -104,6 +105,7 @@ export function createApp(deps) {
   app.use('/api/telemetry', telemetryRouter(deps));
   app.use('/api/devices', devicesRouter(deps));
   app.use('/api/device', deviceAdminRouter(deps));
+  app.use('/api', mapRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));

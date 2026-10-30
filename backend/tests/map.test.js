@@ -1,0 +1,181 @@
+/**
+ * Pest Surveillance Map: decision rule, /api/map-data, seed + location endpoints.
+ */
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { createMemoryStore } from '../src/db/memoryStore.js';
+import { StoreError } from '../src/utils/validate.js';
+import { aggregateDaily, decide, splitCounts } from '../src/services/decision.js';
+import { ADMIN_KEY, DEVICE, mockTrapUrl, startApp } from './helpers.js';
+
+const TRAP_A = 'aaaaaaaa-0000-4000-8000-000000000001';
+const TRAP_B = 'aaaaaaaa-0000-4000-8000-000000000002';
+const today = new Date().toISOString().slice(0, 10);
+const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+
+const seedBody = () => ({
+  traps: [
+    { id: TRAP_A, name: 'SIM Malur 01', latitude: 13.0041, longitude: 77.9381 },
+    { id: TRAP_B, name: 'SIM Kolar 02', latitude: 13.1367, longitude: 78.1292 },
+  ],
+  observations: [
+    { trap_id: TRAP_A, date: daysAgo(1), pest_count: 55, predator_count: 2, dominant_pest: 'whitefly' }, // SPRAY
+    { trap_id: TRAP_A, date: today, pest_count: 60, predator_count: 20, dominant_pest: 'whitefly' }, // BIOCONTROL (predators catching up)
+    { trap_id: TRAP_B, date: today, pest_count: 4, predator_count: 0 }, // WAIT
+  ],
+});
+
+describe('decision rule', () => {
+  test('SPRAY / BIOCONTROL / WAIT thresholds', () => {
+    assert.equal(decide(40, 0), 'SPRAY');
+    assert.equal(decide(40, 10), 'BIOCONTROL'); // ratio 0.25 >= 0.15
+    assert.equal(decide(15, 0), 'BIOCONTROL');
+    assert.equal(decide(14, 0), 'WAIT');
+    assert.equal(decide(-5, NaN), 'WAIT');
+  });
+
+  test('natural enemies are not counted as pests', () => {
+    assert.deepEqual(splitCounts({ whitefly: 9, aphid: 3, ladybird: 2, lacewing: 1 }), { pests: 12, predators: 3, dominant: 'whitefly' });
+  });
+
+  test('daily aggregation keeps the max capture per trap/day and skips unlocated traps', () => {
+    const devices = new Map([
+      [TRAP_A, { id: TRAP_A, name: 'A', latitude: 13, longitude: 77 }],
+      [TRAP_B, { id: TRAP_B, name: 'B', latitude: null, longitude: null }],
+    ]);
+    const cap = (device_id, ts, counts, status = 'ok') => ({
+      device_id,
+      timestamp: ts,
+      detection: { pest_counts: counts, vision_meta: { status } },
+    });
+    const rows = aggregateDaily(
+      [
+        cap(TRAP_A, '2026-10-01T08:00:00Z', { whitefly: 10 }),
+        cap(TRAP_A, '2026-10-01T16:00:00Z', { whitefly: 25, spider: 4 }),
+        cap(TRAP_A, '2026-10-02T08:00:00Z', { whitefly: 99 }, 'failed'), // not counted
+        cap(TRAP_B, '2026-10-01T08:00:00Z', { whitefly: 50 }), // no coordinates
+      ],
+      devices
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].pest_count, 25);
+    assert.equal(rows[0].predator_count, 4);
+  });
+});
+
+describe('GET /api/map-data + seed', () => {
+  const env = { ADMIN_API_KEY: ADMIN_KEY };
+  const admin = { 'X-Admin-Key': ADMIN_KEY };
+
+  test('seed requires admin; loads simulated traps; decisions computed server-side', async () => {
+    const app = await startApp({ env });
+    try {
+      assert.equal((await app.request('POST', '/api/admin/map-seed', { body: seedBody() })).status, 401);
+      const body = seedBody();
+      body.observations[0].decision = 'WAIT'; // a client-sent decision must be ignored
+      const seeded = await app.request('POST', '/api/admin/map-seed', { body, headers: admin });
+      assert.equal(seeded.status, 201);
+      assert.deepEqual(seeded.body.decisions, { SPRAY: 1, BIOCONTROL: 1, WAIT: 1 });
+
+      const map = await app.request('GET', '/api/map-data?days=7');
+      assert.equal(map.status, 200);
+      const { rows, meta } = map.body;
+      assert.equal(rows.length, 3);
+      assert.deepEqual(Object.keys(rows[0]).sort(), [
+        'date', 'decision', 'dominant_pest', 'latitude', 'longitude', 'pest_count', 'predator_count', 'simulated', 'source', 'trap_id', 'trap_name',
+      ]);
+      assert.equal(rows[0].decision, 'SPRAY');
+      assert.ok(rows.every((r) => r.simulated === true));
+      assert.equal(meta.simulated, true);
+      assert.equal(meta.all_simulated, true);
+      assert.equal(meta.trap_count, 2);
+
+      // Re-seeding is idempotent (upsert by trap + day)
+      await app.request('POST', '/api/admin/map-seed', { body: seedBody(), headers: admin });
+      assert.equal((await app.request('GET', '/api/map-data?days=7')).body.rows.length, 3);
+
+      // Simulated map traps stay out of the dashboard's device list
+      const devices = (await app.request('GET', '/api/devices')).body;
+      assert.ok(!devices.some((d) => d.id === TRAP_A));
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('seed validation: bad coordinates, unknown trap, future date, real-device clash', async () => {
+    const app = await startApp({ env });
+    try {
+      const post = (body) => app.request('POST', '/api/admin/map-seed', { body, headers: admin });
+      const b1 = seedBody();
+      b1.traps[0].latitude = 123;
+      assert.equal((await post(b1)).body.code, 'invalid_coordinates');
+      const b2 = seedBody();
+      b2.observations[0].trap_id = DEVICE;
+      assert.equal((await post(b2)).body.code, 'unknown_trap');
+      const b3 = seedBody();
+      b3.observations[0].date = '2999-01-01';
+      assert.equal((await post(b3)).body.code, 'invalid_date');
+      const b4 = seedBody();
+      b4.observations[0].pest_count = 3.5;
+      assert.equal((await post(b4)).body.code, 'invalid_count');
+      const b5 = seedBody();
+      b5.traps[0].id = DEVICE; // the real demo device
+      b5.observations = [];
+      assert.equal((await post(b5)).status, 409);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('real captures appear once the trap has coordinates', async () => {
+    const app = await startApp({ env });
+    try {
+      await app.request('POST', '/api/telemetry', { body: { temperature: 26, humidity: 70, image_url: mockTrapUrl('m1', 0.9) } });
+      assert.equal((await app.request('GET', '/api/map-data')).body.rows.length, 0);
+      assert.match((await app.request('GET', '/api/map-data')).body.meta.warnings.join(' '), /no coordinates/);
+
+      assert.equal((await app.request('PATCH', '/api/device/location', { body: { device_id: DEVICE, latitude: 13.2, longitude: 77.7 } })).status, 401);
+      const loc = await app.request('PATCH', '/api/device/location', {
+        body: { device_id: DEVICE, latitude: 13.2, longitude: 77.7 },
+        headers: admin,
+      });
+      assert.equal(loc.status, 200);
+
+      const { rows } = (await app.request('GET', '/api/map-data')).body;
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].source, 'captures');
+      assert.equal(rows[0].simulated, true); // synthetic demo trap image
+      assert.ok(['SPRAY', 'BIOCONTROL', 'WAIT'].includes(rows[0].decision));
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('database without the v3 table still returns real data plus a warning', async () => {
+    const store = createMemoryStore();
+    store.listObservations = async () => {
+      throw new StoreError('listObservations', new Error('relation does not exist'));
+    };
+    const app = await startApp({ store });
+    try {
+      const res = await app.request('GET', '/api/map-data');
+      assert.equal(res.status, 200);
+      assert.match(res.body.meta.warnings.join(' '), /schema\.sql/);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('DELETE /api/admin/map-seed removes only simulated traps', async () => {
+    const app = await startApp({ env });
+    try {
+      await app.request('POST', '/api/admin/map-seed', { body: seedBody(), headers: admin });
+      const del = await app.request('DELETE', '/api/admin/map-seed', { headers: admin });
+      assert.equal(del.body.removed_traps, 2);
+      assert.equal((await app.request('GET', '/api/map-data')).body.rows.length, 0);
+      assert.ok((await app.request('GET', '/api/devices')).body.some((d) => d.id === DEVICE));
+    } finally {
+      await app.close();
+    }
+  });
+});

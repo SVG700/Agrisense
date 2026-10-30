@@ -14,8 +14,10 @@ export function createMemoryStore() {
   const detections = new Map(); // telemetry_id -> detection
   const byCaptureId = new Map(); // capture_id -> telemetry
   const images = new Map(); // path -> data URL
+  const observations = new Map(); // `${device_id}|${date}` -> trap_daily_observations row
   let telemetrySeq = 1;
   let detectionSeq = 1;
+  let observationSeq = 1;
 
   const now = () => new Date().toISOString();
   const clone = (o) => structuredClone(o);
@@ -39,8 +41,50 @@ export function createMemoryStore() {
       return true;
     },
 
-    async listDevices() {
-      return [...devices.values()].sort((a, b) => a.created_at.localeCompare(b.created_at)).map(clone);
+    async listDevices({ includeSimulated = false } = {}) {
+      return [...devices.values()]
+        .filter((d) => includeSimulated || d.simulated !== true)
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+        .map(clone);
+    },
+
+    async upsertDevices(rows) {
+      for (const r of rows) {
+        const existing = devices.get(r.id);
+        devices.set(r.id, {
+          battery_level: 100,
+          status: 'online',
+          battery_source: 'unknown',
+          battery_updated_at: null,
+          created_at: now(),
+          ...existing,
+          ...clone(r),
+          updated_at: now(),
+        });
+      }
+      return rows.map((r) => clone(devices.get(r.id)));
+    },
+
+    async upsertObservations(rows) {
+      for (const r of rows) {
+        const key = `${r.device_id}|${r.date}`;
+        const prev = observations.get(key);
+        observations.set(key, { id: prev?.id ?? observationSeq++, created_at: prev?.created_at ?? now(), ...clone(r) });
+      }
+      return rows.map((r) => ({ id: observations.get(`${r.device_id}|${r.date}`).id }));
+    },
+
+    async listObservations({ since }) {
+      return [...observations.values()].filter((o) => o.date >= since).sort((a, b) => a.date.localeCompare(b.date)).map(clone);
+    },
+
+    async deleteSimulatedDevices() {
+      const removed = [...devices.values()].filter((d) => d.simulated === true).map((d) => ({ id: d.id }));
+      for (const { id } of removed) {
+        devices.delete(id);
+        for (const [k, o] of observations) if (o.device_id === id) observations.delete(k);
+      }
+      return removed;
     },
 
     async getDevice(id) {

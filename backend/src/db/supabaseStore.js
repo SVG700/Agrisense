@@ -61,8 +61,37 @@ export function createSupabaseStore({ config, client, logger }) {
       return true;
     },
 
-    async listDevices() {
-      return run('listDevices', supabase.from('devices').select('*').order('created_at', { ascending: true }));
+    /**
+     * Simulated map traps are filtered in JS (not SQL) so this keeps working on
+     * databases that haven't applied the v3 schema yet (no `simulated` column).
+     */
+    async listDevices({ includeSimulated = false } = {}) {
+      const rows = await run('listDevices', supabase.from('devices').select('*').order('created_at', { ascending: true }));
+      return includeSimulated ? rows : rows.filter((d) => d.simulated !== true);
+    },
+
+    /** Insert or update map traps (seed). Requires schema v3. */
+    async upsertDevices(devices) {
+      return run('upsertDevices', supabase.from('devices').upsert(devices, { onConflict: 'id' }).select());
+    },
+
+    async upsertObservations(rows) {
+      return run(
+        'upsertObservations',
+        supabase.from('trap_daily_observations').upsert(rows, { onConflict: 'device_id,date' }).select('id')
+      );
+    },
+
+    async listObservations({ since }) {
+      return run(
+        'listObservations',
+        supabase.from('trap_daily_observations').select('*').gte('date', since).order('date', { ascending: true }).limit(20000)
+      );
+    },
+
+    /** Removes simulated map traps (their observations cascade). */
+    async deleteSimulatedDevices() {
+      return run('deleteSimulatedDevices', supabase.from('devices').delete().eq('simulated', true).select('id'));
     },
 
     async getDevice(id) {
@@ -116,7 +145,7 @@ export function createSupabaseStore({ config, client, logger }) {
     },
 
     /** Oldest-first page of history; `before` (ISO) pages further back. */
-    async listTelemetry({ deviceId, limit = 50, before }) {
+    async listTelemetry({ deviceId, limit = 50, before, sign = true }) {
       let query = supabase
         .from('sensor_telemetry')
         .select('*, pest_detections(*)')
@@ -126,7 +155,7 @@ export function createSupabaseStore({ config, client, logger }) {
       if (before) query = query.lt('timestamp', before);
       const rows = await run('listTelemetry', query);
       const flat = rows.reverse().map(({ pest_detections, ...t }) => ({ ...t, detection: firstDetection(pest_detections) }));
-      return signImages(flat);
+      return sign ? signImages(flat) : flat;
     },
 
     /** Deterministic path (one object per capture_id) so retries overwrite instead of duplicating. */
