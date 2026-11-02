@@ -219,7 +219,7 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
             {latest && <span className="text-slate-500">Last capture {timeAgo(latest.timestamp)}</span>}
           </Item>
           <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
-            <WordReveal text={headline} className="text-shine" delay={0.15} />
+            <WordReveal text={headline} wordClassName="text-shine" delay={0.15} />
             {style && <span className={`ml-2 inline-block h-3 w-3 translate-y-[-0.35em] rounded-full ${style.dot}`} />}
           </Item>
           <Item as="p" className="text-sm leading-relaxed text-slate-400 sm:text-base">

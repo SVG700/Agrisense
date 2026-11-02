@@ -107,7 +107,7 @@ export function Reveal({ as = 'div', delay = 0, y = 24, className, children, ...
  * Headline that reveals word by word. The full text stays available to
  * assistive tech via aria-label; the animated words are aria-hidden.
  */
-export function WordReveal({ text, as = 'span', className, delay = 0, stagger = 0.05 }) {
+export function WordReveal({ text, as = 'span', className, wordClassName = '', delay = 0, stagger = 0.05 }) {
   const Comp = motion[as];
   const words = String(text).split(' ');
   return (
@@ -123,10 +123,18 @@ export function WordReveal({ text, as = 'span', className, delay = 0, stagger = 
         <motion.span
           key={`${w}-${i}`}
           aria-hidden="true"
-          className="inline-block"
+          // Per-word classes: effects like background-clip:text can't reach through
+          // the transformed/filtered word spans from the parent.
+          className={`inline-block ${wordClassName}`}
           variants={{
             hidden: { opacity: 0, y: '0.45em', filter: 'blur(6px)' },
-            show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.5, ease: EASE } },
+            show: {
+              opacity: 1,
+              y: 0,
+              filter: 'blur(0px)',
+              transition: { duration: 0.5, ease: EASE },
+              transitionEnd: { filter: 'none' },
+            },
           }}
         >
           {w}
