@@ -131,6 +131,27 @@ describe('Provenance labels', () => {
     expect(screen.getByText(/Rule engine \(Gemini failed: auth_error\)/)).toBeTruthy();
   });
 
+  test('advisory shows the predator-aware decision with BORDERLINE tag', () => {
+    const decision = {
+      decision: 'BIOCONTROL',
+      label: 'RELEASE BIOCONTROL',
+      reason: 'Predators are keeping pace.',
+      avg_pests: 27,
+      avg_predators: 4,
+      pests_per_predator: 6.8,
+      no_predators: false,
+      range: { pests: [23, 31], predators: [3.4, 4.6] },
+      borderline: true,
+      window: { days: 3, requested: 3 },
+      thresholds: { action_threshold_per_day: 25, spray_ratio: 10 },
+    };
+    render(<AdvisoryCard advisory={{ risk_level: 'Medium', summary: 'x', mitigation_strategy: ['a'], source: 'gemini', status: 'ok', decision }} />);
+    expect(screen.getByText('RELEASE BIOCONTROL')).toBeTruthy();
+    expect(screen.getByText('BORDERLINE')).toBeTruthy();
+    expect(screen.getByText(/range 23-31/)).toBeTruthy();
+    expect(screen.getByText(/6.8 pests per predator/)).toBeTruthy();
+  });
+
   test('missing readings render as a dash, not zero', () => {
     render(<FarmerDashboard device={DEVICE} telemetry={[capture({ temperature: null, humidity: null })]} onGoAdmin={() => {}} />);
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);

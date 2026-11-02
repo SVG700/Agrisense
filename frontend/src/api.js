@@ -57,6 +57,7 @@ export const api = {
   devices: () => request('/api/devices'),
   telemetry: (deviceId, limit = 50) =>
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),
+  decision: (deviceId) => request(`/api/decision?device_id=${encodeURIComponent(deviceId)}`),
   mapData: (days = 14) => request(`/api/map-data?days=${encodeURIComponent(days)}`),
   setBattery: (device_id, battery_level) =>
     request('/api/device/battery', { method: 'PATCH', body: { device_id, battery_level }, admin: true }),

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { loadConfig } from '../src/config.js';
 import { normalizeResponse, countPests } from '../src/services/vision.js';
 import { validateAdvisory, classifyClaudeError, ruleBasedAdvisory } from '../src/services/advisor.js';
+import { evaluateDecision } from '../src/services/decision.js';
 import { createSupabaseStore } from '../src/db/supabaseStore.js';
 import { StoreError } from '../src/utils/validate.js';
 import { VALID_ADVISORY, sdkError } from './helpers.js';
@@ -114,6 +115,21 @@ describe('advisory', () => {
     assert.match(adv.summary, /not measured/);
     assert.match(adv.summary, /Limited evidence/);
     assert.ok(!/\d+\s?ml/i.test(adv.mitigation_strategy.join(' ')));
+  });
+
+  test('rule engine explains and follows the predator-aware decision', () => {
+    const base = { pest_counts: { whitefly: 60, macrolophus: 20 }, temperature: 26, humidity: 60, history: [], detection: {} };
+    const bio = ruleBasedAdvisory({
+      ...base,
+      decision: evaluateDecision([{ date: '2026-10-01', pests: 60, predators: 20, confidence: 0.9 }]),
+    });
+    assert.equal(bio.risk_level, 'Medium');
+    assert.match(bio.summary, /^RELEASE BIOCONTROL:/);
+    assert.match(bio.recommendation, /natural enemies/);
+
+    const edge = ruleBasedAdvisory({ ...base, decision: evaluateDecision([{ date: '2026-10-01', pests: 26, predators: 0 }]) });
+    assert.equal(edge.risk_level, 'High');
+    assert.match(edge.recommendation, /close to a threshold/);
   });
 });
 

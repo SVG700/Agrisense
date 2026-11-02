@@ -71,6 +71,10 @@ describe('Gemini advisory (mocked)', () => {
     assert.deepEqual(p.config.responseJsonSchema.required, ['risk_level', 'confidence', 'summary', 'recommendation', 'mitigation_strategy']);
     assert.match(p.config.systemInstruction, /Never state exact pesticide doses/);
     assert.match(p.contents, /SIMULATED/);
+    // Gemini is asked to explain the predator-aware decision, not invent its own
+    assert.match(p.config.systemInstruction, /Do NOT change or contradict the decision/);
+    assert.match(p.contents, /"decision": \{/);
+    assert.ok(['SPRAY', 'BIOCONTROL', 'WAIT'].includes(adv.decision.decision));
   });
 
   test('health reports the Gemini provider without the key', async () => {

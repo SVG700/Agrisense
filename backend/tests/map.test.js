@@ -5,7 +5,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryStore } from '../src/db/memoryStore.js';
 import { StoreError } from '../src/utils/validate.js';
-import { aggregateDaily, decide, splitCounts } from '../src/services/decision.js';
+import { aggregateDaily, decide, evaluateDecision, splitCounts } from '../src/services/decision.js';
 import { ADMIN_KEY, DEVICE, mockTrapUrl, startApp } from './helpers.js';
 
 const TRAP_A = 'aaaaaaaa-0000-4000-8000-000000000001';
@@ -26,16 +26,58 @@ const seedBody = () => ({
 });
 
 describe('decision rule', () => {
-  test('SPRAY / BIOCONTROL / WAIT thresholds', () => {
-    assert.equal(decide(40, 0), 'SPRAY');
-    assert.equal(decide(40, 10), 'BIOCONTROL'); // ratio 0.25 >= 0.15
-    assert.equal(decide(15, 0), 'BIOCONTROL');
-    assert.equal(decide(14, 0), 'WAIT');
+  test('SPRAY / BIOCONTROL / WAIT thresholds (25/day, 10 pests per predator)', () => {
+    assert.equal(decide(40, 0), 'SPRAY'); // no predators
+    assert.equal(decide(40, 4), 'SPRAY'); // ratio 10 -> at the spray ratio
+    assert.equal(decide(40, 5), 'BIOCONTROL'); // ratio 8 -> predators keeping pace
+    assert.equal(decide(25, 0), 'SPRAY');
+    assert.equal(decide(24, 0), 'WAIT');
     assert.equal(decide(-5, NaN), 'WAIT');
   });
 
-  test('natural enemies are not counted as pests', () => {
+  test('natural enemies are not counted as pests; model aliases are mapped', () => {
     assert.deepEqual(splitCounts({ whitefly: 9, aphid: 3, ladybird: 2, lacewing: 1 }), { pests: 12, predators: 3, dominant: 'whitefly' });
+    assert.deepEqual(splitCounts({ WF: 30, MR: 2, NC: 1 }), { pests: 30, predators: 3, dominant: 'whitefly' });
+    assert.equal(splitCounts({ mystery_bug: 5 }).pests, 5); // unknown classes count as pests (conservative)
+  });
+
+  test('evaluateDecision averages the last 3 days and explains itself', () => {
+    const days = [
+      { date: '2026-10-01', pests: 200, predators: 0 }, // outside the window
+      { date: '2026-10-02', pests: 30, predators: 1 },
+      { date: '2026-10-03', pests: 36, predators: 2 },
+      { date: '2026-10-04', pests: 24, predators: 3 },
+    ];
+    const r = evaluateDecision(days);
+    assert.equal(r.avg_pests, 30);
+    assert.equal(r.avg_predators, 2);
+    assert.equal(r.decision, 'SPRAY'); // 30/day, 15 per predator
+    assert.equal(r.label, 'SPRAY');
+    assert.deepEqual(r.window, { days: 3, requested: 3, from: '2026-10-02', to: '2026-10-04' });
+    assert.match(r.reason, /30 pests\/day over the last 3 days/);
+    assert.equal(r.thresholds.placeholder, 'to confirm with IIHR mentor');
+    assert.deepEqual(r.range.pests, [25.5, 34.5]); // ±15% when confidence is unknown
+  });
+
+  test('evaluateDecision: biocontrol, borderline, no data, partial window', () => {
+    const bio = evaluateDecision([{ date: '2026-10-01', pests: 60, predators: 20, confidence: 0.9 }]);
+    assert.equal(bio.decision, 'BIOCONTROL');
+    assert.equal(bio.label, 'RELEASE BIOCONTROL');
+    assert.equal(bio.borderline, false);
+    assert.match(bio.reason, /only 1 of 3 days/);
+
+    const edge = evaluateDecision([{ date: '2026-10-01', pests: 26, predators: 0 }]);
+    assert.equal(edge.decision, 'SPRAY');
+    assert.equal(edge.borderline, true);
+    assert.ok(edge.possible_decisions.includes('WAIT'));
+    assert.match(edge.reason, /BORDERLINE/);
+
+    // Low detector confidence widens the range (capped at 50%)
+    assert.equal(evaluateDecision([{ date: 'd', pests: 40, predators: 0, confidence: 0.2 }]).range.uncertainty, 0.5);
+
+    const none = evaluateDecision([]);
+    assert.equal(none.decision, null);
+    assert.equal(none.label, 'NO DATA');
   });
 
   test('daily aggregation keeps the max capture per trap/day and skips unlocated traps', () => {
@@ -82,9 +124,21 @@ describe('GET /api/map-data + seed', () => {
       const { rows, meta } = map.body;
       assert.equal(rows.length, 3);
       assert.deepEqual(Object.keys(rows[0]).sort(), [
-        'date', 'decision', 'dominant_pest', 'latitude', 'longitude', 'pest_count', 'predator_count', 'simulated', 'source', 'trap_id', 'trap_name',
+        'borderline', 'date', 'decision', 'decision_reason', 'dominant_pest', 'latitude', 'longitude', 'pest_count', 'predator_count', 'simulated', 'source', 'trap_id', 'trap_name',
       ]);
       assert.equal(rows[0].decision, 'SPRAY');
+      // Today's TRAP_A decision averages yesterday (55,2) and today (60,20): 57.5/day, ~5 per predator
+      const aToday = rows.find((r) => r.trap_id === TRAP_A && r.date === today);
+      assert.equal(aToday.decision, 'BIOCONTROL');
+      assert.match(aToday.decision_reason, /last 2 days/);
+
+      const dec = await app.request('GET', `/api/decision?device_id=${TRAP_A}`);
+      assert.equal(dec.status, 200);
+      assert.equal(dec.body.decision, 'BIOCONTROL');
+      assert.equal(dec.body.avg_pests, 57.5);
+      assert.equal(dec.body.simulated, true);
+      assert.equal(dec.body.days.length, 2);
+      assert.equal((await app.request('GET', '/api/decision?device_id=nope')).status, 400);
       assert.ok(rows.every((r) => r.simulated === true));
       assert.equal(meta.simulated, true);
       assert.equal(meta.all_simulated, true);

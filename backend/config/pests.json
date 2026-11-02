@@ -1,0 +1,47 @@
+{
+  "_about": "Pest/predator classes and decision thresholds. Values marked PLACEHOLDER must be confirmed with the ICAR-IIHR mentor before field use. Loaded by backend/src/services/pestConfig.js at startup.",
+
+  "classes": [
+    {
+      "id": "whitefly",
+      "category": "pest",
+      "label_en": "Whitefly",
+      "label_kn": "ಬಿಳಿ ನೊಣ",
+      "aliases": ["WF", "whitefly", "whiteflies", "white_fly", "trialeurodes", "bemisia"]
+    },
+    {
+      "id": "macrolophus",
+      "category": "predator",
+      "label_en": "Macrolophus (predator bug)",
+      "label_kn": "ಮ್ಯಾಕ್ರೊಲೋಫಸ್ (ಪರಭಕ್ಷಕ ತಿಗಣೆ)",
+      "aliases": ["MR", "macrolophus", "macrolophus_pygmaeus"]
+    },
+    {
+      "id": "nesidiocoris",
+      "category": "predator",
+      "label_en": "Nesidiocoris (predator bug)",
+      "label_kn": "ನೆಸಿಡಿಯೊಕೊರಿಸ್ (ಪರಭಕ್ಷಕ ತಿಗಣೆ)",
+      "aliases": ["NC", "nesidiocoris", "nesidiocoris_tenuis"]
+    },
+    { "id": "aphid", "category": "pest", "label_en": "Aphid", "label_kn": "ಸಸ್ಯಹೇನು", "aliases": ["aphid", "aphids"] },
+    { "id": "thrips", "category": "pest", "label_en": "Thrips", "label_kn": "ಥ್ರಿಪ್ಸ್", "aliases": ["thrips"] },
+    { "id": "fungus_gnat", "category": "pest", "label_en": "Fungus gnat", "label_kn": "ಶಿಲೀಂಧ್ರ ನೊಣ", "aliases": ["fungus_gnat", "fungus gnat"] },
+    { "id": "ladybird", "category": "predator", "label_en": "Ladybird", "label_kn": "ಗುಲಗಂಜಿ ಹುಳು", "aliases": ["ladybird", "ladybug", "lady_beetle"] },
+    { "id": "lacewing", "category": "predator", "label_en": "Lacewing", "label_kn": "ಲೇಸ್‌ವಿಂಗ್", "aliases": ["lacewing"] },
+    { "id": "spider", "category": "predator", "label_en": "Spider", "label_kn": "ಜೇಡ", "aliases": ["spider", "spiders"] },
+    { "id": "encarsia", "category": "predator", "label_en": "Encarsia (parasitoid)", "label_kn": "ಎನ್‌ಕಾರ್ಸಿಯಾ", "aliases": ["encarsia", "parasitoid_wasp"] }
+  ],
+
+  "decision": {
+    "action_threshold_per_day": 25,
+    "_action_threshold_per_day": "PLACEHOLDER - to confirm with IIHR mentor. Average pests per trap per day (over the rolling window) that triggers action.",
+    "spray_ratio": 10,
+    "_spray_ratio": "PLACEHOLDER - to confirm with IIHR mentor. Pests per predator at or above which predators are NOT keeping pace -> SPRAY; below it -> RELEASE BIOCONTROL.",
+    "rolling_window_days": 3,
+    "_rolling_window_days": "PLACEHOLDER - to confirm with IIHR mentor. How many of the most recent days with counts are averaged.",
+    "count_uncertainty": 0.15,
+    "_count_uncertainty": "PLACEHOLDER - to confirm with the trained model's evaluation. Relative +/- uncertainty of a count when detection confidence is unknown; with confidence c it is (1 - c), clamped to [min, max] below.",
+    "count_uncertainty_min": 0.05,
+    "count_uncertainty_max": 0.5
+  }
+}

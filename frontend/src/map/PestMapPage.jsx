@@ -18,9 +18,9 @@ const KeplerView = lazy(() => import('./KeplerView.jsx'));
 
 const DECISION_ORDER = { SPRAY: 0, BIOCONTROL: 1, WAIT: 2 };
 const DECISION_HELP = {
-  SPRAY: 'High pest pressure and too few natural enemies',
-  BIOCONTROL: 'Pressure building, or natural enemies catching up',
-  WAIT: 'Below the monitoring threshold',
+  SPRAY: '3-day average at or above 25 pests/day and 10+ pests per predator',
+  BIOCONTROL: 'At or above 25 pests/day, but predators are keeping pace (under 10 pests each)',
+  WAIT: '3-day average below 25 pests/day',
 };
 const REFRESH_MS = 60_000;
 

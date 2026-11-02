@@ -98,6 +98,8 @@ export default function AdvisoryCard({ advisory }) {
         {risk === 'High' && <span className={`live-dot ml-auto self-start ${style.text}`} />}
       </motion.div>
 
+      <DecisionPanel decision={advisory.decision} />
+
       {advisory.summary && <p className="text-sm text-slate-300">{advisory.summary}</p>}
 
       <div>
@@ -126,6 +128,43 @@ export default function AdvisoryCard({ advisory }) {
         {advisory.generated_at && <> · Generated {new Date(advisory.generated_at).toLocaleTimeString()}</>}
       </p>
     </section>
+  );
+}
+
+const DECISION_TONE = {
+  SPRAY: 'text-rose-300 bg-rose-500/10 ring-rose-500/30',
+  BIOCONTROL: 'text-amber-300 bg-amber-500/10 ring-amber-500/30',
+  WAIT: 'text-emerald-300 bg-emerald-500/10 ring-emerald-500/30',
+};
+
+/** The predator-aware rule's decision that the advisory explains (older captures have none). */
+export function DecisionPanel({ decision }) {
+  if (!decision?.decision) return null;
+  const [lo, hi] = decision.range?.pests ?? [];
+  return (
+    <div className={`rounded-xl p-3 ring-1 ${DECISION_TONE[decision.decision]}`} data-testid="decision-panel">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-widest text-slate-400">Decision</span>
+        <span className="text-lg font-extrabold">{decision.label}</span>
+        {decision.borderline && <Badge tone="warn">BORDERLINE</Badge>}
+      </div>
+      <p className="mt-1 text-sm text-slate-300">{decision.reason}</p>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+        <span>
+          Avg {decision.avg_pests} pests/day
+          {lo !== undefined && ` (range ${lo}-${hi})`}
+        </span>
+        <span>
+          {decision.no_predators ? 'No predators seen' : `${decision.pests_per_predator} pests per predator`}
+        </span>
+        <span>
+          {decision.window?.days} of {decision.window?.requested} days
+        </span>
+        <span title="Thresholds are placeholders until confirmed with the ICAR-IIHR mentor">
+          Thresholds: {decision.thresholds?.action_threshold_per_day}/day, ratio {decision.thresholds?.spray_ratio} (placeholder)
+        </span>
+      </div>
+    </div>
   );
 }
 

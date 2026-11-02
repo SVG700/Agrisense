@@ -117,7 +117,10 @@ captures (labelled `dashboard`), with an auto-stream mode.
 ## Pest Surveillance Map
 
 The **Pest Surveillance Map** page (sidebar → *Pest Surveillance Map*) shows every trap on a kepler.gl map:
-- **Colour** shows the decision: red **SPRAY**, amber **BIOCONTROL**, green **WAIT**.
+- **Colour** shows the predator-aware decision: red **SPRAY**, amber **BIOCONTROL** (release biocontrol), green **WAIT**.
+  The decision averages the last 3 days: at least 25 pests/day with 10+ pests per predator means SPRAY; at least 25/day with
+  fewer pests per predator means RELEASE BIOCONTROL; otherwise WAIT. The thresholds in `backend/config/pests.json` are
+  **placeholders to confirm with the IIHR mentor** (see DECISIONS.md D7).
 - **Size** shows the pest count.
 - **Time filter:** a one-day filter on `date`; press ▷ on the timeline to replay an outbreak day by day.
 - **Trap list:** a table under the map lists every trap for any day, with or without the map.
@@ -317,6 +320,7 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |
 | GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |
 | POST | `/api/admin/map-seed` | admin | `{traps, observations}`. Simulated data only; decisions computed server-side |
 | DELETE | `/api/admin/map-seed` | admin | Removes all simulated traps and their observations |

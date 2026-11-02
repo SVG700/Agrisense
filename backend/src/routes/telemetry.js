@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { DEMO_DEVICE_ID } from '../config.js';
 import { requireDevice } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { dailySeries, evaluateDecision, splitCounts } from '../services/decision.js';
 import {
   HttpError,
   batteryLevel,
@@ -140,10 +141,26 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
       // ---- 4. Vision -------------------------------------------------------------
       const result = await vision.detect({ imageUrl, image });
 
-      // ---- 5. Advisory (only when we actually have counts) ------------------------
+      // ---- 5. Predator-aware decision (history + this capture), then the advisory --
+      const recent = await store.listTelemetry({ deviceId, limit: 200, sign: false });
+      const days = dailySeries(recent);
+      const counted = result.boxes.filter((b) => b.confidence >= config.vision.minConfidence);
+      const confs = counted.map((b) => b.confidence);
+      const meanConfidence = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
+      if (result.counts) {
+        // The entry for today is the larger of any earlier capture today and this one
+        const today = timestamp.slice(0, 10);
+        const { pests, predators } = splitCounts(result.counts);
+        const prev = days.find((d) => d.date === today);
+        if (!prev) days.push({ date: today, pests, predators, confidence: meanConfidence });
+        else if (pests > prev.pests) Object.assign(prev, { pests, predators, confidence: meanConfidence });
+      }
+      const decision = evaluateDecision(days);
+
       let advisory;
       if (result.counts) {
-        const history = (await store.listTelemetry({ deviceId, limit: 6 }))
+        const history = recent
+          .slice(-6)
           .filter((t) => hasCounts(t.detection))
           .map((t) => ({
             time: t.timestamp,
@@ -151,8 +168,6 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
             temperature: t.temperature,
             humidity: t.humidity,
           }));
-        const counted = result.boxes.filter((b) => b.confidence >= config.vision.minConfidence);
-        const confs = counted.map((b) => b.confidence);
         advisory = await advisor.generate({
           capture_time: timestamp,
           device_name: device?.name ?? deviceId,
@@ -160,6 +175,7 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
           temperature,
           humidity,
           history,
+          decision,
           detection: {
             simulated: result.status === 'simulated',
             counted: counted.length,
@@ -171,6 +187,8 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
       } else {
         advisory = skippedAdvisory(result);
       }
+      // The rule-based decision travels with the advisory that explains it
+      advisory = { ...advisory, decision };
 
       // ---- 6. Atomic persist -------------------------------------------------------
       const { telemetry, duplicate } = await store.ingestCapture({

@@ -60,18 +60,24 @@ Found by testing the **production build** with its CSP (`vite preview`):
   URL-restricted `pk.` token.
 - **Not verified live:** no Mapbox token was available. The style list is unit-tested.
 
-### D7. Decision rule: one place, illustrative thresholds
-- `backend/src/services/decision.js` is the single source:
-  - `SPRAY`: `pest_count ≥ 40` and `predator_count / pest_count < 0.15`
-  - `BIOCONTROL`: `pest_count ≥ 15` (including high counts with enough natural enemies)
-  - `WAIT`: otherwise
-- **These numbers are demo values, not validated economic thresholds** for any
-  crop or pest. Calibrate them with an agronomist before real use.
+### D7. Decision rule: predator-aware, one place, placeholder thresholds
+- `backend/src/services/decision.js` is the single source (dashboard, map, decision API,
+  and later the phone check and what-if tools). Over the last 3 days with counts:
+  - `SPRAY`: average ≥ 25 pests/day **and** ≥ 10 pests per predator (or no predators)
+  - `BIOCONTROL` (shown as "RELEASE BIOCONTROL"): ≥ 25 pests/day but < 10 pests per predator
+  - `WAIT`: average < 25 pests/day
+- The thresholds live in `backend/config/pests.json`, marked **PLACEHOLDER - to confirm
+  with the ICAR-IIHR mentor**. They are not validated economic thresholds.
+- Every result has a plain-language reason, a count range (±(1 − detector confidence),
+  15% when unknown, clamped to 5-50%), and a **BORDERLINE** flag when the decision could
+  flip inside that range.
+- The map shows a rolling decision per day. Captures store the decision inside the
+  advisory. Gemini (or the rule-engine fallback) is told to explain the decision, never
+  to override it. There is one advisory, not a second one.
+- Pest/predator classes, including the Roboflow model's `WF`/`MR`/`NC` labels, are
+  mapped in the same config file. Unknown classes count as pests (the conservative choice).
 - The seed script sends raw counts only; the server decides, so a client-sent
   `decision` is ignored (tested).
-- Natural enemies in real detections are recognised by class name (ladybird,
-  lacewing, hoverfly, parasitoid_wasp, encarsia, spider, predatory_mite). The current
-  vision model doesn't output these classes, so real `predator_count` is 0 until it does.
 
 ### D8. Data model: daily observations + live aggregation
 - **Schema v3** (`supabase/schema.sql`, idempotent and additive):

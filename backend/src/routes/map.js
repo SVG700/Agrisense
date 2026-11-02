@@ -1,6 +1,7 @@
 /**
  * Pest Surveillance Map routes
  *   GET    /api/map-data?days=30      one row per trap per day (public read, like the dashboard)
+ *   GET    /api/decision?device_id=   current predator-aware decision for one trap (last N days)
  *   POST   /api/admin/map-seed        load SIMULATED traps + daily counts (admin; used by demo/seed.py)
  *   DELETE /api/admin/map-seed        remove all simulated traps and their observations (admin)
  *   PATCH  /api/device/location       set a real trap's coordinates (admin)
@@ -13,7 +14,16 @@
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { DECISIONS, THRESHOLDS, aggregateDaily, decide } from '../services/decision.js';
+import {
+  DECISIONS,
+  THRESHOLDS,
+  aggregateDaily,
+  dailySeries,
+  decide,
+  evaluateDecision,
+  rollingDecisions,
+} from '../services/decision.js';
+import { DECISION_CONFIG } from '../services/pestConfig.js';
 import { HttpError, StoreError, isUuid, requireUuid } from '../utils/validate.js';
 
 const MAX_DAYS = 120;
@@ -54,6 +64,8 @@ export function mapRouter({ config, store, logger }) {
   router.get('/map-data', async (req, res) => {
     const days = Math.min(MAX_DAYS, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
     const since = isoDay(new Date(Date.now() - (days - 1) * 86_400_000));
+    // Fetch a few extra days so the first visible days still get a full rolling window
+    const fetchSince = isoDay(new Date(Date.parse(`${since}T00:00:00Z`) - (DECISION_CONFIG.rollingWindowDays - 1) * 86_400_000));
     const warnings = [];
 
     const devices = await store.listDevices({ includeSimulated: true });
@@ -62,7 +74,7 @@ export function mapRouter({ config, store, logger }) {
     // Seeded history. A database without schema v3 has no table: report it, keep real data.
     let observations = [];
     try {
-      observations = await store.listObservations({ since });
+      observations = await store.listObservations({ since: fetchSince });
     } catch (err) {
       if (!(err instanceof StoreError)) throw err;
       warnings.push('trap_daily_observations unavailable - apply supabase/schema.sql (v3) to load seeded map data');
@@ -91,9 +103,28 @@ export function mapRouter({ config, store, logger }) {
     // Real captures override seeded rows for the same trap/day
     const telemetry = await store.listTelemetry({ limit: 5000, sign: false });
     for (const r of aggregateDaily(telemetry, byId)) {
-      if (r.date < since) continue;
-      rows.set(`${r.trap_id}|${r.date}`, { ...r, decision: decide(r.pest_count, r.predator_count) });
+      if (r.date < fetchSince) continue;
+      rows.set(`${r.trap_id}|${r.date}`, r);
     }
+
+    // Predator-aware rolling decision per trap (each day averages the last N days)
+    const perTrap = new Map();
+    for (const r of rows.values()) {
+      if (!perTrap.has(r.trap_id)) perTrap.set(r.trap_id, []);
+      perTrap.get(r.trap_id).push(r);
+    }
+    for (const list of perTrap.values()) {
+      const series = list.map((r) => ({ date: r.date, pests: r.pest_count, predators: r.predator_count, confidence: r.confidence ?? null }));
+      const byDate = new Map(rollingDecisions(series).map((x) => [x.date, x.result]));
+      for (const r of list) {
+        const res = byDate.get(r.date);
+        r.decision = res?.decision ?? decide(r.pest_count, r.predator_count);
+        r.decision_reason = res?.reason ?? null;
+        r.borderline = Boolean(res?.borderline);
+        delete r.confidence;
+      }
+    }
+    for (const [k, r] of rows) if (r.date < since) rows.delete(k);
 
     const list = [...rows.values()].sort((a, b) => a.date.localeCompare(b.date) || a.trap_name.localeCompare(b.trap_name));
     const traps = new Set(list.map((r) => r.trap_id));
@@ -115,6 +146,26 @@ export function mapRouter({ config, store, logger }) {
         warnings,
       },
     });
+  });
+
+  // Current predator-aware decision for one trap (seeded days + real captures, last N days)
+  router.get('/decision', async (req, res) => {
+    const deviceId = requireUuid(req.query.device_id, 'device_id');
+    const fetchSince = isoDay(new Date(Date.now() - (MAX_DAYS - 1) * 86_400_000));
+    const byDate = new Map();
+    try {
+      for (const o of await store.listObservations({ since: fetchSince })) {
+        if (o.device_id !== deviceId) continue;
+        byDate.set(o.date, { date: o.date, pests: o.pest_count, predators: o.predator_count, confidence: null, simulated: true });
+      }
+    } catch (err) {
+      if (!(err instanceof StoreError)) throw err;
+    }
+    for (const d of dailySeries(await store.listTelemetry({ deviceId, limit: 500, sign: false }))) byDate.set(d.date, d);
+    const days = [...byDate.values()];
+    const result = evaluateDecision(days);
+    const used = days.filter((d) => result.window.from && d.date >= result.window.from && d.date <= result.window.to);
+    res.json({ device_id: deviceId, ...result, simulated: used.some((d) => d.simulated), days: used });
   });
 
   router.post('/admin/map-seed', adminLimit, requireAdmin(config), async (req, res) => {
