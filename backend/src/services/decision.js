@@ -22,7 +22,41 @@ export const DECISION_LABELS = {
   SPRAY: 'SPRAY',
   BIOCONTROL: 'RELEASE BIOCONTROL',
   WAIT: 'WAIT',
+  CHECK_TRAP: 'CHECK TRAP',
 };
+
+const CHECK_TRAP_REASONS = {
+  failed: 'The last trap photo could not be analysed (detection failed). Check the camera and the sticky card, then take a new photo.',
+  not_configured: 'Insects in the last photo were not counted because no detector is set up. Count the card by eye or configure the detector.',
+  skipped: 'The last capture had no trap photo. Check that the camera is working.',
+};
+
+/**
+ * CHECK TRAP overrides the count-based decision when the latest capture could
+ * not be counted, or the trap has gone quiet. The count-based result is kept
+ * as `last_counted` so the farmer still sees the last known advice.
+ * @param {object} counted   evaluateDecision(...) result
+ * @param {{status?: string, timestamp?: string, reason?: string}|null} latest  latest capture (vision status) or null
+ */
+export function withTrapCheck(counted, latest, { now = Date.now(), cfg = DECISION_CONFIG } = {}) {
+  if (!latest) return counted;
+  let reason = latest.reason ?? CHECK_TRAP_REASONS[latest.status] ?? null;
+  const ageH = (now - Date.parse(latest.timestamp)) / 3_600_000;
+  if (!reason && Number.isFinite(ageH) && ageH > cfg.checkTrapAfterHours) {
+    reason = `No capture for ${Math.round(ageH)} hours. Check that the trap device is powered and online.`;
+  }
+  if (!reason) return counted;
+  return {
+    decision: 'CHECK_TRAP',
+    label: DECISION_LABELS.CHECK_TRAP,
+    reason,
+    borderline: false,
+    check_trap: true,
+    last_counted: counted.decision ? { decision: counted.decision, label: counted.label, reason: counted.reason } : null,
+    window: counted.window,
+    thresholds: counted.thresholds,
+  };
+}
 
 /** Thresholds as exposed by the API (snake_case, marked as placeholders). */
 export const THRESHOLDS = {

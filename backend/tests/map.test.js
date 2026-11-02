@@ -5,7 +5,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryStore } from '../src/db/memoryStore.js';
 import { StoreError } from '../src/utils/validate.js';
-import { aggregateDaily, decide, evaluateDecision, splitCounts } from '../src/services/decision.js';
+import { aggregateDaily, decide, evaluateDecision, splitCounts, withTrapCheck } from '../src/services/decision.js';
 import { ADMIN_KEY, DEVICE, mockTrapUrl, startApp } from './helpers.js';
 
 const TRAP_A = 'aaaaaaaa-0000-4000-8000-000000000001';
@@ -78,6 +78,24 @@ describe('decision rule', () => {
     const none = evaluateDecision([]);
     assert.equal(none.decision, null);
     assert.equal(none.label, 'NO DATA');
+  });
+
+  test('CHECK TRAP: uncounted latest photo or a quiet trap overrides the count decision', () => {
+    const counted = evaluateDecision([{ date: '2026-10-01', pests: 40, predators: 0 }]);
+    const now = Date.parse('2026-10-02T12:00:00Z');
+    const fresh = { status: 'ok', timestamp: '2026-10-02T08:00:00Z' };
+    assert.equal(withTrapCheck(counted, fresh, { now }).decision, 'SPRAY');
+    assert.equal(withTrapCheck(counted, null, { now }).decision, 'SPRAY');
+
+    const failed = withTrapCheck(counted, { status: 'failed', timestamp: '2026-10-02T08:00:00Z' }, { now });
+    assert.equal(failed.decision, 'CHECK_TRAP');
+    assert.equal(failed.label, 'CHECK TRAP');
+    assert.match(failed.reason, /could not be analysed/);
+    assert.equal(failed.last_counted.decision, 'SPRAY');
+
+    const quiet = withTrapCheck(counted, { status: 'ok', timestamp: '2026-09-29T08:00:00Z' }, { now });
+    assert.equal(quiet.decision, 'CHECK_TRAP');
+    assert.match(quiet.reason, /No capture for 76 hours/);
   });
 
   test('daily aggregation keeps the max capture per trap/day and skips unlocated traps', () => {

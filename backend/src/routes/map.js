@@ -22,6 +22,7 @@ import {
   decide,
   evaluateDecision,
   rollingDecisions,
+  withTrapCheck,
 } from '../services/decision.js';
 import { DECISION_CONFIG } from '../services/pestConfig.js';
 import { HttpError, StoreError, isUuid, requireUuid } from '../utils/validate.js';
@@ -161,9 +162,13 @@ export function mapRouter({ config, store, logger }) {
     } catch (err) {
       if (!(err instanceof StoreError)) throw err;
     }
-    for (const d of dailySeries(await store.listTelemetry({ deviceId, limit: 500, sign: false }))) byDate.set(d.date, d);
+    const telemetry = await store.listTelemetry({ deviceId, limit: 500, sign: false });
+    for (const d of dailySeries(telemetry)) byDate.set(d.date, d);
     const days = [...byDate.values()];
-    const result = evaluateDecision(days);
+    // The latest real capture decides CHECK TRAP (failed / uncounted photo, or trap gone quiet)
+    const last = telemetry.at(-1);
+    const latest = last ? { status: last.detection?.vision_meta?.status, timestamp: last.timestamp } : null;
+    const result = withTrapCheck(evaluateDecision(days), latest);
     const used = days.filter((d) => result.window.from && d.date >= result.window.from && d.date <= result.window.to);
     res.json({ device_id: deviceId, ...result, simulated: used.some((d) => d.simulated), days: used });
   });

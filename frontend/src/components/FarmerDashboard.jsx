@@ -18,6 +18,9 @@ import TrapCanvas from './TrapCanvas.jsx';
 import AdvisoryCard from './AdvisoryCard.jsx';
 import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
+import DecisionBadge from './DecisionBadge.jsx';
+import TrapCards from './TrapCards.jsx';
+import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
   DATA_SOURCES,
@@ -40,7 +43,7 @@ const HEADLINES = {
 };
 
 /** Farmer-facing analytics view. */
-export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
+export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, onGoAdmin }) {
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
@@ -105,7 +108,10 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         total={total}
         onViewTrap={() => trapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onGoAdmin={onGoAdmin}
+        decision={det?.ai_advisory?.decision}
       />
+
+      <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
 
       {/* Provenance strip: what the numbers below are */}
       {capture && (
@@ -193,7 +199,7 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
 /* -------------------------------------------------------------------------- */
 
 /** Summary banner built only from the selected capture's real data. */
-function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin }) {
+function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin, decision }) {
   const headline = !capture ? 'Waiting for the first trap capture' : HEADLINES[risk] ?? 'Awaiting pest analysis';
   const style = RISK_STYLES[risk];
   const boxes = (capture?.detection?.bounding_boxes ?? []).slice(0, 40);
@@ -217,6 +223,7 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
               {device?.name ?? 'No trap selected'}
             </span>
             {latest && <span className="text-slate-500">Last capture {timeAgo(latest.timestamp)}</span>}
+            {decision?.decision && <DecisionBadge decision={decision.decision} borderline={decision.borderline} />}
           </Item>
           <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
             <WordReveal text={headline} wordClassName="text-shine" delay={0.15} />
@@ -388,6 +395,7 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
           <AnimatePresence initial={false}>
             {recent.map((t, i) => {
               const risk = t.detection?.ai_advisory?.risk_level;
+              const dec = decisionStyle(t.detection?.ai_advisory?.decision?.decision);
               const vs = visionStatus(t.detection);
               const selected = t.id === selectedId;
               return (
@@ -404,7 +412,13 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
                       selected ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40' : 'hover:translate-x-0.5 hover:bg-slate-800/60'
                     }`}
                   >
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-500'}`} />
+                    {dec ? (
+                      <span className="w-3 shrink-0 text-center text-xs leading-none" style={{ color: dec.color }} title={dec.label}>
+                        {dec.shape}
+                      </span>
+                    ) : (
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-500'}`} />
+                    )}
                     <span className="tabular-nums text-slate-300">{new Date(t.timestamp).toLocaleTimeString()}</span>
                     {vs === 'simulated' && <span className="text-[10px] uppercase tracking-wide text-amber-300/80">sim</span>}
                     <span className="ml-auto truncate tabular-nums text-slate-400">

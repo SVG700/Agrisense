@@ -5,6 +5,7 @@ import TrapCanvas, { sanitizeBoxes } from '../components/TrapCanvas.jsx';
 import AdvisoryCard from '../components/AdvisoryCard.jsx';
 import AdminPanel from '../components/AdminPanel.jsx';
 import FarmerDashboard from '../components/FarmerDashboard.jsx';
+import DecisionBadge from '../components/DecisionBadge.jsx';
 
 const DEVICE = { id: '11111111-1111-4111-8111-111111111111', name: 'Trap 01', battery_level: 80, status: 'online', battery_source: 'unknown' };
 
@@ -51,6 +52,56 @@ describe('App', () => {
     render(<App />);
     expect(await screen.findByText('25.0°C')).toBeTruthy();
     expect(screen.getAllByText(/Simulated/).length).toBeGreaterThan(0);
+  });
+
+  test('trap cards show each trap’s traffic-light decision', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) => {
+        if (url.includes('/api/devices')) return jsonResponse([DEVICE]);
+        if (url.includes('/api/telemetry')) return jsonResponse([capture()]);
+        if (url.includes('/api/decision'))
+          return jsonResponse({ decision: 'BIOCONTROL', label: 'RELEASE BIOCONTROL', reason: 'Predators keeping pace.', avg_pests: 40, pests_per_predator: 4, window: { days: 3 }, borderline: true });
+        return jsonResponse({ ok: true, mode: 'demo', store: 'memory', integrations: {}, auth: {} });
+      })
+    );
+    render(<App />);
+    const card = await screen.findByTestId('trap-card');
+    await waitFor(() => expect(card.querySelector('[data-decision="BIOCONTROL"]')).toBeTruthy());
+    expect(card.textContent).toContain('◆');
+    expect(card.textContent).toContain('BORDERLINE');
+    expect(card.textContent).toContain('40 pests/day');
+  });
+});
+
+describe('DecisionBadge', () => {
+  test('every state has its own shape, colour and words', () => {
+    const shapes = { SPRAY: '▲', BIOCONTROL: '◆', WAIT: '●', CHECK_TRAP: '■' };
+    for (const [d, shape] of Object.entries(shapes)) {
+      const { container, unmount } = render(<DecisionBadge decision={d} />);
+      const badge = container.querySelector(`[data-decision="${d}"]`);
+      expect(badge.textContent).toContain(shape);
+      expect(badge.getAttribute('aria-label')).toMatch(/^Decision: /);
+      unmount();
+    }
+    expect(render(<DecisionBadge decision="NOPE" />).container.textContent).toBe('');
+  });
+
+  test('uncounted capture shows CHECK TRAP with the last counted advice', () => {
+    render(
+      <AdvisoryCard
+        advisory={{
+          risk_level: null,
+          summary: 'Pest detection failed.',
+          source: 'none',
+          status: 'skipped',
+          decision: { decision: 'CHECK_TRAP', label: 'CHECK TRAP', reason: 'Check the camera.', check_trap: true, last_counted: { decision: 'SPRAY' } },
+        }}
+      />
+    );
+    expect(screen.getByText('CHECK TRAP')).toBeTruthy();
+    expect(screen.getByText(/Last counted advice/)).toBeTruthy();
+    expect(screen.getByText('SPRAY')).toBeTruthy();
   });
 });
 

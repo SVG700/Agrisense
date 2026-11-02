@@ -11,6 +11,8 @@ import { motion } from 'framer-motion';
 import { CalendarDays, CloudOff, Info, Map as MapIcon, RefreshCw, TriangleAlert } from 'lucide-react';
 import { api } from '../api.js';
 import Badge from '../components/Badge.jsx';
+import DecisionBadge from '../components/DecisionBadge.jsx';
+import { DECISION_STYLES } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Stagger, useTilt } from '../lib/motion.jsx';
 import { DECISION_COLORS, DEFAULT_STYLE_URL } from './keplerConfig.js';
 
@@ -220,8 +222,10 @@ function Legend() {
     <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
       {Object.entries(DECISION_COLORS).map(([d, color]) => (
         <li key={d} className="flex items-center gap-1.5" title={DECISION_HELP[d]}>
-          <span className="h-2.5 w-2.5 rounded-full ring-2 ring-white/10" style={{ background: color }} />
-          {d}
+          <span aria-hidden="true" style={{ color }}>
+            {DECISION_STYLES[d].shape}
+          </span>
+          {DECISION_STYLES[d].label}
         </li>
       ))}
       <li className="flex items-center gap-1.5 text-slate-500">
@@ -291,8 +295,10 @@ function TrapTable({ rows, meta }) {
           <div className="mb-3 flex flex-wrap gap-2 text-xs">
             {Object.keys(DECISION_COLORS).map((d) => (
               <span key={d} className="rounded-full bg-slate-800/70 px-2.5 py-1 text-slate-300 ring-1 ring-slate-700">
-                <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: DECISION_COLORS[d] }} />
-                {d}: {tally[d] ?? 0}
+                <span aria-hidden="true" className="mr-1.5" style={{ color: DECISION_COLORS[d] }}>
+                  {DECISION_STYLES[d].shape}
+                </span>
+                {DECISION_STYLES[d].label}: {tally[d] ?? 0}
               </span>
             ))}
           </div>
@@ -316,9 +322,8 @@ function TrapTable({ rows, meta }) {
                       {r.simulated && <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-300/80">sim</span>}
                     </td>
                     <td className="py-2 pr-3">
-                      <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: DECISION_COLORS[r.decision] }}>
-                        <span className="h-2 w-2 rounded-full" style={{ background: DECISION_COLORS[r.decision] }} />
-                        {r.decision}
+                      <span title={r.decision_reason ?? undefined}>
+                        <DecisionBadge decision={r.decision} borderline={r.borderline} size="sm" />
                       </span>
                     </td>
                     <td className="py-2 pr-3 text-right tabular-nums text-slate-200">{r.pest_count}</td>
@@ -375,8 +380,10 @@ function MapStats({ rows, meta }) {
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
           {DECISIONS.map((d) => (
             <span key={d} className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full" style={{ background: DECISION_COLORS[d] }} />
-              <AnimatedNumber value={tally[d]} /> {d.toLowerCase()}
+              <span aria-hidden="true" style={{ color: DECISION_COLORS[d] }}>
+                {DECISION_STYLES[d].shape}
+              </span>
+              <AnimatedNumber value={tally[d]} /> {DECISION_STYLES[d].label.toLowerCase()}
             </span>
           ))}
         </div>

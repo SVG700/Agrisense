@@ -40,5 +40,6 @@ export const DECISION_CONFIG = Object.freeze({
   countUncertainty: Number(d.count_uncertainty),
   countUncertaintyMin: Number(d.count_uncertainty_min),
   countUncertaintyMax: Number(d.count_uncertainty_max),
+  checkTrapAfterHours: Number(d.check_trap_after_hours ?? 48),
   placeholder: true, // every threshold is a placeholder until confirmed with the IIHR mentor
 });

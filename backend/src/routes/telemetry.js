@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { DEMO_DEVICE_ID } from '../config.js';
 import { requireDevice } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { dailySeries, evaluateDecision, splitCounts } from '../services/decision.js';
+import { dailySeries, evaluateDecision, splitCounts, withTrapCheck } from '../services/decision.js';
 import {
   HttpError,
   batteryLevel,
@@ -155,7 +155,7 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
         if (!prev) days.push({ date: today, pests, predators, confidence: meanConfidence });
         else if (pests > prev.pests) Object.assign(prev, { pests, predators, confidence: meanConfidence });
       }
-      const decision = evaluateDecision(days);
+      const decision = withTrapCheck(evaluateDecision(days), { status: result.status, timestamp });
 
       let advisory;
       if (result.counts) {

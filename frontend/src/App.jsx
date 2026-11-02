@@ -253,7 +253,13 @@ export default function App() {
             <AnimatePresence mode="wait">
               <motion.div key={tab} {...pageTransition}>
                 {tab === 'farmer' ? (
-                  <FarmerDashboard device={device} telemetry={telemetry} onGoAdmin={() => setTab('admin')} />
+                  <FarmerDashboard
+                    device={device}
+                    devices={devices}
+                    onSelectDevice={selectDevice}
+                    telemetry={telemetry}
+                    onGoAdmin={() => setTab('admin')}
+                  />
                 ) : tab === 'map' ? (
                   <Suspense fallback={<DashboardSkeleton />}>
                     <PestMapPage />

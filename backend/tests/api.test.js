@@ -201,6 +201,7 @@ describe('Vision provider integration (mocked)', () => {
       assert.deepEqual(det.bounding_boxes, []);
       assert.equal(det.ai_advisory.status, 'skipped');
       assert.equal(det.ai_advisory.risk_level, null);
+      assert.equal(det.ai_advisory.decision.decision, 'CHECK_TRAP'); // grey ■ CHECK TRAP, never a guessed decision
       assert.equal(res.body.telemetry.temperature, 26.5);
     } finally {
       await app.close();

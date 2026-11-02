@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { RISK_STYLES } from '../lib/pests.js';
 import { EASE } from '../lib/motion.jsx';
 import Badge from './Badge.jsx';
+import DecisionBadge from './DecisionBadge.jsx';
+import { decisionStyle } from '../lib/decision.js';
 
 const RISK_ICON = { Low: ShieldCheck, Medium: ShieldQuestion, High: ShieldAlert };
 
@@ -65,6 +67,7 @@ export default function AdvisoryCard({ advisory }) {
           <TriangleAlert className="h-4 w-4 shrink-0 text-amber-300" />
           {advisory.summary || 'No advisory is available for this capture.'}
         </p>
+        <DecisionPanel decision={advisory.decision} />
       </section>
     );
   }
@@ -131,24 +134,32 @@ export default function AdvisoryCard({ advisory }) {
   );
 }
 
-const DECISION_TONE = {
-  SPRAY: 'text-rose-300 bg-rose-500/10 ring-rose-500/30',
-  BIOCONTROL: 'text-amber-300 bg-amber-500/10 ring-amber-500/30',
-  WAIT: 'text-emerald-300 bg-emerald-500/10 ring-emerald-500/30',
-};
-
 /** The predator-aware rule's decision that the advisory explains (older captures have none). */
 export function DecisionPanel({ decision }) {
-  if (!decision?.decision) return null;
+  const style = decisionStyle(decision?.decision);
+  if (!style) return null;
   const [lo, hi] = decision.range?.pests ?? [];
   return (
-    <div className={`rounded-xl p-3 ring-1 ${DECISION_TONE[decision.decision]}`} data-testid="decision-panel">
+    <motion.div
+      key={decision.decision}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: EASE }}
+      className={`rounded-xl p-3 ring-1 ${style.panel}`}
+      data-testid="decision-panel"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs uppercase tracking-widest text-slate-400">Decision</span>
-        <span className="text-lg font-extrabold">{decision.label}</span>
-        {decision.borderline && <Badge tone="warn">BORDERLINE</Badge>}
+        <DecisionBadge decision={decision.decision} borderline={decision.borderline} size="lg" />
       </div>
-      <p className="mt-1 text-sm text-slate-300">{decision.reason}</p>
+      <p className="mt-2 text-sm text-slate-300">{decision.reason}</p>
+      {decision.check_trap ? (
+        decision.last_counted && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            Last counted advice: <DecisionBadge decision={decision.last_counted.decision} size="sm" />
+          </p>
+        )
+      ) : (
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
         <span>
           Avg {decision.avg_pests} pests/day
@@ -164,7 +175,8 @@ export function DecisionPanel({ decision }) {
           Thresholds: {decision.thresholds?.action_threshold_per_day}/day, ratio {decision.thresholds?.spray_ratio} (placeholder)
         </span>
       </div>
-    </div>
+      )}
+    </motion.div>
   );
 }
 
