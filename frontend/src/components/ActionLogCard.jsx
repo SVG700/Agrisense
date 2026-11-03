@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { EASE } from '../lib/motion.jsx';
 import { timeAgo } from '../lib/pests.js';
 import DecisionBadge from './DecisionBadge.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 /** The three things a farmer can report after reading the advice (colours match the chart markers). */
 export const ACTION_TYPES = {
@@ -19,6 +20,7 @@ export const ACTION_TYPES = {
  * key (like other dashboard writes); reading is open.
  */
 export default function ActionLogCard({ deviceId, decision, actions, unavailable, onChanged }) {
+  const t = useT();
   const [busy, setBusy] = useState(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState(null);
@@ -57,10 +59,10 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
           <span className="icon-chip h-8! w-8! rounded-lg!">
             <ClipboardCheck className="h-4 w-4" />
           </span>
-          What did you do?
+          {t('actions.title')}
         </h2>
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
-          Log your action against the current advice
+          {t('actions.subtitle')}
           {decision?.decision && <DecisionBadge decision={decision.decision} size="sm" />}
         </p>
       </div>
@@ -70,17 +72,17 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
       ) : (
         <>
           <div className="grid grid-cols-3 gap-2">
-            {Object.entries(ACTION_TYPES).map(([id, t]) => {
-              const Icon = t.icon;
+            {Object.entries(ACTION_TYPES).map(([id, type]) => {
+              const Icon = type.icon;
               return (
                 <button
                   key={id}
                   onClick={() => log(id)}
                   disabled={!deviceId || busy !== null}
-                  className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold ring-1 transition disabled:opacity-50 ${t.tone}`}
+                  className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-center text-xs font-semibold ring-1 transition disabled:opacity-50 ${type.tone}`}
                 >
                   {busy === id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
-                  {t.label}
+                  {t(`actions.${id}`)}
                 </button>
               );
             })}
@@ -88,7 +90,7 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
           <input
             value={note}
             onChange={(e) => setNote(e.target.value.slice(0, 280))}
-            placeholder="Optional note (product, which rows, why not yet…)"
+            placeholder={t('actions.note')}
             className="field px-3 py-2 text-sm"
             aria-label="Note"
           />
@@ -105,8 +107,8 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
         <ul className="flex flex-col gap-1.5">
           <AnimatePresence initial={false}>
             {actions.slice(0, 5).map((a, i) => {
-              const t = ACTION_TYPES[a.action] ?? ACTION_TYPES.not_yet;
-              const Icon = t.icon;
+              const type = ACTION_TYPES[a.action] ?? ACTION_TYPES.not_yet;
+              const Icon = type.icon;
               return (
                 <motion.li
                   key={a.id}
@@ -117,13 +119,13 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
                   transition={{ duration: 0.3, ease: EASE }}
                   className="flex items-start gap-2 rounded-lg bg-slate-900/50 px-2.5 py-2 text-xs ring-1 ring-slate-800"
                 >
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: t.color }} />
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: type.color }} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <b className="text-slate-100">{t.label}</b>
+                      <b className="text-slate-100">{t(`actions.${a.action}`)}</b>
                       {a.decision && (
                         <span className="flex items-center gap-1 text-slate-500">
-                          advice was <DecisionBadge decision={a.decision} size="sm" />
+                          {t('actions.adviceWas')} <DecisionBadge decision={a.decision} size="sm" />
                         </span>
                       )}
                       <span className="text-slate-500">· {timeAgo(a.acted_at)}</span>

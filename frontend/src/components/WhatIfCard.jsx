@@ -3,6 +3,7 @@ import { FlaskConical, RotateCcw } from 'lucide-react';
 import { api } from '../api.js';
 import { DECISION_STYLES } from '../lib/decision.js';
 import DecisionBadge from './DecisionBadge.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const MAX_PESTS = 150;
 const MAX_PRED = 30;
@@ -24,6 +25,7 @@ const SCENARIOS = [
  * traps - nothing is re-implemented here.
  */
 export default function WhatIfCard({ deviceId }) {
+  const t = useT();
   const [base, setBase] = useState(null); // this trap's current averages
   const [s, setS] = useState({ pests: 30, predators: 2, confidence: 0.85 });
   const [result, setResult] = useState(null);
@@ -84,7 +86,7 @@ export default function WhatIfCard({ deviceId }) {
             <span className="icon-chip h-8! w-8! rounded-lg!">
               <FlaskConical className="h-4 w-4" />
             </span>
-            What if…?
+            {t('title.whatIf')}
           </h2>
           <p className="mt-1 text-sm text-slate-400">
             Change the numbers and see how the advice changes. The answers come from the same decision engine that decides for

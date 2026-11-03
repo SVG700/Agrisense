@@ -5,20 +5,21 @@ import { api } from '../api.js';
 import { EASE } from '../lib/motion.jsx';
 import { timeAgo } from '../lib/pests.js';
 import Badge from './Badge.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const REFRESH_MS = 15 * 60_000;
 const CHECK_ICON = { rain: CloudRain, wind: Wind, daylight: Sun };
 
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-function fmtWindow(w) {
+function fmtWindow(w, t) {
   const start = new Date(w.start);
   const today = new Date();
   const tomorrow = new Date(today.getTime() + 86_400_000);
   const day =
     start.toDateString() === today.toDateString()
-      ? 'Today'
+      ? t('weather.today')
       : start.toDateString() === tomorrow.toDateString()
-        ? 'Tomorrow'
+        ? t('weather.tomorrow')
         : start.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   return `${day} ${fmtTime(w.start)}-${fmtTime(w.end)}`;
 }
@@ -29,6 +30,7 @@ function fmtWindow(w) {
  * unavailable the card says so and nothing else changes.
  */
 export default function WeatherCard({ deviceId, decision }) {
+  const t = useT();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -40,10 +42,10 @@ export default function WeatherCard({ deviceId, decision }) {
         .then((d) => !cancelled && (setData(d), setFailed(false)))
         .catch(() => !cancelled && setFailed(true));
     load();
-    const t = setInterval(load, REFRESH_MS);
+    const timer = setInterval(load, REFRESH_MS);
     return () => {
       cancelled = true;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [deviceId]);
 
@@ -52,7 +54,7 @@ export default function WeatherCard({ deviceId, decision }) {
       <span className="icon-chip h-8! w-8! rounded-lg!">
         <CloudSun className="h-4 w-4" />
       </span>
-      Can I spray now?
+      {t('weather.title')}
     </h2>
   );
 
@@ -85,7 +87,7 @@ export default function WeatherCard({ deviceId, decision }) {
         <div className="flex flex-wrap gap-1.5">
           {data.stale && <Badge tone="warn">Stale forecast</Badge>}
           <Badge tone="muted" title={`${data.location.lat}, ${data.location.lon}`}>
-            {data.location.default ? 'Default location' : data.location.label}
+            {data.location.default ? t('weather.defaultLocation') : data.location.label}
           </Badge>
         </div>
       </div>
@@ -104,14 +106,14 @@ export default function WeatherCard({ deviceId, decision }) {
         </span>
         <div className="min-w-0">
           <div className={`text-xl font-extrabold ${s.can_spray_now ? 'text-emerald-300' : 'text-rose-300'}`} data-testid="spray-verdict">
-            {s.can_spray_now ? 'Yes, conditions are good' : 'Not now'}
+            {s.can_spray_now ? t('weather.yes') : t('weather.no')}
           </div>
           <div className="text-xs text-slate-400">
             {s.next_window
               ? s.can_spray_now
-                ? `Good until ${fmtTime(s.next_window.end)}`
-                : `Next good window: ${fmtWindow(s.next_window)}`
-              : 'No good window in the next 3 days'}
+                ? t('weather.until', { t: fmtTime(s.next_window.end) })
+                : t('weather.next', { w: fmtWindow(s.next_window, t) })
+              : t('weather.none')}
           </div>
         </div>
       </motion.div>
@@ -119,10 +121,10 @@ export default function WeatherCard({ deviceId, decision }) {
       {sprayAdvised && (
         <p className="rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800" data-testid="spray-timing">
           {s.can_spray_now
-            ? 'Spraying is advised for this trap, and conditions are suitable now.'
+            ? t('weather.adviseNow')
             : s.next_window
-              ? `Spraying is advised for this trap, but wait for the window: ${fmtWindow(s.next_window)}.`
-              : 'Spraying is advised for this trap, but no suitable window is forecast yet - check again later.'}
+              ? t('weather.adviseWait', { w: fmtWindow(s.next_window, t) })
+              : t('weather.adviseNone')}
         </p>
       )}
 
@@ -132,20 +134,22 @@ export default function WeatherCard({ deviceId, decision }) {
           return (
             <li key={ch.id} className="flex items-start gap-2">
               <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ch.ok ? 'text-emerald-300' : 'text-rose-300'}`} />
-              <span className={ch.ok ? 'text-slate-300' : 'text-rose-200'}>{ch.label}</span>
+              <span className={ch.ok ? 'text-slate-300' : 'text-rose-200'}>
+                {t.lang === 'en' ? ch.label : t(`weather.${ch.id}${ch.ok ? 'Ok' : 'No'}`, { w: Math.round(c.wind_kmh ?? 0) })}
+              </span>
             </li>
           );
         })}
-        {s.cautions.map((t) => (
-          <li key={t} className="flex items-start gap-2 text-amber-200">
-            <Thermometer className="mt-0.5 h-4 w-4 shrink-0" /> {t}
+        {s.cautions.map((msg) => (
+          <li key={msg} className="flex items-start gap-2 text-amber-200">
+            <Thermometer className="mt-0.5 h-4 w-4 shrink-0" /> {msg}
           </li>
         ))}
       </ul>
 
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <Mini icon={Thermometer} label="Now" value={c.temperature != null ? `${Math.round(c.temperature)}°C` : '—'} />
-        <Mini icon={Droplets} label="Humidity" value={c.humidity != null ? `${Math.round(c.humidity)}%` : '—'} />
+        <Mini icon={Thermometer} label={t('weather.now')} value={c.temperature != null ? `${Math.round(c.temperature)}°C` : '—'} />
+        <Mini icon={Droplets} label={t('kpi.humidity')} value={c.humidity != null ? `${Math.round(c.humidity)}%` : '—'} />
         <Mini icon={Wind} label="Wind" value={c.wind_kmh != null ? `${Math.round(c.wind_kmh)} km/h` : '—'} />
       </div>
 

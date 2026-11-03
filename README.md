@@ -114,6 +114,20 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## English / ಕನ್ನಡ
+
+An **EN | ಕನ್ನಡ** switch in the header translates the farmer-facing pages: **Farmer Analytics** (headline, KPIs,
+simulated banner, decision panel, *Can I spray now?*, *What did you do?*, card titles), the **trap cards**
+and **Phone Check**. The map and admin pages stay English, and the switch is hidden there. The choice is
+remembered per browser.
+
+- Decision reasons come from the engine in English. In Kannada they are **rebuilt from the same numbers**
+  (pests/day, per predator, the action level, BORDERLINE), not machine-translated.
+- Gemini advice steps stay in English, marked *(ವಿವರಗಳು ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ)*.
+- Text lives in `frontend/src/lib/i18n.jsx`. A test fails if any English key lacks a Kannada one.
+- Kannada renders with system fonts (Noto Sans Kannada on Android, Nirmala UI or Tunga on Windows).
+- **The Kannada wording is a first draft: have a native speaker or the IIHR team review it.**
+
 ## Telegram summaries and alerts (English + ಕನ್ನಡ)
 
 - **Daily summary** at `TELEGRAM_SUMMARY_TIME` (default 07:00 IST): every trap's traffic-light decision

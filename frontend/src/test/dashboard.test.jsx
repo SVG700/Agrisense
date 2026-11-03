@@ -543,3 +543,58 @@ describe('Telegram card', () => {
     expect(preview.innerHTML).not.toContain('<b>'); // shown as text, never as HTML
   });
 });
+
+describe('EN / ಕನ್ನಡ', () => {
+  const appFetch = () =>
+    vi.fn((url) => {
+      if (url.includes('/api/devices')) return jsonResponse([DEVICE]);
+      if (url.includes('/api/telemetry')) return jsonResponse([capture()]);
+      if (url.includes('/api/decision?'))
+        return jsonResponse({ decision: 'SPRAY', label: 'SPRAY', reason: 'Average 40 pests/day ...', avg_pests: 40, no_predators: true, window: { days: 3 }, thresholds: { action_threshold_per_day: 25 } });
+      return jsonResponse({ ok: true, mode: 'demo', store: 'memory', integrations: {}, auth: {} });
+    });
+
+  test('toggle switches the farmer pages to Kannada, is remembered, and the map stays English', async () => {
+    localStorage.removeItem('agrisense.lang');
+    vi.stubGlobal('fetch', appFetch());
+    const { unmount } = render(<App />);
+    await screen.findByText('25.0°C');
+    fireEvent.click(screen.getByRole('button', { name: 'ಕನ್ನಡ' }));
+    expect(await screen.findByText('ಸಿಕ್ಕಿಬಿದ್ದ ಕೀಟಗಳು')).toBeTruthy(); // "Insects trapped"
+    await waitFor(() => expect(screen.getByTestId('trap-card').textContent).toContain('ಸಿಂಪಡಿಸಿ')); // SPRAY
+    expect(screen.getByTestId('trap-card').textContent).toContain('ದಿನಕ್ಕೆ 40 ಕೀಟಗಳು'); // reason rebuilt from numbers
+    expect(document.documentElement.lang).toBe('kn');
+    expect(localStorage.getItem('agrisense.lang')).toBe('kn');
+
+    // Map page: English only, no toggle
+    fireEvent.click(screen.getAllByText(/Pest Surveillance Map|^Map$/)[0]);
+    await waitFor(() => expect(document.documentElement.lang).toBe('en'));
+    expect(screen.queryByRole('button', { name: 'ಕನ್ನಡ' })).toBeNull();
+    unmount();
+
+    // Remembered on the next visit
+    render(<App />);
+    expect(await screen.findByText('ಸಿಕ್ಕಿಬಿದ್ದ ಕೀಟಗಳು')).toBeTruthy();
+    localStorage.removeItem('agrisense.lang');
+  });
+
+  test('decision reasons are rebuilt in Kannada from the same numbers', async () => {
+    const { decisionReason } = await import('../lib/i18n.jsx');
+    const d = { decision: 'BIOCONTROL', reason: 'English reason', avg_pests: 49.3, pests_per_predator: 4.2, borderline: true, thresholds: { action_threshold_per_day: 25 } };
+    expect(decisionReason('en', d)).toBe('English reason');
+    const kn = decisionReason('kn', d);
+    expect(kn).toContain('49.3');
+    expect(kn).toContain('4.2');
+    expect(kn).toContain('ಜೈವಿಕ ನಿಯಂತ್ರಕ');
+    expect(kn).toContain('ಗಡಿರೇಖೆ');
+  });
+
+  test('every English key has a Kannada translation', async () => {
+    const src = await import('../lib/i18n.jsx?raw');
+    const block = (lang) => new Set([...src.default.split(`  ${lang}: {`)[1].split('\n  },')[0].matchAll(/^\s+'?([\w.]+)'?:/gm)].map((m) => m[1]));
+    const en = block('en');
+    const kn = block('kn');
+    const missing = [...en].filter((k) => !kn.has(k));
+    expect(missing).toEqual([]);
+  });
+});

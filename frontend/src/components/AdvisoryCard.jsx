@@ -5,6 +5,7 @@ import { EASE } from '../lib/motion.jsx';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import { decisionStyle } from '../lib/decision.js';
+import { decisionReason, useT } from '../lib/i18n.jsx';
 
 const RISK_ICON = { Low: ShieldCheck, Medium: ShieldQuestion, High: ShieldAlert };
 
@@ -42,6 +43,7 @@ function sourceBadge(advisory) {
 
 /** Prominent widget for the capture's advisory (Claude or rule engine). */
 export default function AdvisoryCard({ advisory }) {
+  const t = useT();
   if (!advisory) {
     return (
       <section className="card flex flex-col items-center justify-center gap-3 py-12 text-center text-sm text-slate-500">
@@ -59,7 +61,7 @@ export default function AdvisoryCard({ advisory }) {
         <span className="icon-chip h-8! w-8! rounded-lg!">
           <BrainCircuit className="h-4 w-4" />
         </span>
-        Agronomic Advisory
+        {t('title.advisory')}
       </h2>
       {sourceBadge(advisory)}
     </div>
@@ -143,6 +145,7 @@ export default function AdvisoryCard({ advisory }) {
 
 /** The predator-aware rule's decision that the advisory explains (older captures have none). */
 export function DecisionPanel({ decision }) {
+  const t = useT();
   const style = decisionStyle(decision?.decision);
   if (!style) return null;
   const [lo, hi] = decision.range?.pests ?? [];
@@ -156,10 +159,10 @@ export function DecisionPanel({ decision }) {
       data-testid="decision-panel"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-slate-400">Decision</span>
+        <span className="text-xs uppercase tracking-widest text-slate-400">{t('decision')}</span>
         <DecisionBadge decision={decision.decision} borderline={decision.borderline} size="lg" />
       </div>
-      <p className="mt-2 text-sm text-slate-300">{decision.reason}</p>
+      <p className="mt-2 text-sm text-slate-300">{decisionReason(t.lang, decision)}</p>
       {decision.check_trap ? (
         decision.last_counted && (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">

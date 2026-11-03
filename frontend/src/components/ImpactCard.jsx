@@ -4,6 +4,7 @@ import { Droplet, IndianRupee, Leaf, SprayCan } from 'lucide-react';
 import { api } from '../api.js';
 import { AnimatedNumber, EASE } from '../lib/motion.jsx';
 import Badge from './Badge.jsx';
+import { useT } from '../lib/i18n.jsx';
 
 const PERIODS = [14, 30];
 const inr = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
@@ -14,6 +15,7 @@ const inr = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).
  * an estimate; the assumptions are one click away.
  */
 export default function ImpactCard({ refreshKey }) {
+  const t = useT();
   const [days, setDays] = useState(30);
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -44,7 +46,7 @@ export default function ImpactCard({ refreshKey }) {
             <span className="icon-chip h-8! w-8! rounded-lg!">
               <Leaf className="h-4 w-4" />
             </span>
-            Estimated impact
+            {t('title.impact')}
           </h2>
           <p className="mt-1 text-xs text-slate-400">
             All {data.traps} traps, last {data.days} days, compared with spraying every {a.calendar_spray_interval_days} days.

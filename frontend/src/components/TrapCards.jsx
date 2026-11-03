@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
 import { EASE } from '../lib/motion.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
+import { decisionReason, useT } from '../lib/i18n.jsx';
 
 /**
  * One card per trap with its traffic-light decision (from GET /api/decision).
@@ -40,6 +41,7 @@ export default function TrapCards({ devices, activeId, onSelect, refreshKey }) {
 }
 
 function TrapCard({ device, result, active, onSelect, index }) {
+  const t = useT();
   const style = decisionStyle(result?.decision);
   const loading = result === undefined;
   return (
@@ -61,7 +63,7 @@ function TrapCard({ device, result, active, onSelect, index }) {
         <div className="min-w-0">
           <div className="font-semibold leading-snug break-words text-white">{device.name}</div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <BatteryMedium className="h-3.5 w-3.5" /> {device.battery_level}%{active && <span className="text-emerald-300">· viewing</span>}
+            <BatteryMedium className="h-3.5 w-3.5" /> {device.battery_level}%{active && <span className="text-emerald-300">· {t('trap.viewing')}</span>}
           </div>
         </div>
         {loading ? (
@@ -69,21 +71,22 @@ function TrapCard({ device, result, active, onSelect, index }) {
         ) : style ? (
           <DecisionBadge decision={result.decision} borderline={result.borderline} />
         ) : (
-          <span className="text-xs text-slate-500">{result?.error ? 'Unavailable' : 'No data yet'}</span>
+          <span className="text-xs text-slate-500">{result?.error ? t('trap.unavailable') : t('trap.noData')}</span>
         )}
       </div>
       {result?.decision && !result.check_trap && (
         <div className="flex flex-wrap gap-x-3 text-xs text-slate-400">
           <span className="inline-flex items-center gap-1">
-            <Bug className="h-3.5 w-3.5" /> {result.avg_pests} pests/day
+            <Bug className="h-3.5 w-3.5" /> {t('trap.pestsPerDay', { n: result.avg_pests })}
           </span>
-          <span>{result.no_predators ? 'no predators' : `${result.pests_per_predator} per predator`}</span>
+          <span>{result.no_predators ? t('trap.noPredators') : t('trap.perPredator', { n: result.pests_per_predator })}</span>
           <span>
-            {result.window?.days}-day avg{result.simulated ? ' · simulated' : ''}
+            {t('trap.dayAvg', { n: result.window?.days })}
+            {result.simulated ? ` · ${t('trap.simulated')}` : ''}
           </span>
         </div>
       )}
-      {result?.reason && <p className="line-clamp-2 text-xs leading-snug text-slate-400">{result.reason}</p>}
+      {result?.reason && <p className="line-clamp-2 text-xs leading-snug text-slate-400">{decisionReason(t.lang, result)}</p>}
     </motion.button>
   );
 }

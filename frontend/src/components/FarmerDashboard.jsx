@@ -20,6 +20,7 @@ import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
+import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
 import ImpactCard from './ImpactCard.jsx';
@@ -50,6 +51,7 @@ const HEADLINES = {
 
 /** Farmer-facing analytics view. */
 export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, onGoAdmin }) {
+  const t = useT();
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
@@ -133,12 +135,12 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
           data-testid="simulated-banner"
           className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100"
         >
-          <Badge tone="warn">Simulated data</Badge>
-          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">Demo detector</Badge>}
+          <Badge tone="warn">{t('simulatedData')}</Badge>
+          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">{t('demoDetector')}</Badge>}
           <span className="text-amber-100/80">
             {capture.detection?.vision_meta?.fallback
               ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
-              : 'This capture was generated for demonstration, not photographed in a field. Counts and decisions show how the system behaves, not a real infestation.'}
+              : t('banner.simulated')}
           </span>
         </div>
       )}
@@ -193,10 +195,10 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
       <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4" stagger={0.07} delay={0.1}>
         <Stat
           icon={Bug}
-          label="Insects trapped"
+          label={t('kpi.insects')}
           trend={trends.total}
           trendColor="#a3e635"
-          value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : 'Not counted'}
+          value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : t('kpi.notCounted')}
           sub={
             delta !== null ? (
               <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${delta > 0 ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
@@ -209,19 +211,19 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
         />
         <Stat
           icon={Thermometer}
-          label="Temperature"
+          label={t('kpi.temperature')}
           trend={trends.temperature}
           trendColor="#fb923c"
           value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
         />
         <Stat
           icon={Droplets}
-          label="Humidity"
+          label={t('kpi.humidity')}
           trend={trends.humidity}
           trendColor="#38bdf8"
           value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
         />
-        <Stat icon={ShieldAlert} label="Risk level" trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ?? '—'}</span>} />
+        <Stat icon={ShieldAlert} label={t('kpi.risk')} trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ? t(`risk.${risk}`) : '—'}</span>} />
       </Stagger>
 
       <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.2}>
@@ -277,11 +279,14 @@ function QualityBadge({ quality }) {
 
 /** Summary banner built only from the selected capture's real data. */
 function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin, decision }) {
+  const t = useT();
   const headline = !capture
-    ? 'Waiting for the first trap capture'
+    ? t('hero.waiting')
     : decision?.decision === 'CHECK_TRAP'
-      ? 'Check the trap'
-      : HEADLINES[risk] ?? 'Awaiting pest analysis';
+      ? t('hero.check')
+      : HEADLINES[risk]
+        ? t(`hero.${risk}`)
+        : t('hero.awaiting');
   const style = RISK_STYLES[risk];
   const boxes = (capture?.detection?.bounding_boxes ?? []).slice(0, 40);
 
@@ -303,7 +308,7 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
               <span className={`live-dot ${stale ? 'text-amber-400' : 'text-emerald-400'}`} />
               {device?.name ?? 'No trap selected'}
             </span>
-            {latest && <span className="text-slate-500">Last capture {timeAgo(latest.timestamp)}</span>}
+            {latest && <span className="text-slate-500">{t('hero.lastCapture', { ago: timeAgo(latest.timestamp) })}</span>}
             {decision?.decision && <DecisionBadge decision={decision.decision} borderline={decision.borderline} />}
           </Item>
           <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
@@ -312,17 +317,19 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
           </Item>
           <Item as="p" className="text-sm leading-relaxed text-slate-400 sm:text-base">
             {!capture
-              ? 'Send a capture from the edge device or the Hardware tab to start monitoring.'
+              ? t('hero.noCapture')
               : countsKnown
-                ? `${total} insect${total === 1 ? '' : 's'} counted on the ${capture.id === latest?.id ? 'latest' : 'selected'} sticky-trap image. Review the detections and the advisory below.`
-                : 'Insects were not counted for this capture. Sensor readings and the trap image are still recorded below.'}
+                ? t.lang === 'en'
+                  ? `${total} insect${total === 1 ? '' : 's'} counted on the ${capture.id === latest?.id ? 'latest' : 'selected'} sticky-trap image. Review the detections and the advisory below.`
+                  : t('hero.counted', { n: total, which: t(capture.id === latest?.id ? 'hero.latest' : 'hero.selected') })
+                : t('hero.notCounted')}
           </Item>
           <Item className="mt-2 flex flex-wrap gap-3">
             <button onClick={onViewTrap} className="btn btn-primary" disabled={!capture}>
-              <ScanSearch className="h-4 w-4" /> View detections
+              <ScanSearch className="h-4 w-4" /> {t('hero.viewDetections')}
             </button>
             <button onClick={onGoAdmin} className="btn btn-ghost">
-              <Cpu className="h-4 w-4" /> Hardware control <ArrowRight className="h-3.5 w-3.5" />
+              <Cpu className="h-4 w-4" /> {t('hero.hardware')} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </Item>
         </Stagger>
