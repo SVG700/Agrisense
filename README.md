@@ -301,18 +301,38 @@ output.
 
 ## Vision provider configuration
 
-**Roboflow** (hosted Serverless API, format checked against Roboflow's docs in Oct 2026):
+**Roboflow** (default): the yellow-sticky-trap model `yellow-sticky-traps-bwxut-ieond/1` on
+`https://serverless.roboflow.com`. Only the key is required:
 
 ```
 VISION_PROVIDER=roboflow
-YOLO_API_URL=https://serverless.roboflow.com/<project-id>/<version>
-YOLO_API_KEY=<roboflow api key>        # sent as Authorization: Bearer
-VISION_MODEL_ID=<project-id>/<version>
+ROBOFLOW_API_KEY=<roboflow api key>   # main name; YOLO_API_KEY still works as a fallback
+# optional: ROBOFLOW_MODEL=<project>/<version>, ROBOFLOW_API_URL=<host or full model URL>
 ```
 
-Uploaded photos are sent as a base64 body (`application/x-www-form-urlencoded`). URL images are sent as
-`?image=<url>`. The response's `predictions[].x/y` are box **centres** in pixels and are converted to
-normalized corner boxes using `image.width/height`.
+- The key is sent as Roboflow's `api_key` parameter, from the backend only. It is never logged, stored or
+  returned; `/api/health` shows only which env var NAME supplied it.
+- **Classes:** the model's labels `WF` (whitefly, pest), `MR` (Macrolophus, predator) and `NC`
+  (Nesidiocoris, predator) are mapped through `backend/config/pests.json`. Every detection stores
+  `counts` per class and `vision_meta.totals` = `{pests, predators}`, which feed the decision engine.
+- **Tiling (SAHI):** whiteflies are a few pixels wide on a phone photo, and the model sees 640 px. Uploaded
+  photos therefore get one full-image pass **plus** a `VISION_TILES` x `VISION_TILES` grid (default 4x4)
+  of tiles with `VISION_TILE_OVERLAP` (0.2) overlap. Tile boxes are mapped back to the whole photo, and
+  duplicates are merged per class (IoU >= 0.5, or a box mostly inside another, which catches insects cut
+  at a tile edge). Tiles are never smaller than 640 px, so smaller photos use fewer tiles. Each request
+  is downscaled to at most 1280 px to keep uploads fast. **Cost:** a 4x4 photo is 17 Roboflow calls.
+  URL images (`?image=<url>`) are sent once, untiled.
+- **Annotated image:** for uploaded photos the API response includes `annotated_image` (a JPEG data URL
+  with pests boxed in red and predators in green). It is returned to the uploader and not stored, because
+  the dashboard draws boxes itself.
+- **Demo fallback** (`VISION_DEMO_FALLBACK=true`, the default): with no key, or when Roboflow fails, the
+  photo is counted by the labelled **demo detector**. Its status is `simulated`, `vision_meta.fallback` says
+  why, there are no boxes on the real photo, the annotated image carries a "DEMO DETECTOR" banner, and the
+  dashboard shows a *Simulated data* banner. Set it to `false` in the field: a failure is then stored as
+  `failed` and the trap shows ■ CHECK TRAP.
+- **Live check, 2026-11-03:** on a synthetic 2600x1950 card, the full pass plus 4x4 tiles found 48
+  whiteflies (47 with the full image only) in about 4 s. Thresholds and tiling should be re-checked on
+  real IIHR trap photos.
 
 **Generic** endpoint: `POST` either `{"image_url"}` or `{"image_base64", "content_type"}`, and return
 `{"detections":[{"label","confidence","bbox":[x1,y1,x2,y2]}], "image_width"?, "image_height"?}`. Without
@@ -320,8 +340,8 @@ the image size, the coordinates must already be normalized.
 
 All boxes are validated: finite numbers, confidence between 0 and 1, sensible labels, and at least partly
 inside the image (partly-outside boxes are clipped). Rejected boxes are counted in `vision_meta.rejected`.
-An empty result is stored as **zero detections**. A failed call is stored as `failed`, with no boxes and no
-advisory, and is never replaced by simulated data. Check with
+An empty result is stored as **zero detections**. With the demo fallback off, a failed call is stored as
+`failed`, with no boxes and no advisory. Check with
 `npm run verify:vision -- --image path/to/trap.jpg`.
 
 ---

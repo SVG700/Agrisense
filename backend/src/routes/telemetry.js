@@ -215,6 +215,8 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
             rejected: result.rejected,
             error: result.error,
             latency_ms: result.latency_ms ?? null,
+            totals: result.totals ?? null,
+            fallback: result.fallback ?? null,
           },
         },
       });
@@ -227,7 +229,13 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
         advisory: `${advisory.source}/${advisory.status}`,
         duplicate,
       });
-      res.status(duplicate ? 200 : 201).json({ telemetry, duplicate, sources: sourcesOf(telemetry, store.kind) });
+      // The annotated photo is returned to the uploader only (not stored: the dashboard draws boxes itself)
+      res.status(duplicate ? 200 : 201).json({
+        telemetry,
+        duplicate,
+        sources: sourcesOf(telemetry, store.kind),
+        ...(result.annotated_image && !duplicate ? { annotated_image: result.annotated_image } : {}),
+      });
     }
   );
 

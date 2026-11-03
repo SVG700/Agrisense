@@ -219,7 +219,11 @@ describe('Vision provider integration (mocked)', () => {
       assert.deepEqual(det.bounding_boxes, []);
       assert.equal(Object.values(det.pest_counts).reduce((a, b) => a + b, 0), 0);
       assert.equal(http.calls[0].opts.params.image, 'https://cdn.example.test/trap.jpg');
-      assert.equal(http.calls[0].opts.headers.Authorization, 'Bearer vision-test-key');
+      // Roboflow's hosted API takes the key as api_key; it must never be echoed back or stored
+      assert.equal(http.calls[0].opts.params.api_key, 'vision-test-key');
+      assert.equal(http.calls[0].opts.headers.Authorization, undefined);
+      assert.ok(!JSON.stringify(res.body).includes('vision-test-key'));
+      assert.deepEqual(det.pest_counts, { whitefly: 0, macrolophus: 0, nesidiocoris: 0 });
     } finally {
       await app.close();
     }

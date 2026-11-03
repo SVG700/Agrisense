@@ -108,8 +108,9 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
           <Badge tone="warn">Simulated data</Badge>
           {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">Demo detector</Badge>}
           <span className="text-amber-100/80">
-            This capture was generated for demonstration, not photographed in a field. Counts and decisions show how the system
-            behaves, not a real infestation.
+            {capture.detection?.vision_meta?.fallback
+              ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
+              : 'This capture was generated for demonstration, not photographed in a field. Counts and decisions show how the system behaves, not a real infestation.'}
           </span>
         </div>
       )}

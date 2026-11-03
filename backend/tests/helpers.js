@@ -24,7 +24,8 @@ export const PNG_BASE64 = Buffer.concat([
 export const GIF_BASE64 = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(32)]).toString('base64');
 
 export async function startApp({ env = {}, store, visionHttp, llmClient } = {}) {
-  const { config, errors } = loadConfig({ DEMO_MODE: 'true', ...env });
+  // Tiling and the demo fallback have their own tests; the rest exercise the plain provider path
+  const { config, errors } = loadConfig({ DEMO_MODE: 'true', VISION_TILES: '1', VISION_DEMO_FALLBACK: 'false', ...env });
   if (errors.length) throw new Error(`Invalid test config: ${errors.join('; ')}`);
   const logger = createLogger({ silent: true });
   store ??= createMemoryStore();
