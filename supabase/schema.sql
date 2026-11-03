@@ -1,5 +1,5 @@
 -- =============================================================================
--- Agrisense AI - Supabase schema (v2)
+-- Agrisense AI - Supabase schema (v4: v2 + v3 map + v4 action log)
 --
 -- Idempotent: safe on a fresh project AND on a project created with the v1
 -- schema. It only ADDS columns/constraints/policies; it never drops tables or
@@ -131,6 +131,23 @@ create table if not exists public.trap_daily_observations (
 );
 create index if not exists trap_daily_observations_date_idx on public.trap_daily_observations (date);
 alter table public.trap_daily_observations enable row level security;
+
+-- -----------------------------------------------------------------------------
+-- v4: action log - what the farmer did after the advice (Sprayed / Released / Not yet)
+-- -----------------------------------------------------------------------------
+create table if not exists public.trap_actions (
+  id         bigint generated always as identity primary key,
+  device_id  uuid not null references public.devices (id) on delete cascade,
+  action     text not null check (action in ('sprayed', 'released', 'not_yet')),
+  -- the advice shown when the farmer acted (context for the log; never trusted for decisions)
+  decision   text check (decision in ('SPRAY', 'BIOCONTROL', 'WAIT', 'CHECK_TRAP')),
+  note       text check (char_length(note) <= 280),
+  acted_at   timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+create index if not exists trap_actions_device_time_idx on public.trap_actions (device_id, acted_at desc);
+-- No policies: only the backend (service role) can read or write
+alter table public.trap_actions enable row level security;
 
 -- -----------------------------------------------------------------------------
 -- Atomic, idempotent ingestion. Called by the backend with the service role.

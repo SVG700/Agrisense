@@ -210,6 +210,53 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Action log', () => {
+  test('logging posts the action with the note and refreshes; undo deletes the newest', async () => {
+    const fetchMock = vi.fn(() => jsonResponse({ id: 7 }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const { default: ActionLogCard } = await import('../components/ActionLogCard.jsx');
+    const onChanged = vi.fn();
+    const actions = [{ id: 7, action: 'released', decision: 'BIOCONTROL', note: 'Macrolophus', acted_at: new Date().toISOString() }];
+    render(<ActionLogCard deviceId={DEVICE.id} decision={{ decision: 'SPRAY' }} actions={actions} onChanged={onChanged} />);
+
+    fireEvent.change(screen.getByLabelText('Note'), { target: { value: 'rows 1-4' } });
+    fireEvent.click(screen.getByRole('button', { name: /Sprayed/ }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toContain('/api/actions');
+    expect(JSON.parse(opts.body)).toEqual({ device_id: DEVICE.id, action: 'sprayed', note: 'rows 1-4' });
+    expect(screen.getByText('Macrolophus')).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText('Undo last action'));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => u.endsWith('/api/actions/7') && o.method === 'DELETE')).toBe(true));
+  });
+
+  test('without the admin key the farmer is told where to enter it', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: 'Admin key required', code: 'unauthorized' }, 401)));
+    const { default: ActionLogCard } = await import('../components/ActionLogCard.jsx');
+    render(<ActionLogCard deviceId={DEVICE.id} actions={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: /Not yet/ }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/admin key/);
+  });
+
+  test('missing schema v4 shows the migration to apply instead of buttons', async () => {
+    const { default: ActionLogCard } = await import('../components/ActionLogCard.jsx');
+    render(<ActionLogCard deviceId={DEVICE.id} actions={[]} unavailable="Action log unavailable - apply supabase/migrations/v4_action_log.sql" />);
+    expect(screen.getByText(/v4_action_log\.sql/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Sprayed/ })).toBeNull();
+  });
+
+  test('actions inside the chart range get markers (legend shown)', async () => {
+    const { default: MicroclimateChart } = await import('../components/MicroclimateChart.jsx');
+    const t0 = Date.now() - 3 * 3_600_000;
+    const caps = [0, 1, 2].map((i) => capture({ id: i + 1, timestamp: new Date(t0 + i * 3_600_000).toISOString() }));
+    const { rerender } = render(<MicroclimateChart telemetry={caps} actions={[]} />);
+    expect(screen.queryByTestId('chart-action-legend')).toBeNull();
+    rerender(<MicroclimateChart telemetry={caps} actions={[{ id: 1, action: 'sprayed', acted_at: new Date(t0 + 90 * 60_000).toISOString() }]} />);
+    expect(screen.getByTestId('chart-action-legend').textContent).toContain('Sprayed');
+  });
+});
+
 describe('Impact estimate', () => {
   test('is labelled ESTIMATE, flags simulated data and shows its assumptions', async () => {
     vi.stubGlobal(

@@ -12,6 +12,7 @@ import { mapRouter } from './routes/map.js';
 import { demoRouter } from './routes/demo.js';
 import { checkRouter } from './routes/check.js';
 import { weatherRouter } from './routes/weather.js';
+import { actionsRouter } from './routes/actions.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -113,6 +114,7 @@ export function createApp(deps) {
   app.use('/api', demoRouter(deps));
   app.use('/api', checkRouter(deps));
   if (weather) app.use('/api', weatherRouter(deps));
+  app.use('/api', actionsRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));

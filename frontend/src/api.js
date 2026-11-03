@@ -59,6 +59,9 @@ export const api = {
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),
   decision: (deviceId) => request(`/api/decision?device_id=${encodeURIComponent(deviceId)}`),
   mapData: (days = 14) => request(`/api/map-data?days=${encodeURIComponent(days)}`),
+  actions: (deviceId, limit = 50) => request(`/api/actions?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`),
+  logAction: (payload) => request('/api/actions', { method: 'POST', body: payload, admin: true }),
+  deleteAction: (id) => request(`/api/actions/${encodeURIComponent(id)}`, { method: 'DELETE', admin: true }),
   impact: (days = 30) => request(`/api/impact?days=${encodeURIComponent(days)}`),
   simulate: ({ pests, predators, confidence }) =>
     request(`/api/decision/simulate?pests=${pests}&predators=${predators}${confidence != null ? `&confidence=${confidence}` : ''}`),

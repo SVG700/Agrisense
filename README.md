@@ -114,6 +114,19 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Action log
+
+The **What did you do?** card (Farmer Analytics, under the spray-window card) lets the farmer log
+**Sprayed**, **Released predators** or **Not yet**, with an optional note, against the trap's current advice.
+The advice at that moment is computed and stored by the server ('advice was ▲ SPRAY'), never taken from the
+browser. The last 5 entries are listed (the newest can be undone), and every entry appears as a labelled,
+coloured **marker on the trap chart** at the capture it followed, so the effect of a spray or release is
+visible. Logging needs the admin key, like other dashboard writes. *Reset demo data* seeds two story
+entries: Polyhouse 1 *Not yet* (waiting for dry weather) and Polyhouse 2 *Released*.
+
+**Needs schema v4:** run `supabase/migrations/v4_action_log.sql` once in the Supabase SQL editor (it is also
+folded into `supabase/schema.sql`). Until then the card says exactly that, and everything else keeps working.
+
 ## Impact estimate
 
 The **Estimated impact** card (Farmer Analytics, under the trap cards; `GET /api/impact?days=30`) compares
@@ -434,6 +447,9 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
 | POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
+| GET | `/api/actions?device_id=` | – | Action log, newest first (needs schema v4) |
+| POST | `/api/actions` | admin | `{device_id, action: sprayed|released|not_yet, note?, acted_at?}`; stores the advice at the time |
+| DELETE | `/api/actions/:id` | admin | Undo an entry |
 | GET | `/api/impact?days=30` | – | Impact ESTIMATE vs calendar spraying over all traps: sprays avoided, %, litres, cost, biocontrol releases, assumptions |
 | GET | `/api/decision/simulate?pests=&predators=&confidence=` | – | What-if: the same decision engine on hypothetical per-day averages (nothing stored) |
 | GET | `/api/decision/regions?max_pests=&max_predators=&steps=` | – | Decision map: grid of decisions over pests/day x predators/day |

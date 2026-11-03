@@ -23,6 +23,8 @@ import TrapCards from './TrapCards.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
 import ImpactCard from './ImpactCard.jsx';
+import ActionLogCard from './ActionLogCard.jsx';
+import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
@@ -55,6 +57,25 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
+
+  // Action log for this trap (shared by the log card and the chart markers)
+  const [actions, setActions] = useState([]);
+  const [actionsUnavailable, setActionsUnavailable] = useState(null);
+  const loadActions = async () => {
+    if (!device?.id) return;
+    try {
+      setActions(await api.actions(device.id));
+      setActionsUnavailable(null);
+    } catch (err) {
+      setActions([]);
+      setActionsUnavailable(err.code === 'actions_unavailable' ? err.message : null);
+    }
+  };
+  useEffect(() => {
+    setActions([]);
+    loadActions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device?.id]);
   const isHistoric = Boolean(capture && latest && capture.id !== latest.id);
   const det = capture?.detection ?? null;
   const countsKnown = hasCounts(det);
@@ -213,6 +234,13 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
         <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <AdvisoryCard advisory={det?.ai_advisory} />
           <WeatherCard deviceId={device?.id} decision={latest?.detection?.ai_advisory?.decision} />
+          <ActionLogCard
+            deviceId={device?.id}
+            decision={latest?.detection?.ai_advisory?.decision}
+            actions={actions}
+            unavailable={actionsUnavailable}
+            onChanged={loadActions}
+          />
           <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
         </Item>
       </Stagger>
@@ -222,7 +250,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
       </Reveal>
 
       <Reveal>
-        <MicroclimateChart telemetry={telemetry} />
+        <MicroclimateChart telemetry={telemetry} actions={actions} />
       </Reveal>
     </div>
   );

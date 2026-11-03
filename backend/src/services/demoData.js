@@ -232,6 +232,7 @@ export async function resetDemo({ store, vision, config, publicUrl, now = Date.n
     }))
   );
 
+  const plannedActions = [];
   const traps = await Promise.all(
     DEMO_TRAPS.map(async (trap) => {
       const days = [];
@@ -243,6 +244,7 @@ export async function resetDemo({ store, vision, config, publicUrl, now = Date.n
         stored.push(capture);
       }
       const last = stored.at(-1)?.detection.ai_advisory.decision;
+      plannedActions.push(...demoActions(trap, stored));
       return {
         id: trap.id,
         name: trap.name,
@@ -253,7 +255,34 @@ export async function resetDemo({ store, vision, config, publicUrl, now = Date.n
       };
     })
   );
-  return { traps, captures: traps.reduce((n, t) => n + t.captures, 0), days: DEMO_DAYS };
+  // The action log needs schema v4; without it the demo still works, just without actions
+  let actions = 0;
+  try {
+    if (plannedActions.length) actions = (await store.addActions(plannedActions)).length;
+  } catch {
+    actions = null;
+  }
+  return { traps, captures: traps.reduce((n, t) => n + t.captures, 0), days: DEMO_DAYS, actions };
+}
+
+/**
+ * A believable farmer response for the story: Polyhouse 1 hesitates on its first
+ * SPRAY ("not yet" - waiting for dry weather), Polyhouse 2 releases predators when
+ * it first turns RELEASE BIOCONTROL. Logged a few hours after the capture.
+ */
+function demoActions(trap, stored) {
+  const first = (decision) => stored.find((c) => c.detection.ai_advisory.decision?.decision === decision);
+  const at = (c, hours) => new Date(Date.parse(c.telemetry.timestamp) + hours * 3_600_000).toISOString();
+  const out = [];
+  if (trap.id === DEMO_TRAPS[0].id) {
+    const c = first('SPRAY');
+    if (c) out.push({ device_id: trap.id, action: 'not_yet', decision: 'SPRAY', note: 'Demo: waiting for a dry morning to spray', acted_at: at(c, 2) });
+  }
+  if (trap.id === DEMO_TRAPS[1].id) {
+    const c = first('BIOCONTROL');
+    if (c) out.push({ device_id: trap.id, action: 'released', decision: 'BIOCONTROL', note: 'Demo: released Macrolophus', acted_at: at(c, 3) });
+  }
+  return out.filter((a) => Date.parse(a.acted_at) <= Date.now());
 }
 
 /** Removes the demo traps and their captures. */

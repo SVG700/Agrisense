@@ -150,6 +150,34 @@ export async function trapDayRows({ store, logger }, days, { requireCoords = tru
   return { list, since, warnings, devices };
 }
 
+/**
+ * A trap's current predator-aware decision: seeded days + real captures over the
+ * last N days, with CHECK TRAP from the latest capture. Used by /decision and the
+ * action log (to record the advice shown when the farmer acted).
+ */
+export async function trapDecision({ store }, deviceId) {
+  const fetchSince = isoDay(new Date(Date.now() - (MAX_DAYS - 1) * 86_400_000));
+  const byDate = new Map();
+  try {
+    for (const o of await store.listObservations({ since: fetchSince })) {
+      if (o.device_id !== deviceId) continue;
+      byDate.set(o.date, { date: o.date, pests: o.pest_count, predators: o.predator_count, confidence: null, simulated: true });
+    }
+  } catch (err) {
+    if (!(err instanceof StoreError)) throw err;
+  }
+  const telemetry = await store.listTelemetry({ deviceId, limit: 500, sign: false });
+  for (const d of dailySeries(telemetry)) byDate.set(d.date, d);
+  const days = [...byDate.values()];
+  // The latest real capture decides CHECK TRAP (failed / uncounted photo, or trap gone quiet)
+  const last = telemetry.at(-1);
+  const meta = last?.detection?.vision_meta;
+  const latest = last ? { status: meta?.status, timestamp: last.timestamp, reason: meta?.quality?.reason ?? undefined } : null;
+  const result = withTrapCheck(evaluateDecision(days), latest);
+  const used = days.filter((d) => result.window.from && d.date >= result.window.from && d.date <= result.window.to);
+  return { device_id: deviceId, ...result, simulated: used.some((d) => d.simulated), days: used };
+}
+
 export function mapRouter({ config, store, logger }) {
   const router = Router();
   const adminLimit = rateLimit({ name: 'admin', windowMs: config.rateLimit.windowMs, max: config.rateLimit.adminMax });
@@ -213,26 +241,7 @@ export function mapRouter({ config, store, logger }) {
   // Current predator-aware decision for one trap (seeded days + real captures, last N days)
   router.get('/decision', async (req, res) => {
     const deviceId = requireUuid(req.query.device_id, 'device_id');
-    const fetchSince = isoDay(new Date(Date.now() - (MAX_DAYS - 1) * 86_400_000));
-    const byDate = new Map();
-    try {
-      for (const o of await store.listObservations({ since: fetchSince })) {
-        if (o.device_id !== deviceId) continue;
-        byDate.set(o.date, { date: o.date, pests: o.pest_count, predators: o.predator_count, confidence: null, simulated: true });
-      }
-    } catch (err) {
-      if (!(err instanceof StoreError)) throw err;
-    }
-    const telemetry = await store.listTelemetry({ deviceId, limit: 500, sign: false });
-    for (const d of dailySeries(telemetry)) byDate.set(d.date, d);
-    const days = [...byDate.values()];
-    // The latest real capture decides CHECK TRAP (failed / uncounted photo, or trap gone quiet)
-    const last = telemetry.at(-1);
-    const meta = last?.detection?.vision_meta;
-    const latest = last ? { status: meta?.status, timestamp: last.timestamp, reason: meta?.quality?.reason ?? undefined } : null;
-    const result = withTrapCheck(evaluateDecision(days), latest);
-    const used = days.filter((d) => result.window.from && d.date >= result.window.from && d.date <= result.window.to);
-    res.json({ device_id: deviceId, ...result, simulated: used.some((d) => d.simulated), days: used });
+    res.json(await trapDecision({ store }, deviceId));
   });
 
   router.post('/admin/map-seed', adminLimit, requireAdmin(config), async (req, res) => {
