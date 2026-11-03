@@ -12,7 +12,7 @@ const env = { ADMIN_API_KEY: ADMIN_KEY, TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_CHAT
 const admin = { 'X-Admin-Key': ADMIN_KEY };
 
 /** Fake Bot API: records sendMessage calls; getUpdates returns one private chat. */
-function fakeTelegram({ fail = false } = {}) {
+function fakeTelegram({ fail = false, updates = [{ message: { chat: { id: 987654321, type: 'private', first_name: 'Ravi' } } }], getStatus = null } = {}) {
   const sent = [];
   return {
     sent,
@@ -21,7 +21,11 @@ function fakeTelegram({ fail = false } = {}) {
       sent.push({ url, ...body });
       return { data: { ok: true } };
     },
-    get: async () => ({ data: { result: [{ message: { chat: { id: 987654321, type: 'private', first_name: 'Ravi' } } }] } }),
+    get: async (url) => {
+      if (getStatus) throw Object.assign(new Error(`Request failed: ${url}`), { response: { status: getStatus, data: { description: 'Unauthorized' } } });
+      if (url.endsWith('/getMe')) return { data: { ok: true, result: { username: 'Agrisense_test_bot', first_name: 'Agrisense' } } };
+      return { data: { ok: true, result: updates } };
+    },
   };
 }
 
@@ -101,6 +105,7 @@ describe('Telegram API + alerts', () => {
       const status = await app.request('GET', '/api/admin/telegram', { headers: admin });
       const chats = await app.request('GET', '/api/admin/telegram/chats', { headers: admin });
       assert.deepEqual(chats.body.chats, [{ id: 987654321, type: 'private', name: 'Ravi' }]);
+      assert.deepEqual(chats.body.bot, { username: 'Agrisense_test_bot', name: 'Agrisense' });
       for (const r of [t, s, status, chats]) assert.ok(!JSON.stringify(r.body).includes(TOKEN.split(':')[1]));
       assert.equal(status.body.chats, 1);
     } finally {
@@ -139,6 +144,28 @@ describe('Telegram API + alerts', () => {
       assert.ok(!JSON.stringify(r.body).includes(TOKEN.split(':')[1]));
     } finally {
       await app.close();
+    }
+  });
+
+  test('chat lookup: names the bot when nobody has messaged it; a wrong token gets a clear fix', async () => {
+    const empty = await startApp({ env, telegramHttp: fakeTelegram({ updates: [] }) });
+    try {
+      const r = await empty.request('GET', '/api/admin/telegram/chats', { headers: admin });
+      assert.equal(r.status, 200);
+      assert.deepEqual(r.body.chats, []);
+      assert.equal(r.body.bot.username, 'Agrisense_test_bot');
+    } finally {
+      await empty.close();
+    }
+    const bad = await startApp({ env, telegramHttp: fakeTelegram({ getStatus: 401 }) });
+    try {
+      const r = await bad.request('GET', '/api/admin/telegram/chats', { headers: admin });
+      assert.equal(r.status, 502);
+      assert.equal(r.body.code, 'telegram_http_401');
+      assert.match(r.body.error, /rejected the bot token.*@BotFather/);
+      assert.ok(!JSON.stringify(r.body).includes(TOKEN.split(':')[1]));
+    } finally {
+      await bad.close();
     }
   });
 

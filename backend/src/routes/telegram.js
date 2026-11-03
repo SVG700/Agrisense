@@ -33,7 +33,16 @@ export function telegramRouter({ config, telegram }) {
     if (!r.ok && r.code === 'not_configured') {
       throw new HttpError(409, 'Add TELEGRAM_BOT_TOKEN to backend/.env first', { code: 'telegram_not_configured' });
     }
-    if (!r.ok) throw new HttpError(502, 'Could not reach Telegram', { code: r.code });
+    if (!r.ok) {
+      const why = {
+        telegram_http_401: 'Telegram rejected the bot token - copy it again from @BotFather into TELEGRAM_BOT_TOKEN in backend/.env and restart',
+        telegram_http_404: 'Telegram rejected the bot token - copy it again from @BotFather into TELEGRAM_BOT_TOKEN in backend/.env and restart',
+        telegram_http_409: 'This bot has a webhook set, which blocks chat lookup - remove it with @BotFather or deleteWebhook',
+        telegram_timeout: 'Telegram did not answer in time - check the internet connection and try again',
+        telegram_unreachable: 'Could not reach Telegram from the backend - check the internet connection / firewall and try again',
+      }[r.code];
+      throw new HttpError(502, why ?? `Telegram error${r.description ? `: ${r.description}` : ''}`, { code: r.code });
+    }
     res.json(r);
   });
 

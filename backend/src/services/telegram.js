@@ -223,6 +223,17 @@ export function createTelegram({ config, store, weather, http = axios, logger })
     /** Chats that have messaged the bot recently - to find TELEGRAM_CHAT_ID. Works with only the token set. */
     async findChats() {
       if (!tg.token) return { ok: false, code: 'not_configured', chats: [] };
+      // Which bot this token belongs to, so the farmer knows exactly whom to message
+      let bot = null;
+      try {
+        const { data } = await http.get(`${API}/bot${tg.token}/getMe`, { timeout: tg.timeoutMs });
+        if (data?.result?.username) bot = { username: data.result.username, name: data.result.first_name ?? null };
+      } catch (err) {
+        const code = errorCode(err);
+        const description = err?.response?.data?.description ?? null;
+        // 401/404 here means the token itself is wrong - no point asking Telegram for chats
+        if (code === 'telegram_http_401' || code === 'telegram_http_404') return { ok: false, code, description, chats: [], bot: null };
+      }
       try {
         const { data } = await http.get(`${API}/bot${tg.token}/getUpdates`, { timeout: tg.timeoutMs, params: { limit: 50 } });
         const chats = new Map();
@@ -230,9 +241,9 @@ export function createTelegram({ config, store, weather, http = axios, logger })
           const c = (u.message ?? u.channel_post ?? u.my_chat_member ?? u.edited_message)?.chat;
           if (c) chats.set(c.id, { id: c.id, type: c.type, name: c.title ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(' ') });
         }
-        return { ok: true, chats: [...chats.values()] };
+        return { ok: true, chats: [...chats.values()], bot };
       } catch (err) {
-        return { ok: false, code: errorCode(err), chats: [] };
+        return { ok: false, code: errorCode(err), description: err?.response?.data?.description ?? null, chats: [], bot };
       }
     },
 

@@ -162,7 +162,7 @@ export function loadConfig(env = process.env) {
       summaryTime: str('TELEGRAM_SUMMARY_TIME', '07:00'),
       timezone: str('TELEGRAM_TIMEZONE', 'Asia/Kolkata'),
       dashboardUrl: str('DASHBOARD_URL'),
-      timeoutMs: int('TELEGRAM_TIMEOUT_MS', 5000, 500, 30_000),
+      timeoutMs: int('TELEGRAM_TIMEOUT_MS', 10_000, 500, 30_000),
     },
 
     // Open-Meteo (free, no key): spray window + degree-days. Never blocks anything.

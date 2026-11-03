@@ -15,6 +15,7 @@ export default function TelegramCard({ log }) {
   const [busy, setBusy] = useState(null);
   const [preview, setPreview] = useState(null);
   const [chats, setChats] = useState(null);
+  const [bot, setBot] = useState(null);
 
   const loadStatus = () => api.telegramStatus().then(setStatus).catch(() => setStatus(null));
   useEffect(() => {
@@ -73,7 +74,7 @@ export default function TelegramCard({ log }) {
         </button>
         <button
           className="btn btn-ghost text-xs"
-          onClick={() => run('chat lookup', api.telegramChats, (r) => setChats(r.chats))}
+          onClick={() => run('chat lookup', api.telegramChats, (r) => (setChats(r.chats), setBot(r.bot ?? null)))}
           disabled={busy !== null || status?.state === 'not_configured'}
         >
           {busy === 'chat lookup' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />} Find my chat id
@@ -90,6 +91,7 @@ export default function TelegramCard({ log }) {
         <div className="text-xs text-slate-300">
           {chats.length ? (
             <ul className="space-y-1">
+              {bot && <li className="text-slate-400">Bot: @{bot.username} - copy your number below into TELEGRAM_CHAT_ID:</li>}
               {chats.map((c) => (
                 <li key={c.id}>
                   <code className="rounded bg-slate-800 px-1.5 py-0.5 text-emerald-200">{c.id}</code> {c.name} ({c.type})
@@ -97,7 +99,18 @@ export default function TelegramCard({ log }) {
               ))}
             </ul>
           ) : (
-            'No chats yet - send your bot a message in Telegram first, then try again.'
+            <p data-testid="telegram-no-chats">
+              No messages found for{' '}
+              {bot ? (
+                <a href={`https://t.me/${bot.username}`} target="_blank" rel="noreferrer" className="font-semibold text-emerald-300 underline">
+                  @{bot.username}
+                </a>
+              ) : (
+                'your bot'
+              )}{' '}
+              yet. Open {bot ? `@${bot.username}` : 'the bot'} in Telegram (not @BotFather), press <b>Start</b>, send "hi", then click{' '}
+              <b>Find my chat id</b> again.
+            </p>
           )}
         </div>
       )}

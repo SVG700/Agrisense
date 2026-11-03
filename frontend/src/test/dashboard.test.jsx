@@ -522,6 +522,25 @@ describe('AdminPanel', () => {
 });
 
 describe('Telegram card', () => {
+  test('no chats yet: names the exact bot to message, with a link', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) =>
+        url.includes('/chats')
+          ? jsonResponse({ ok: true, chats: [], bot: { username: 'Agrisense_new_bot', name: 'Agrisense' } })
+          : jsonResponse({ state: 'missing_chat_id', chats: 0, language: 'both', summary_time: '07:00', timezone: 'Asia/Kolkata', last: null })
+      )
+    );
+    const { default: TelegramCard } = await import('../components/TelegramCard.jsx');
+    render(<TelegramCard />);
+    await screen.findByText(/chat id missing/);
+    fireEvent.click(screen.getByRole('button', { name: /Find my chat id/ }));
+    const msg = await screen.findByTestId('telegram-no-chats');
+    expect(msg.textContent).toContain('Open @Agrisense_new_bot in Telegram (not @BotFather)');
+    expect(msg.querySelector('a').getAttribute('href')).toBe('https://t.me/Agrisense_new_bot');
+  });
+
+
   test('not set up: shows the 3 setup steps; preview works; send buttons stay disabled', async () => {
     vi.stubGlobal(
       'fetch',
