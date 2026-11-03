@@ -114,6 +114,17 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## What-if simulator
+
+The **What if…?** card on Farmer Analytics starts from the selected trap's real 3-day averages and lets you
+move **pests/day**, **predators/day** and **detector confidence**, or try quick scenarios (*release
+predators*, *pests double*, *after a spray*, *low detector confidence*). Every answer comes from the
+backend's decision engine (`GET /api/decision/simulate`), the same function that decides for real traps.
+Nothing is re-implemented in the browser. The decision map shades the WAIT, RELEASE BIOCONTROL and
+SPRAY regions computed by that engine, with the 25/day action line and the 10:1 ratio line. A white dot
+marks the what-if and a ring marks the trap now. It shows judges at a glance why releasing predators
+changes the advice.
+
 ## Weather: spray window and degree-days
 
 The dashboard's **Can I spray now?** card uses the free [Open-Meteo](https://open-meteo.com) forecast
@@ -407,6 +418,8 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
 | POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
+| GET | `/api/decision/simulate?pests=&predators=&confidence=` | – | What-if: the same decision engine on hypothetical per-day averages (nothing stored) |
+| GET | `/api/decision/regions?max_pests=&max_predators=&steps=` | – | Decision map: grid of decisions over pests/day x predators/day |
 | GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |
 | GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |
 | POST | `/api/admin/map-seed` | admin | `{traps, observations}`. Simulated data only; decisions computed server-side |

@@ -2,6 +2,8 @@
  * Pest Surveillance Map routes
  *   GET    /api/map-data?days=30      one row per trap per day (public read, like the dashboard)
  *   GET    /api/decision?device_id=   current predator-aware decision for one trap (last N days)
+ *   GET    /api/decision/simulate     what-if: same engine on hypothetical pests/predators per day
+ *   GET    /api/decision/regions      decision map over a pests x predators grid
  *   POST   /api/admin/map-seed        load SIMULATED traps + daily counts (admin; used by demo/seed.py)
  *   DELETE /api/admin/map-seed        remove all simulated traps and their observations (admin)
  *   PATCH  /api/device/location       set a real trap's coordinates (admin)
@@ -33,6 +35,21 @@ const MAX_OBSERVATIONS = 20000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoDay = (d) => d.toISOString().slice(0, 10);
+
+/** Non-negative per-day rate from a query string (what-if inputs). */
+function rate(value, field) {
+  const n = Number(value);
+  if (value === undefined || value === '' || !Number.isFinite(n) || n < 0 || n > 100_000) {
+    throw new HttpError(400, `"${field}" must be a number between 0 and 100000`, { code: 'invalid_' + field });
+  }
+  return n;
+}
+
+function fraction(value, field) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || n > 1) throw new HttpError(400, `"${field}" must be between 0 and 1`, { code: 'invalid_' + field });
+  return n;
+}
 
 function coordinate(value, field, min, max) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
@@ -147,6 +164,31 @@ export function mapRouter({ config, store, logger }) {
         warnings,
       },
     });
+  });
+
+  // What-if: the SAME engine on hypothetical daily averages (pure computation, nothing stored)
+  router.get('/decision/simulate', (req, res) => {
+    const pests = rate(req.query.pests, 'pests');
+    const predators = rate(req.query.predators, 'predators');
+    const confidence = req.query.confidence === undefined ? null : fraction(req.query.confidence, 'confidence');
+    // A full window of identical days = "if the N-day average were ..."
+    const n = DECISION_CONFIG.rollingWindowDays;
+    const days = Array.from({ length: n }, (_, i) => ({ date: `sim-${i}`, pests, predators, confidence }));
+    const result = evaluateDecision(days);
+    res.json({ ...result, inputs: { pests_per_day: pests, predators_per_day: predators, confidence }, window: { ...result.window, from: null, to: null } });
+  });
+
+  // Decision map: which advice the engine gives across a grid of pests/day x predators/day
+  router.get('/decision/regions', (req, res) => {
+    const maxPests = rate(req.query.max_pests ?? 100, 'max_pests') || 100;
+    const maxPred = rate(req.query.max_predators ?? 20, 'max_predators') || 20;
+    const steps = Math.min(60, Math.max(4, Number.parseInt(req.query.steps, 10) || 40));
+    const axis = (max) => Array.from({ length: steps + 1 }, (_, i) => Math.round(((max * i) / steps) * 100) / 100);
+    const pests = axis(maxPests);
+    const predators = axis(maxPred);
+    // rows = predators (low -> high), columns = pests (low -> high)
+    const cells = predators.map((r) => pests.map((p) => decide(p, r)));
+    res.json({ pests, predators, cells, thresholds: THRESHOLDS });
   });
 
   // Current predator-aware decision for one trap (seeded days + real captures, last N days)

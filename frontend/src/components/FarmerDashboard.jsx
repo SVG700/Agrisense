@@ -21,6 +21,7 @@ import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
 import WeatherCard from './WeatherCard.jsx';
+import WhatIfCard from './WhatIfCard.jsx';
 import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
@@ -212,6 +213,10 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
           <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
         </Item>
       </Stagger>
+
+      <Reveal>
+        <WhatIfCard deviceId={device?.id} />
+      </Reveal>
 
       <Reveal>
         <MicroclimateChart telemetry={telemetry} />

@@ -210,6 +210,34 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('What-if simulator', () => {
+  test('starts from the trap, asks the engine on every change, and draws the decision map', async () => {
+    const fetchMock = vi.fn((url) => {
+      if (url.includes('/api/decision/regions'))
+        return jsonResponse({ pests: [0, 50, 100], predators: [0, 15, 30], cells: [['WAIT', 'SPRAY', 'SPRAY'], ['WAIT', 'BIOCONTROL', 'SPRAY'], ['WAIT', 'BIOCONTROL', 'BIOCONTROL']], thresholds: { action_threshold_per_day: 25, spray_ratio: 10 } });
+      if (url.includes('/api/decision/simulate')) {
+        const pests = Number(new URL(url, 'http://x').searchParams.get('pests'));
+        const decision = pests >= 25 ? 'SPRAY' : 'WAIT';
+        return jsonResponse({ decision, label: decision, reason: `engine says ${decision} at ${pests}`, borderline: false, range: { pests: [pests, pests], uncertainty: 0.15 } });
+      }
+      if (url.includes('/api/decision?')) return jsonResponse({ decision: 'SPRAY', avg_pests: 40, avg_predators: 1, range: { mean_confidence: 0.9 } });
+      return jsonResponse({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { default: WhatIfCard } = await import('../components/WhatIfCard.jsx');
+    render(<WhatIfCard deviceId={DEVICE.id} />);
+
+    await waitFor(() => expect(screen.getByTestId('what-if-result').textContent).toContain('engine says SPRAY at 40'));
+    expect(screen.getByTestId('decision-map')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Pests per day (3-day average)'), { target: { value: '10' } });
+    await waitFor(() => expect(screen.getByTestId('what-if-result').textContent).toContain('engine says WAIT at 10'));
+    fireEvent.click(screen.getByText(/Back to this trap/));
+    await waitFor(() => expect(screen.getByTestId('what-if-result').textContent).toContain('at 40'));
+    // Every answer came from the backend engine
+    expect(fetchMock.mock.calls.some(([u]) => u.includes('/api/decision/simulate?pests=10&predators=1&confidence=0.9'))).toBe(true);
+  });
+});
+
 describe('Weather card', () => {
   const weather = (over = {}) => ({
     available: true,

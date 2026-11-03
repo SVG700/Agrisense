@@ -251,3 +251,47 @@ describe('GET /api/map-data + seed', () => {
     }
   });
 });
+
+describe('what-if simulator', () => {
+  test('simulate uses the same engine: decision, reason, range, borderline', async () => {
+    const app = await startApp({});
+    try {
+      const spray = await app.request('GET', '/api/decision/simulate?pests=40&predators=2');
+      assert.equal(spray.status, 200);
+      assert.equal(spray.body.decision, 'SPRAY');
+      assert.equal(spray.body.avg_pests, 40);
+      assert.equal(spray.body.window.days, 3);
+      assert.deepEqual(spray.body.inputs, { pests_per_day: 40, predators_per_day: 2, confidence: null });
+      assert.deepEqual(spray.body, { ...evaluateDecision([1, 2, 3].map((i) => ({ date: `d${i}`, pests: 40, predators: 2 }))), inputs: spray.body.inputs, window: spray.body.window });
+
+      const bio = await app.request('GET', '/api/decision/simulate?pests=40&predators=8');
+      assert.equal(bio.body.label, 'RELEASE BIOCONTROL');
+      // Lower detector confidence widens the range -> borderline near the threshold
+      assert.equal((await app.request('GET', '/api/decision/simulate?pests=23&predators=0&confidence=0.95')).body.borderline, false);
+      assert.equal((await app.request('GET', '/api/decision/simulate?pests=23&predators=0&confidence=0.7')).body.borderline, true);
+
+      assert.equal((await app.request('GET', '/api/decision/simulate?pests=-1&predators=0')).status, 400);
+      assert.equal((await app.request('GET', '/api/decision/simulate?predators=0')).status, 400);
+      assert.equal((await app.request('GET', '/api/decision/simulate?pests=5&predators=0&confidence=2')).status, 400);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('regions: a grid of decisions from decide() with the configured thresholds', async () => {
+    const app = await startApp({});
+    try {
+      const r = (await app.request('GET', '/api/decision/regions?max_pests=100&max_predators=20&steps=20')).body;
+      assert.equal(r.pests.length, 21);
+      assert.equal(r.cells.length, 21);
+      const at = (p, q) => r.cells[r.predators.indexOf(q)][r.pests.indexOf(p)];
+      assert.equal(at(20, 0), 'WAIT');
+      assert.equal(at(25, 0), 'SPRAY');
+      assert.equal(at(50, 5), 'SPRAY'); // 10 per predator
+      assert.equal(at(50, 6), 'BIOCONTROL');
+      assert.equal(r.thresholds.action_threshold_per_day, 25);
+    } finally {
+      await app.close();
+    }
+  });
+});
