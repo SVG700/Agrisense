@@ -9,6 +9,7 @@ import { LOW_BATTERY_THRESHOLD, SENSOR_LIMITS, integrationFlags } from './config
 import { telemetryRouter } from './routes/telemetry.js';
 import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
 import { mapRouter } from './routes/map.js';
+import { demoRouter } from './routes/demo.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -98,14 +99,16 @@ export function createApp(deps) {
   app.get('/api/mock-trap/:seed.svg', (req, res) => {
     const seed = String(req.params.seed).slice(0, 64);
     const density = Number(req.query.d ?? 0.4);
+    const opts = { mix: String(req.query.m ?? 'default'), predators: Number(req.query.p ?? 0) };
     res.type('image/svg+xml').set('Cache-Control', 'public, max-age=31536000, immutable');
-    res.send(renderTrapSvg(seed, density));
+    res.send(renderTrapSvg(seed, density, opts));
   });
 
   app.use('/api/telemetry', telemetryRouter(deps));
   app.use('/api/devices', devicesRouter(deps));
   app.use('/api/device', deviceAdminRouter(deps));
   app.use('/api', mapRouter(deps));
+  app.use('/api', demoRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));

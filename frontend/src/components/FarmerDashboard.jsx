@@ -30,6 +30,7 @@ import {
   VISION_STATES,
   fmtReading,
   hasCounts,
+  isSimulated,
   pestMeta,
   timeAgo,
   totalOf,
@@ -97,6 +98,21 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
           </motion.button>
         )}
       </AnimatePresence>
+
+      {isSimulated(capture) && (
+        <div
+          role="note"
+          data-testid="simulated-banner"
+          className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100"
+        >
+          <Badge tone="warn">Simulated data</Badge>
+          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">Demo detector</Badge>}
+          <span className="text-amber-100/80">
+            This capture was generated for demonstration, not photographed in a field. Counts and decisions show how the system
+            behaves, not a real infestation.
+          </span>
+        </div>
+      )}
 
       <Hero
         device={device}

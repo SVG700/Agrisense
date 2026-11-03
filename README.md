@@ -114,6 +114,27 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Demo mode
+
+One click loads four **DEMO** traps with 14 days of simulated captures (two per day: 08:00 and 17:00 IST),
+built so that every decision appears:
+
+| Trap | Story | Ends as |
+|---|---|---|
+| DEMO · Polyhouse 1 (tomato) | whitefly climbing, almost no predators | ▲ SPRAY |
+| DEMO · Polyhouse 2 (tomato) | whitefly high, but Macrolophus/Nesidiocoris build up | ◆ RELEASE BIOCONTROL |
+| DEMO · Net-house (capsicum) | hovering just under 25/day | ● WAIT, BORDERLINE |
+| DEMO · Polyhouse 3 (cucumber) | last photo unreadable (fogged lens) | ■ CHECK TRAP |
+
+- **Dashboard:** *Admin & Hardware Control → Demo mode → Reset demo data* (needs the admin key).
+- **Terminal:** `cd backend && npm run demo:reset` (reads `ADMIN_API_KEY` from `backend/.env`; add `-- --clear` to remove them).
+- Reset any time: it deletes the DEMO traps and re-seeds them, ending at the current time. Run it again before a
+  presentation, because a trap with no capture for 48 hours turns grey (CHECK TRAP).
+- Nothing is passed off as real. Every DEMO capture is `data_source: simulator`, its detections come from the
+  **demo detector** (synthetic sticky-card images whose boxes are generated), and its advisory is the rule engine
+  labelled *demo*. The dashboard shows a **Simulated data / Demo detector** banner on these captures. A reset makes
+  no vision or LLM calls, so it costs nothing and works offline.
+
 ## Pest Surveillance Map
 
 The **Pest Surveillance Map** page (sidebar → *Pest Surveillance Map*) shows every trap on a kepler.gl map:
@@ -320,6 +341,7 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
 | GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |
 | GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |
 | POST | `/api/admin/map-seed` | admin | `{traps, observations}`. Simulated data only; decisions computed server-side |

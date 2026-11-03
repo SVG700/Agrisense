@@ -10,7 +10,10 @@ import {
   Loader2,
   Play,
   Radio,
+  RotateCcw,
+  Sparkles,
   Square,
+  Trash2,
   Terminal,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,6 +21,7 @@ import { api, getAdminKey, mockTrapUrl, setAdminKey } from '../api.js';
 import { EASE, Item, Stagger } from '../lib/motion.jsx';
 import { LOW_BATTERY, RISK_STYLES, timeAgo, totalOf } from '../lib/pests.js';
 import Badge from './Badge.jsx';
+import DecisionBadge from './DecisionBadge.jsx';
 
 let logSeq = 0;
 
@@ -40,6 +44,9 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
       <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
         <Item>
           <AdminKeyBox required={adminAuthRequired} />
+        </Item>
+        <Item>
+          <DemoControl onChanged={onIngested} log={pushLog} />
         </Item>
         <Item as="section" className="card">
           <h2 className="card-title mb-1">
@@ -98,6 +105,71 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** Demo mode: one click re-seeds 4 DEMO traps with 14 days of simulated captures (or removes them). */
+function DemoControl({ onChanged, log }) {
+  const [busy, setBusy] = useState(null); // 'reset' | 'clear' | null
+  const [result, setResult] = useState(null);
+
+  const run = async (kind) => {
+    setBusy(kind);
+    try {
+      if (kind === 'reset') {
+        const r = await api.resetDemo();
+        setResult(r);
+        log(`Demo reset: ${r.captures} simulated captures across ${r.traps.length} DEMO traps (${r.days} days)`);
+      } else {
+        const r = await api.clearDemo();
+        setResult(null);
+        log(`Demo cleared: removed ${r.removed} DEMO trap(s)`, 'warn');
+      }
+      await onChanged?.();
+    } catch (err) {
+      log(`Demo ${kind} failed: ${explain(err)}`, 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="card" data-testid="demo-control">
+      <h2 className="card-title mb-1">
+        <span className="icon-chip h-8! w-8! rounded-lg!">
+          <Sparkles className="h-4 w-4" />
+        </span>
+        Demo mode
+        <Badge tone="warn" className="ml-auto">
+          Simulated data
+        </Badge>
+      </h2>
+      <p className="mb-4 text-sm text-slate-400">
+        Loads four <b>DEMO</b> traps with 14 days of simulated whitefly and predator captures (demo detector + rule engine,
+        no paid API calls). They are built to show every decision: SPRAY, RELEASE BIOCONTROL, a BORDERLINE WAIT and CHECK
+        TRAP. Reset any time to start the story again from today.
+      </p>
+      <div className="flex flex-wrap gap-3">
+        <button className="btn btn-primary" onClick={() => run('reset')} disabled={busy !== null}>
+          {busy === 'reset' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+          {busy === 'reset' ? 'Seeding…' : 'Reset demo data'}
+        </button>
+        <button className="btn btn-ghost" onClick={() => run('clear')} disabled={busy !== null}>
+          {busy === 'clear' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          Remove demo traps
+        </button>
+      </div>
+      {result && (
+        <ul className="mt-4 flex flex-col gap-2 text-sm">
+          {result.traps.map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-900/50 px-3 py-2">
+              <span className="text-slate-200">{t.name}</span>
+              <DecisionBadge decision={t.decision} borderline={t.borderline} size="sm" />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 /** Operator enters the admin key at runtime; it is kept in sessionStorage, never in the build. */
 function AdminKeyBox({ required }) {

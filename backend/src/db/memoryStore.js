@@ -87,6 +87,22 @@ export function createMemoryStore() {
       return removed;
     },
 
+    /** Removes the given devices with all their captures and observations (demo reset). */
+    async deleteDevices(ids) {
+      const drop = new Set(ids);
+      const removed = ids.filter((id) => devices.delete(id)).map((id) => ({ id }));
+      for (const [k, o] of observations) if (drop.has(o.device_id)) observations.delete(k);
+      for (let i = telemetry.length - 1; i >= 0; i--) {
+        const t = telemetry[i];
+        if (!drop.has(t.device_id)) continue;
+        telemetry.splice(i, 1);
+        byCaptureId.delete(t.capture_id);
+        detections.delete(t.id);
+        if (t.image_path) images.delete(t.image_path);
+      }
+      return removed;
+    },
+
     async getDevice(id) {
       return clone(devices.get(id) ?? null);
     },

@@ -29,6 +29,13 @@ function sourceBadge(advisory) {
       </Badge>
     );
   }
+  if (advisory.source === 'rule-engine' && advisory.status === 'demo') {
+    return (
+      <Badge tone="warn" title="Seeded demo advisory from the rule engine (no LLM call)">
+        Rule engine · demo
+      </Badge>
+    );
+  }
   if (advisory.source === 'rule-engine') return <Badge tone="muted">Rule engine</Badge>;
   return <Badge tone="muted">No advisory</Badge>;
 }

@@ -210,6 +210,32 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Demo mode', () => {
+  test('simulated captures carry a "Simulated data" + "Demo detector" banner', () => {
+    render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} />);
+    const banner = screen.getByTestId('simulated-banner');
+    expect(banner.textContent).toContain('Simulated data');
+    expect(banner.textContent).toContain('Demo detector');
+  });
+
+  test('one click resets the demo and lists each trap’s decision', async () => {
+    const traps = [
+      { id: 'a', name: 'DEMO · Polyhouse 1 (tomato)', decision: 'SPRAY', borderline: false },
+      { id: 'b', name: 'DEMO · Net-house (capsicum)', decision: 'WAIT', borderline: true },
+    ];
+    const fetchMock = vi.fn(() => jsonResponse({ traps, captures: 54, days: 14 }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const onIngested = vi.fn();
+    render(<AdminPanel devices={[DEVICE]} activeDeviceId={DEVICE.id} onDevicePatched={() => {}} onIngested={onIngested} />);
+    fireEvent.click(screen.getByRole('button', { name: /Reset demo data/ }));
+    expect(await screen.findByText('DEMO · Net-house (capsicum)')).toBeTruthy();
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/admin/demo/reset');
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(onIngested).toHaveBeenCalled();
+    expect(screen.getByText(/54 simulated captures/)).toBeTruthy();
+  });
+});
+
 describe('AdminPanel', () => {
   test('manual battery update triggers the low-battery alert and is labelled manual', async () => {
     let devices = [DEVICE];

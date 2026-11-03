@@ -94,6 +94,12 @@ export function createSupabaseStore({ config, client, logger }) {
       return run('deleteSimulatedDevices', supabase.from('devices').delete().eq('simulated', true).select('id'));
     },
 
+    /** Removes the given devices; captures, detections and observations cascade (demo reset). */
+    async deleteDevices(ids) {
+      if (!ids.length) return [];
+      return run('deleteDevices', supabase.from('devices').delete().in('id', ids).select('id'));
+    },
+
     async getDevice(id) {
       return run('getDevice', supabase.from('devices').select('*').eq('id', id).maybeSingle());
     },

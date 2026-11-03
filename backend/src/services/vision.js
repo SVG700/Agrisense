@@ -164,7 +164,7 @@ export function createVision({ config, http = axios, logger }) {
       // Synthetic demo traps: simulated detections that match the rendered SVG
       const mock = !image && parseMockTrapUrl(imageUrl);
       if (mock) {
-        const boxes = generateTrap(mock.seed, mock.density).map(({ label, confidence, x, y, width, height }) => ({
+        const boxes = generateTrap(mock.seed, mock.density, mock.opts).map(({ label, confidence, x, y, width, height }) => ({
           label,
           confidence,
           x,
