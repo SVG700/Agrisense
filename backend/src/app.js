@@ -10,6 +10,7 @@ import { telemetryRouter } from './routes/telemetry.js';
 import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
 import { mapRouter } from './routes/map.js';
 import { demoRouter } from './routes/demo.js';
+import { checkRouter } from './routes/check.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -109,6 +110,7 @@ export function createApp(deps) {
   app.use('/api/device', deviceAdminRouter(deps));
   app.use('/api', mapRouter(deps));
   app.use('/api', demoRouter(deps));
+  app.use('/api', checkRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));

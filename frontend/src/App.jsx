@@ -19,6 +19,7 @@ import { EASE, WordReveal, pageTransition } from './lib/motion.jsx';
 import { BackToTop, InteractionEffects, ScrollProgress } from './components/InteractionEffects.jsx';
 import FarmerDashboard from './components/FarmerDashboard.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
+import PhoneCheckPage from './components/PhoneCheckPage.jsx';
 import AmbientBackground from './components/AmbientBackground.jsx';
 import { DashboardSkeleton } from './components/Skeletons.jsx';
 
@@ -29,6 +30,7 @@ const POLL_MS = Number(import.meta.env.VITE_POLL_MS) || 5000;
 
 const TABS = [
   { id: 'farmer', label: 'Farmer Analytics', short: 'Analytics', icon: LineChart, blurb: 'Trap insights & advisory' },
+  { id: 'check', label: 'Phone Check', short: 'Check', icon: Camera, blurb: 'Photo a trap card, get advice' },
   { id: 'map', label: 'Pest Surveillance Map', short: 'Map', icon: MapIcon, blurb: 'Trap network & outbreak replay' },
   { id: 'admin', label: 'Admin & Hardware Control', short: 'Hardware', icon: Cpu, blurb: 'Devices, battery & capture' },
 ];
@@ -260,6 +262,8 @@ export default function App() {
                     telemetry={telemetry}
                     onGoAdmin={() => setTab('admin')}
                   />
+                ) : tab === 'check' ? (
+                  <PhoneCheckPage />
                 ) : tab === 'map' ? (
                   <Suspense fallback={<DashboardSkeleton />}>
                     <PestMapPage />

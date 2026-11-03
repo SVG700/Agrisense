@@ -114,6 +114,21 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Phone check
+
+*Phone Check* (sidebar / **Check** tab) lets a farmer photograph a yellow sticky card and enter how many days
+it hung. On a phone, **Take or choose a photo** opens the camera. The photo is corrected for orientation and
+resized to at most 2600 px in the browser, so uploads stay small on rural connections.
+
+The backend (`POST /api/check`) runs the same pipeline as a trap capture: the quality check, then Roboflow
+with tiling, then the predator-aware decision, then the Gemini advisory that explains it. Counts are divided
+by the days hung to give **pests per day**, so the same card means a lower daily rate the longer it hung.
+The answer shows the traffic-light decision with its reason, count range and BORDERLINE tag, the whitefly
+and predator (MR/NC) counts, the annotated photo, the photo-quality verdict and the advice. A card that hung
+only 1-2 days is flagged as a short window. A rejected photo gives **CHECK TRAP** with retake advice.
+**Nothing is stored.** The endpoint is public but rate-limited (`RATE_LIMIT_CHECK_MAX`, default 20 per
+window per IP), because each check can cost vision and LLM calls.
+
 ## Demo mode
 
 One click loads four **DEMO** traps with 14 days of simulated captures (two per day: 08:00 and 17:00 IST),
@@ -369,6 +384,7 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
 | GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |
 | GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |

@@ -210,6 +210,52 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Phone check', () => {
+  test('photo + days hung -> decision, counts and advice; sends days_hung', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 4000, height: 3000, close() {} })));
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage() {} });
+    const toUrl = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,AAAA');
+    // Real Chrome returns a Promise here; an effect that returned it crashed the whole app
+    Element.prototype.scrollIntoView = vi.fn(() => Promise.resolve());
+    const fetchMock = vi.fn(() =>
+      jsonResponse({
+        days_hung: 5,
+        counts: { whitefly: 150, macrolophus: 2, nesidiocoris: 1 },
+        totals: { pests: 150, predators: 3 },
+        per_day: { pests: 30, predators: 0.6 },
+        decision: { decision: 'SPRAY', label: 'SPRAY', reason: 'Average 30 pests/day over the 5 days the card hung.', pests_per_predator: 50, range: { pests: [25.5, 34.5] }, thresholds: { action_threshold_per_day: 25, spray_ratio: 10 } },
+        advisory: { source: 'gemini', recommendation: 'Scout first.', mitigation_strategy: ['Scout first.', 'Spray at label rate.'] },
+        quality: { ok: true, issues: [] },
+        annotated_image: 'data:image/jpeg;base64,BBBB',
+        vision: { status: 'ok', boxes: 153, model: 'yellow-sticky-traps-bwxut-ieond/1', image: { grid: '4x4' } },
+        stored: false,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { default: PhoneCheckPage } = await import('../components/PhoneCheckPage.jsx');
+    render(<PhoneCheckPage />);
+
+    fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'trap.jpg', { type: 'image/jpeg' })] } });
+    await screen.findByAltText('Sticky trap photo');
+    fireEvent.click(screen.getByRole('button', { name: /One day less/ }));
+    fireEvent.click(screen.getByRole('button', { name: /One day less/ }));
+    expect(screen.getByTestId('days-value').textContent).toBe('5 days');
+    fireEvent.click(screen.getByRole('button', { name: /Check trap/ }));
+
+    const res = await screen.findByTestId('check-result');
+    expect(res.querySelector('[data-decision="SPRAY"]')).toBeTruthy();
+    expect(res.textContent).toContain('over the 5 days the card hung');
+    expect(res.textContent).toContain('MR 2 · NC 1');
+    expect(res.textContent).toContain('Spray at label rate.');
+    expect(screen.getByAltText('Sticky trap photo').getAttribute('src')).toBe('data:image/jpeg;base64,BBBB'); // annotated
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent.days_hung).toBe(5);
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/check');
+    ctx.mockRestore();
+    toUrl.mockRestore();
+  });
+});
+
 describe('Photo quality', () => {
   test('a rejected photo says what is wrong and that it must be retaken', () => {
     const quality = {

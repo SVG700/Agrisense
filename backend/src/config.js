@@ -114,6 +114,8 @@ export function loadConfig(env = process.env) {
       windowMs: int('RATE_LIMIT_WINDOW_MS', 60_000, 1000),
       ingestMax: int('RATE_LIMIT_INGEST_MAX', 120, 1),
       adminMax: int('RATE_LIMIT_ADMIN_MAX', 60, 1),
+      // Phone checks can each cost vision + LLM calls
+      checkMax: int('RATE_LIMIT_CHECK_MAX', 20, 1),
     },
 
     supabase: {

@@ -59,6 +59,7 @@ export const api = {
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),
   decision: (deviceId) => request(`/api/decision?device_id=${encodeURIComponent(deviceId)}`),
   mapData: (days = 14) => request(`/api/map-data?days=${encodeURIComponent(days)}`),
+  check: (payload) => request('/api/check', { method: 'POST', body: payload }),
   resetDemo: () => request('/api/admin/demo/reset', { method: 'POST', admin: true }),
   clearDemo: () => request('/api/admin/demo', { method: 'DELETE', admin: true }),
   setBattery: (device_id, battery_level) =>
