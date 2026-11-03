@@ -158,5 +158,20 @@
     "upper_temp_c": 32,
     "generation_degree_days": 300,
     "_generation_degree_days": "Approximate degree-days for one whitefly generation (egg to adult) above the base temperature."
+  },
+  "impact": {
+    "_about": "ESTIMATE ONLY - placeholder assumptions to confirm with the IIHR mentor and local farmers. Compares the traps' decisions with routine calendar spraying.",
+    "calendar_spray_interval_days": 7,
+    "_calendar_spray_interval_days": "Baseline: a typical farmer sprays every 7 days whatever the pest level.",
+    "spray_reapply_days": 7,
+    "_spray_reapply_days": "While a trap stays at SPRAY, one spray covers this many days.",
+    "release_interval_days": 7,
+    "_release_interval_days": "While a trap stays at RELEASE BIOCONTROL, one release covers this many days.",
+    "area_per_trap_acres": 0.5,
+    "product_litres_per_acre_per_spray": 0.25,
+    "_product_litres_per_acre_per_spray": "Pesticide product (not water) per acre per spray.",
+    "cost_inr_per_acre_per_spray": 1500,
+    "_cost_inr_per_acre_per_spray": "Product + labour + equipment per acre per spray, in rupees.",
+    "currency": "INR"
   }
 }

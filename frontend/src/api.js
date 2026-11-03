@@ -59,6 +59,7 @@ export const api = {
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),
   decision: (deviceId) => request(`/api/decision?device_id=${encodeURIComponent(deviceId)}`),
   mapData: (days = 14) => request(`/api/map-data?days=${encodeURIComponent(days)}`),
+  impact: (days = 30) => request(`/api/impact?days=${encodeURIComponent(days)}`),
   simulate: ({ pests, predators, confidence }) =>
     request(`/api/decision/simulate?pests=${pests}&predators=${predators}${confidence != null ? `&confidence=${confidence}` : ''}`),
   decisionRegions: (maxPests = 150, maxPredators = 30, steps = 50) =>

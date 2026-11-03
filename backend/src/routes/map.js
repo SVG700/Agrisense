@@ -2,6 +2,7 @@
  * Pest Surveillance Map routes
  *   GET    /api/map-data?days=30      one row per trap per day (public read, like the dashboard)
  *   GET    /api/decision?device_id=   current predator-aware decision for one trap (last N days)
+ *   GET    /api/impact?days=30        impact ESTIMATE vs calendar spraying, all traps
  *   GET    /api/decision/simulate     what-if: same engine on hypothetical pests/predators per day
  *   GET    /api/decision/regions      decision map over a pests x predators grid
  *   POST   /api/admin/map-seed        load SIMULATED traps + daily counts (admin; used by demo/seed.py)
@@ -26,6 +27,7 @@ import {
   rollingDecisions,
   withTrapCheck,
 } from '../services/decision.js';
+import { estimateImpact } from '../services/impact.js';
 import { DECISION_CONFIG } from '../services/pestConfig.js';
 import { HttpError, StoreError, isUuid, requireUuid } from '../utils/validate.js';
 
@@ -75,76 +77,86 @@ function day(value, field) {
   return value;
 }
 
+/**
+ * One row per trap per UTC day for the last `days` days, with the predator-aware
+ * rolling decision: seeded observations + real captures (captures win). Shared by
+ * /map-data and /impact so both always agree.
+ */
+export async function trapDayRows({ store, logger }, days, { requireCoords = true } = {}) {
+  const since = isoDay(new Date(Date.now() - (days - 1) * 86_400_000));
+  // Fetch a few extra days so the first visible days still get a full rolling window
+  const fetchSince = isoDay(new Date(Date.parse(`${since}T00:00:00Z`) - (DECISION_CONFIG.rollingWindowDays - 1) * 86_400_000));
+  const warnings = [];
+
+  const devices = await store.listDevices({ includeSimulated: true });
+  const byId = new Map(devices.map((d) => [d.id, d]));
+
+  // Seeded history. A database without schema v3 has no table: report it, keep real data.
+  let observations = [];
+  try {
+    observations = await store.listObservations({ since: fetchSince });
+  } catch (err) {
+    if (!(err instanceof StoreError)) throw err;
+    warnings.push('trap_daily_observations unavailable - apply supabase/schema.sql (v3) to load seeded map data');
+    logger.warn('map_observations_unavailable', { cause: err.cause?.message });
+  }
+
+  const rows = new Map();
+  for (const o of observations) {
+    const d = byId.get(o.device_id);
+    if (!d || (requireCoords && (d.latitude == null || d.longitude == null))) continue;
+    rows.set(`${o.device_id}|${o.date}`, {
+      trap_id: o.device_id,
+      trap_name: d.name,
+      latitude: d.latitude,
+      longitude: d.longitude,
+      date: o.date,
+      pest_count: o.pest_count,
+      predator_count: o.predator_count,
+      decision: o.decision,
+      dominant_pest: o.dominant_pest ?? null,
+      simulated: o.simulated === true || d.simulated === true,
+      source: 'observations',
+    });
+  }
+
+  // Real captures override seeded rows for the same trap/day
+  const telemetry = await store.listTelemetry({ limit: 5000, sign: false });
+  for (const r of aggregateDaily(telemetry, byId, { requireCoords })) {
+    if (r.date < fetchSince) continue;
+    rows.set(`${r.trap_id}|${r.date}`, r);
+  }
+
+  // Predator-aware rolling decision per trap (each day averages the last N days)
+  const perTrap = new Map();
+  for (const r of rows.values()) {
+    if (!perTrap.has(r.trap_id)) perTrap.set(r.trap_id, []);
+    perTrap.get(r.trap_id).push(r);
+  }
+  for (const list of perTrap.values()) {
+    const series = list.map((r) => ({ date: r.date, pests: r.pest_count, predators: r.predator_count, confidence: r.confidence ?? null }));
+    const byDate = new Map(rollingDecisions(series).map((x) => [x.date, x.result]));
+    for (const r of list) {
+      const res = byDate.get(r.date);
+      r.decision = res?.decision ?? decide(r.pest_count, r.predator_count);
+      r.decision_reason = res?.reason ?? null;
+      r.borderline = Boolean(res?.borderline);
+      delete r.confidence;
+    }
+  }
+  for (const [k, r] of rows) if (r.date < since) rows.delete(k);
+
+  const list = [...rows.values()].sort((a, b) => a.date.localeCompare(b.date) || a.trap_name.localeCompare(b.trap_name));
+  return { list, since, warnings, devices };
+}
+
 export function mapRouter({ config, store, logger }) {
   const router = Router();
   const adminLimit = rateLimit({ name: 'admin', windowMs: config.rateLimit.windowMs, max: config.rateLimit.adminMax });
 
   router.get('/map-data', async (req, res) => {
     const days = Math.min(MAX_DAYS, Math.max(1, Number.parseInt(req.query.days, 10) || 30));
-    const since = isoDay(new Date(Date.now() - (days - 1) * 86_400_000));
-    // Fetch a few extra days so the first visible days still get a full rolling window
-    const fetchSince = isoDay(new Date(Date.parse(`${since}T00:00:00Z`) - (DECISION_CONFIG.rollingWindowDays - 1) * 86_400_000));
-    const warnings = [];
-
-    const devices = await store.listDevices({ includeSimulated: true });
-    const byId = new Map(devices.map((d) => [d.id, d]));
-
-    // Seeded history. A database without schema v3 has no table: report it, keep real data.
-    let observations = [];
-    try {
-      observations = await store.listObservations({ since: fetchSince });
-    } catch (err) {
-      if (!(err instanceof StoreError)) throw err;
-      warnings.push('trap_daily_observations unavailable - apply supabase/schema.sql (v3) to load seeded map data');
-      logger.warn('map_observations_unavailable', { cause: err.cause?.message });
-    }
-
-    const rows = new Map();
-    for (const o of observations) {
-      const d = byId.get(o.device_id);
-      if (!d || d.latitude == null || d.longitude == null) continue;
-      rows.set(`${o.device_id}|${o.date}`, {
-        trap_id: o.device_id,
-        trap_name: d.name,
-        latitude: d.latitude,
-        longitude: d.longitude,
-        date: o.date,
-        pest_count: o.pest_count,
-        predator_count: o.predator_count,
-        decision: o.decision,
-        dominant_pest: o.dominant_pest ?? null,
-        simulated: o.simulated === true || d.simulated === true,
-        source: 'observations',
-      });
-    }
-
-    // Real captures override seeded rows for the same trap/day
-    const telemetry = await store.listTelemetry({ limit: 5000, sign: false });
-    for (const r of aggregateDaily(telemetry, byId)) {
-      if (r.date < fetchSince) continue;
-      rows.set(`${r.trap_id}|${r.date}`, r);
-    }
-
-    // Predator-aware rolling decision per trap (each day averages the last N days)
-    const perTrap = new Map();
-    for (const r of rows.values()) {
-      if (!perTrap.has(r.trap_id)) perTrap.set(r.trap_id, []);
-      perTrap.get(r.trap_id).push(r);
-    }
-    for (const list of perTrap.values()) {
-      const series = list.map((r) => ({ date: r.date, pests: r.pest_count, predators: r.predator_count, confidence: r.confidence ?? null }));
-      const byDate = new Map(rollingDecisions(series).map((x) => [x.date, x.result]));
-      for (const r of list) {
-        const res = byDate.get(r.date);
-        r.decision = res?.decision ?? decide(r.pest_count, r.predator_count);
-        r.decision_reason = res?.reason ?? null;
-        r.borderline = Boolean(res?.borderline);
-        delete r.confidence;
-      }
-    }
-    for (const [k, r] of rows) if (r.date < since) rows.delete(k);
-
-    const list = [...rows.values()].sort((a, b) => a.date.localeCompare(b.date) || a.trap_name.localeCompare(b.trap_name));
+    const { list, since, warnings, devices } = await trapDayRows({ store, logger }, days);
     const traps = new Set(list.map((r) => r.trap_id));
     const unlocated = devices.filter((d) => d.simulated !== true && (d.latitude == null || d.longitude == null)).length;
     if (unlocated) warnings.push(`${unlocated} trap(s) have no coordinates and are not shown - set them with PATCH /api/device/location`);
@@ -164,6 +176,13 @@ export function mapRouter({ config, store, logger }) {
         warnings,
       },
     });
+  });
+
+  // Impact ESTIMATE vs calendar spraying, over every trap (with or without coordinates)
+  router.get('/impact', async (req, res) => {
+    const days = Math.min(MAX_DAYS, Math.max(7, Number.parseInt(req.query.days, 10) || 30));
+    const { list, since, warnings } = await trapDayRows({ store, logger }, days, { requireCoords: false });
+    res.json({ days, since, generated_at: new Date().toISOString(), ...estimateImpact(list), warnings });
   });
 
   // What-if: the SAME engine on hypothetical daily averages (pure computation, nothing stored)

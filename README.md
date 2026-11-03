@@ -114,6 +114,22 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Impact estimate
+
+The **Estimated impact** card (Farmer Analytics, under the trap cards; `GET /api/impact?days=30`) compares
+the traps' decisions with **routine calendar spraying** (every 7 days whatever the pest level), over
+**all** traps for the last 14 or 30 days:
+
+- **Calendar:** one spray per 7 days per trap.
+- **AgriSense:** one spray when a trap turns SPRAY, and another if it is still SPRAY 7 days later. WAIT and
+  RELEASE BIOCONTROL days are not sprayed; biocontrol releases are counted separately.
+- **Sprays avoided** = calendar - AgriSense (never negative per trap), plus the percentage fewer, **litres of
+  pesticide product** and **rupees** (product + labour) at 0.5 acre per trap, 0.25 L and ₹1,500 per acre per
+  spray, and the **trap-days on which predators were spared** (RELEASE BIOCONTROL).
+- It is **always labelled ESTIMATE**, with *Simulated data* when the inputs are simulated. The assumptions
+  sit under *How this is estimated*, and live in `backend/config/pests.json` → `impact` as placeholders to
+  confirm with the IIHR mentor and local farmers. **It is not a measured result.**
+
 ## What-if simulator
 
 The **What if…?** card on Farmer Analytics starts from the selected trap's real 3-day averages and lets you
@@ -418,6 +434,7 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
 | POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
+| GET | `/api/impact?days=30` | – | Impact ESTIMATE vs calendar spraying over all traps: sprays avoided, %, litres, cost, biocontrol releases, assumptions |
 | GET | `/api/decision/simulate?pests=&predators=&confidence=` | – | What-if: the same decision engine on hypothetical per-day averages (nothing stored) |
 | GET | `/api/decision/regions?max_pests=&max_predators=&steps=` | – | Decision map: grid of decisions over pests/day x predators/day |
 | GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |

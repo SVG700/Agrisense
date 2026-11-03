@@ -210,6 +210,40 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Impact estimate', () => {
+  test('is labelled ESTIMATE, flags simulated data and shows its assumptions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        jsonResponse({
+          estimate: true,
+          days: 30,
+          traps: 5,
+          calendar_sprays: 20,
+          agrisense_sprays: 6,
+          sprays_avoided: 14,
+          percent_fewer_sprays: 70,
+          product_litres_saved: 1.8,
+          cost_saved: 10500,
+          biocontrol_releases: 2,
+          predator_protected_days: 9,
+          simulated: true,
+          all_simulated: false,
+          assumptions: { calendar_spray_interval_days: 7, spray_reapply_days: 7, area_per_trap_acres: 0.5, product_litres_per_acre_per_spray: 0.25, cost_per_acre_per_spray: 1500, placeholder: 'ESTIMATE - assumptions to confirm' },
+        })
+      )
+    );
+    const { default: ImpactCard } = await import('../components/ImpactCard.jsx');
+    render(<ImpactCard />);
+    const card = await screen.findByTestId('impact-card');
+    expect(card.textContent).toContain('ESTIMATE');
+    expect(card.textContent).toContain('Includes simulated data');
+    expect(card.textContent).toContain('70% fewer than calendar');
+    expect(card.textContent).toContain('₹10,500');
+    expect(card.textContent).toContain('Not a measured result');
+  });
+});
+
 describe('What-if simulator', () => {
   test('starts from the trap, asks the engine on every change, and draws the decision map', async () => {
     const fetchMock = vi.fn((url) => {

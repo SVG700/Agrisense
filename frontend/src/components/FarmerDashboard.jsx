@@ -22,6 +22,7 @@ import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
+import ImpactCard from './ImpactCard.jsx';
 import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
@@ -135,6 +136,8 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
       />
 
       <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
+
+      <ImpactCard refreshKey={latest?.id} />
 
       {/* Provenance strip: what the numbers below are */}
       {capture && (

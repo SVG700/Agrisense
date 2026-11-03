@@ -74,3 +74,14 @@ export const QUALITY_CONFIG = Object.freeze({
   maxGlareFraction: Number(q.max_glare_fraction ?? 0.08),
   glareLevel: Number(q.glare_level ?? 240),
 });
+
+const im = raw.impact ?? {};
+export const IMPACT_CONFIG = Object.freeze({
+  calendarIntervalDays: Number(im.calendar_spray_interval_days ?? 7),
+  sprayReapplyDays: Number(im.spray_reapply_days ?? 7),
+  releaseIntervalDays: Number(im.release_interval_days ?? 7),
+  areaPerTrapAcres: Number(im.area_per_trap_acres ?? 0.5),
+  productLitresPerAcrePerSpray: Number(im.product_litres_per_acre_per_spray ?? 0.25),
+  costPerAcrePerSpray: Number(im.cost_inr_per_acre_per_spray ?? 1500),
+  currency: String(im.currency ?? 'INR'),
+});

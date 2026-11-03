@@ -241,13 +241,13 @@ export function dailySeries(telemetryRows) {
 
 /**
  * Real captures for many devices -> map rows (one per trap per UTC day) for
- * traps that have coordinates. Decisions are added by the caller (rolling).
+ * traps that have coordinates (or all traps with requireCoords: false). Decisions are added by the caller (rolling).
  */
-export function aggregateDaily(telemetryRows, devicesById) {
+export function aggregateDaily(telemetryRows, devicesById, { requireCoords = true } = {}) {
   const perDevice = new Map();
   for (const t of telemetryRows) {
     const device = devicesById.get(t.device_id);
-    if (!device || device.latitude == null || device.longitude == null) continue;
+    if (!device || (requireCoords && (device.latitude == null || device.longitude == null))) continue;
     if (!perDevice.has(t.device_id)) perDevice.set(t.device_id, []);
     perDevice.get(t.device_id).push(t);
   }
