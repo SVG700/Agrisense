@@ -7,6 +7,7 @@ import { createStore } from './db/index.js';
 import { createVision } from './services/vision.js';
 import { createAdvisor } from './services/advisor.js';
 import { createWeather } from './services/weather.js';
+import { createTelegram } from './services/telegram.js';
 import { createApp } from './app.js';
 
 const logger = createLogger();
@@ -23,7 +24,9 @@ const store = await createStore({ config, logger });
 const vision = createVision({ config, logger });
 const advisor = createAdvisor({ config, logger });
 const weather = createWeather({ config, logger });
-const app = createApp({ config, store, vision, advisor, weather, logger });
+const telegram = createTelegram({ config, store, weather, logger });
+const app = createApp({ config, store, vision, advisor, weather, telegram, logger });
+telegram.startScheduler();
 
 const server = app.listen(config.port, () => {
   logger.info('server_started', {

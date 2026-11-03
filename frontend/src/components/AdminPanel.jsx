@@ -22,6 +22,7 @@ import { EASE, Item, Stagger } from '../lib/motion.jsx';
 import { LOW_BATTERY, RISK_STYLES, timeAgo, totalOf } from '../lib/pests.js';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
+import TelegramCard from './TelegramCard.jsx';
 
 let logSeq = 0;
 
@@ -47,6 +48,9 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
         </Item>
         <Item>
           <DemoControl onChanged={onIngested} log={pushLog} />
+        </Item>
+        <Item>
+          <TelegramCard log={pushLog} />
         </Item>
         <Item as="section" className="card">
           <h2 className="card-title mb-1">

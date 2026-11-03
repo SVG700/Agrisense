@@ -62,7 +62,7 @@ function sourcesOf(telemetry, storeKind) {
   };
 }
 
-export function telemetryRouter({ config, store, vision, advisor, logger }) {
+export function telemetryRouter({ config, store, vision, advisor, telegram, logger }) {
   const router = Router();
 
   router.post(
@@ -222,6 +222,12 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
           },
         },
       });
+
+      // Telegram alert when the advice changes (fire-and-forget: never delays or fails ingestion)
+      if (telegram && !duplicate) {
+        const previous = recent.at(-1)?.detection?.ai_advisory?.decision?.decision ?? null;
+        telegram.onDecision({ device: { id: deviceId, name: device?.name ?? deviceId }, previous, decision }).catch(() => {});
+      }
 
       logger.info('capture_ingested', {
         request_id: req.id,

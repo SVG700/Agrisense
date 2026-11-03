@@ -10,6 +10,7 @@ import { createMemoryStore } from '../src/db/memoryStore.js';
 import { createVision } from '../src/services/vision.js';
 import { createAdvisor } from '../src/services/advisor.js';
 import { createWeather } from '../src/services/weather.js';
+import { createTelegram } from '../src/services/telegram.js';
 import { createApp } from '../src/app.js';
 
 export const DEVICE = '11111111-1111-4111-8111-111111111111';
@@ -24,7 +25,7 @@ export const PNG_BASE64 = Buffer.concat([
 ]).toString('base64');
 export const GIF_BASE64 = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(32)]).toString('base64');
 
-export async function startApp({ env = {}, store, visionHttp, llmClient, weatherHttp } = {}) {
+export async function startApp({ env = {}, store, visionHttp, llmClient, weatherHttp, telegramHttp } = {}) {
   // Tiling and the demo fallback have their own tests; the rest exercise the plain provider path
   const { config, errors } = loadConfig({ DEMO_MODE: 'true', VISION_TILES: '1', VISION_DEMO_FALLBACK: 'false', VISION_QUALITY_CHECK: 'false', ...env });
   if (errors.length) throw new Error(`Invalid test config: ${errors.join('; ')}`);
@@ -34,7 +35,8 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
   const advisor = createAdvisor({ config, client: llmClient, logger });
   // No real network in tests: weather fails fast unless a fake is given
   const weather = createWeather({ config, logger, http: weatherHttp ?? { get: async () => { throw new Error('offline'); } } });
-  const app = createApp({ config, store, vision, advisor, weather, logger });
+  const telegram = createTelegram({ config, store, weather, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } });
+  const app = createApp({ config, store, vision, advisor, weather, telegram, logger });
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -55,7 +57,7 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
     return { status: res.status, body: json, headers: res.headers };
   }
 
-  return { base, store, config, request, close: () => new Promise((r) => server.close(r)) };
+  return { base, store, config, telegram, request, close: () => new Promise((r) => server.close(r)) };
 }
 
 /** Fake axios-like client for the vision provider. */

@@ -69,6 +69,11 @@ export const api = {
     request(`/api/decision/regions?max_pests=${maxPests}&max_predators=${maxPredators}&steps=${steps}`),
   weather: (deviceId) => request(`/api/weather${deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ''}`),
   check: (payload) => request('/api/check', { method: 'POST', body: payload }),
+  telegramStatus: () => request('/api/admin/telegram', { admin: true }),
+  telegramPreview: () => request('/api/admin/telegram/preview', { admin: true }),
+  telegramTest: () => request('/api/admin/telegram/test', { method: 'POST', admin: true }),
+  telegramSummary: () => request('/api/admin/telegram/summary', { method: 'POST', admin: true }),
+  telegramChats: () => request('/api/admin/telegram/chats', { admin: true }),
   resetDemo: () => request('/api/admin/demo/reset', { method: 'POST', admin: true }),
   clearDemo: () => request('/api/admin/demo', { method: 'DELETE', admin: true }),
   setBattery: (device_id, battery_level) =>

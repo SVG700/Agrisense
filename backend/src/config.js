@@ -148,6 +148,23 @@ export function loadConfig(env = process.env) {
       qualityCheck: !['0', 'false', 'no', 'off'].includes(str('VISION_QUALITY_CHECK', 'true').toLowerCase()),
     }),
 
+    // Telegram summaries + alerts (English + Kannada). Off until TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set.
+    telegram: {
+      token: str('TELEGRAM_BOT_TOKEN'),
+      // One or more chat ids (comma-separated): a person, a group or a channel
+      chatIds: str('TELEGRAM_CHAT_ID')
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean),
+      language: str('TELEGRAM_LANGUAGE', 'both').toLowerCase(), // en | kn | both
+      alerts: !['0', 'false', 'no', 'off'].includes(str('TELEGRAM_ALERTS', 'true').toLowerCase()),
+      // Daily summary time (HH:MM, in TELEGRAM_TIMEZONE); empty = no scheduled summary
+      summaryTime: str('TELEGRAM_SUMMARY_TIME', '07:00'),
+      timezone: str('TELEGRAM_TIMEZONE', 'Asia/Kolkata'),
+      dashboardUrl: str('DASHBOARD_URL'),
+      timeoutMs: int('TELEGRAM_TIMEOUT_MS', 5000, 500, 30_000),
+    },
+
     // Open-Meteo (free, no key): spray window + degree-days. Never blocks anything.
     weather: {
       enabled: !['0', 'false', 'no', 'off'].includes(str('WEATHER_ENABLED', 'true').toLowerCase()),
@@ -245,6 +262,12 @@ export function loadConfig(env = process.env) {
     else errors.push('ADMIN_API_KEY is required when DEMO_MODE=false');
   }
 
+  const tg = config.telegram;
+  if (!['en', 'kn', 'both'].includes(tg.language)) errors.push('TELEGRAM_LANGUAGE must be en, kn or both');
+  if (tg.summaryTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(tg.summaryTime)) errors.push('TELEGRAM_SUMMARY_TIME must be HH:MM (24 h) or empty');
+  if (tg.token && !/^\d{5,}:[\w-]{30,}$/.test(tg.token)) errors.push('TELEGRAM_BOT_TOKEN does not look like a bot token (123456:ABC...)');
+  if (tg.chatIds.some((c) => !/^(-?\d{3,}|@\w{5,})$/.test(c))) errors.push('TELEGRAM_CHAT_ID must be numeric ids (groups start with -) or @channelname, comma-separated');
+  if (tg.token && !tg.chatIds.length) warnings.push('TELEGRAM_BOT_TOKEN set but no TELEGRAM_CHAT_ID - message the bot, then use Admin > Telegram > Find my chat id');
   if (!sb.url) warnings.push('Supabase not configured - using the in-memory store (data is lost on restart)');
   if (!config.vision.url) warnings.push('Vision API not configured - only synthetic demo traps get (simulated) detections');
   if (config.advisor.provider === 'none') {

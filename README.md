@@ -114,6 +114,25 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Telegram summaries and alerts (English + ಕನ್ನಡ)
+
+- **Daily summary** at `TELEGRAM_SUMMARY_TIME` (default 07:00 IST): every trap's traffic-light decision
+  (🔴▲ SPRAY, 🟠◆ RELEASE BIOCONTROL, 🟢● WAIT, ⚪■ CHECK TRAP), with pests per day, pests per predator, and
+  BORDERLINE / simulated tags, most urgent first, plus the spray window. It is sent in English and Kannada
+  (`TELEGRAM_LANGUAGE=en|kn|both`).
+- **Instant alert** when a capture changes a trap's advice to SPRAY, RELEASE BIOCONTROL or CHECK TRAP. It is
+  sent once per trap and decision per 6 h, never for WAIT, and never delays ingestion.
+- **Setup:**
+  1. Create a bot with **@BotFather** and put the token in `TELEGRAM_BOT_TOKEN`.
+  2. Send the bot a message (or add it to a group) and restart the backend.
+  3. Go to *Admin & Hardware Control → Telegram alerts → Find my chat id*, put that number in
+     `TELEGRAM_CHAT_ID`, restart, and press **Send test**.
+- The same card has *Preview summary* (works before setup), *Send test* and *Send summary now*.
+- The bot token is used by the backend only. Telegram puts it in the request URL, so errors are reduced to a
+  status code before logging; it never appears in logs, API responses or the browser.
+- The **Kannada wording is a first draft**: have a native speaker or the IIHR team review it
+  (`backend/src/services/telegram.js` → `TEXT.kn`).
+
 ## Action log
 
 The **What did you do?** card (Farmer Analytics, under the spray-window card) lets the farmer log
@@ -447,6 +466,8 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
 | POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
+| GET | `/api/admin/telegram` (+ `/preview`, `/chats`) | admin | Telegram status (no token), summary preview, chats that messaged the bot |
+| POST | `/api/admin/telegram/test`, `/api/admin/telegram/summary` | admin | Send a test message / the trap summary now |
 | GET | `/api/actions?device_id=` | – | Action log, newest first (needs schema v4) |
 | POST | `/api/actions` | admin | `{device_id, action: sprayed|released|not_yet, note?, acted_at?}`; stores the advice at the time |
 | DELETE | `/api/actions/:id` | admin | Undo an entry |

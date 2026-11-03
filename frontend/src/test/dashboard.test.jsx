@@ -29,6 +29,9 @@ const capture = (over = {}) => ({
   ...over,
 });
 
+/** Calls a test made itself (the Admin panel's Telegram card also fetches its status in the background). */
+const ownCalls = (m) => m.mock.calls.filter(([u]) => !String(u).includes('/api/admin/telegram'));
+
 const jsonResponse = (body, status = 200) =>
   Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
 
@@ -455,8 +458,8 @@ describe('Demo mode', () => {
     render(<AdminPanel devices={[DEVICE]} activeDeviceId={DEVICE.id} onDevicePatched={() => {}} onIngested={onIngested} />);
     fireEvent.click(screen.getByRole('button', { name: /Reset demo data/ }));
     expect(await screen.findByText('DEMO · Net-house (capsicum)')).toBeTruthy();
-    expect(fetchMock.mock.calls[0][0]).toContain('/api/admin/demo/reset');
-    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(ownCalls(fetchMock)[0][0]).toContain('/api/admin/demo/reset');
+    expect(ownCalls(fetchMock)[0][1].method).toBe('POST');
     expect(onIngested).toHaveBeenCalled();
     expect(screen.getByText(/54 simulated captures/)).toBeTruthy();
   });
@@ -466,7 +469,7 @@ describe('AdminPanel', () => {
   test('manual battery update triggers the low-battery alert and is labelled manual', async () => {
     let devices = [DEVICE];
     const fetchMock = vi.fn((url, opts) => {
-      const body = JSON.parse(opts.body);
+      const body = opts?.body ? JSON.parse(opts.body) : {};
       const device = { ...DEVICE, battery_level: body.battery_level, status: 'low_battery', battery_source: 'manual', battery_updated_at: new Date().toISOString() };
       return jsonResponse({ device, alert: 'LOW_BATTERY' });
     });
@@ -479,8 +482,8 @@ describe('AdminPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /14%/ }));
     expect(screen.getByText(/Critical: battery below 15%/)).toBeTruthy();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock.mock.calls[0][1].method).toBe('PATCH');
+    await waitFor(() => expect(ownCalls(fetchMock)).toHaveLength(1));
+    expect(ownCalls(fetchMock)[0][1].method).toBe('PATCH');
     expect(await screen.findByText(/Manual override/)).toBeTruthy();
     expect(screen.getByTestId('device-status').textContent).toBe('low battery');
   });
@@ -492,7 +495,7 @@ describe('AdminPanel', () => {
     render(<AdminPanel devices={[DEVICE]} activeDeviceId={DEVICE.id} adminAuthRequired onDevicePatched={() => {}} onIngested={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /50%/ }));
     expect(await screen.findByText(/Admin key rejected/)).toBeTruthy();
-    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe(`Bearer ${'k'.repeat(20)}`);
+    expect(ownCalls(fetchMock)[0][1].headers.Authorization).toBe(`Bearer ${'k'.repeat(20)}`);
   });
 
   test('auto-stream sends captures and stops cleanly', async () => {
@@ -507,13 +510,36 @@ describe('AdminPanel', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).data_source).toBe('dashboard');
+    expect(ownCalls(fetchMock)).toHaveLength(1);
+    expect(JSON.parse(ownCalls(fetchMock)[0][1].body).data_source).toBe('dashboard');
 
     fireEvent.click(screen.getByRole('button', { name: /Stop stream/ }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30000);
     });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(ownCalls(fetchMock)).toHaveLength(1);
+  });
+});
+
+describe('Telegram card', () => {
+  test('not set up: shows the 3 setup steps; preview works; send buttons stay disabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) =>
+        url.includes('/preview')
+          ? jsonResponse({ text: '🌿 <b>AgriSense trap summary</b>\n🔴▲ <b>Polyhouse 1</b>: SPRAY\n────────────\n🌿 <b>ಅಗ್ರಿಸೆನ್ಸ್ ಬಲೆ ಸಾರಾಂಶ</b>' })
+          : jsonResponse({ state: 'not_configured', chats: 0, language: 'both', summary_time: '07:00', timezone: 'Asia/Kolkata', last: null })
+      )
+    );
+    const { default: TelegramCard } = await import('../components/TelegramCard.jsx');
+    render(<TelegramCard />);
+    expect(await screen.findByText('Not set up')).toBeTruthy();
+    expect(screen.getByText(/BotFather/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Send summary now/ }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /Preview summary/ }));
+    const preview = await screen.findByTestId('telegram-preview');
+    expect(preview.textContent).toContain('AgriSense trap summary');
+    expect(preview.textContent).toContain('ಅಗ್ರಿಸೆನ್ಸ್');
+    expect(preview.innerHTML).not.toContain('<b>'); // shown as text, never as HTML
   });
 });
