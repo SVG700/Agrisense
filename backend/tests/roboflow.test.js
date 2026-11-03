@@ -87,7 +87,7 @@ function fakeRoboflow(tiles) {
 let fake;
 
 const visionFor = (env, http) => {
-  const { config, errors } = loadConfig({ VISION_PROVIDER: 'roboflow', ...env });
+  const { config, errors } = loadConfig({ VISION_PROVIDER: 'roboflow', VISION_QUALITY_CHECK: 'false', ...env });
   assert.deepEqual(errors, []);
   return createVision({ config, http, logger: { warn() {} } });
 };

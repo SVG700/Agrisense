@@ -43,3 +43,13 @@ export const DECISION_CONFIG = Object.freeze({
   checkTrapAfterHours: Number(d.check_trap_after_hours ?? 48),
   placeholder: true, // every threshold is a placeholder until confirmed with the IIHR mentor
 });
+
+const q = raw.image_quality ?? {};
+export const QUALITY_CONFIG = Object.freeze({
+  analysisWidth: Number(q.analysis_width ?? 1024),
+  minSharpness: Number(q.min_sharpness ?? 30),
+  minBrightness: Number(q.min_brightness ?? 45),
+  maxBrightness: Number(q.max_brightness ?? 235),
+  maxGlareFraction: Number(q.max_glare_fraction ?? 0.08),
+  glareLevel: Number(q.glare_level ?? 240),
+});

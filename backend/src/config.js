@@ -142,6 +142,8 @@ export function loadConfig(env = process.env) {
       tileOverlap: Number(str('VISION_TILE_OVERLAP', '0.2')),
       // When the model is unavailable, count with the labelled demo detector instead of reporting nothing
       demoFallback: !['0', 'false', 'no', 'off'].includes(str('VISION_DEMO_FALLBACK', 'true').toLowerCase()),
+      // Reject blurry / dark / overexposed / glary uploads before detection (thresholds in config/pests.json)
+      qualityCheck: !['0', 'false', 'no', 'off'].includes(str('VISION_QUALITY_CHECK', 'true').toLowerCase()),
     }),
 
     // Which LLM writes advisories: auto = Gemini if GEMINI_API_KEY is set, else Claude if

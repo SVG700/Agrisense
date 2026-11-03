@@ -29,6 +29,7 @@ import axios from 'axios';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { annotateImage } from './annotate.js';
+import { assessQuality } from './imageQuality.js';
 import { splitCounts } from './decision.js';
 import { generateTrap, parseMockTrapUrl, SPECIES, TRAP_HEIGHT, TRAP_WIDTH } from './mockTrap.js';
 import { canonicalLabel } from './pestConfig.js';
@@ -233,7 +234,11 @@ export function createVision({ config, http = axios, logger }) {
     const out = { ...result, totals: result.counts ? splitCounts(result.counts) : null };
     if (!image) return out;
     try {
-      const banner = result.fallback ? 'DEMO DETECTOR - counts simulated, not read from this photo' : undefined;
+      const banner = result.fallback
+        ? 'DEMO DETECTOR - counts simulated, not read from this photo'
+        : result.quality && !result.quality.ok
+          ? `CHECK TRAP - photo ${result.quality.issues.join(', ')}: retake it`
+          : undefined;
       return { ...out, annotated_image: await annotateImage(image.buffer, result.boxes, { banner }) };
     } catch (err) {
       logger?.warn('annotate_failed', { error: err.message });
@@ -249,6 +254,7 @@ export function createVision({ config, http = axios, logger }) {
       key: configured ? v.keySource ?? null : null, // env var NAME only, never the value
       tiles: configured && tiled ? `${v.tiles}x${v.tiles}` : null,
       demo_fallback: Boolean(v.demoFallback),
+      quality_check: Boolean(v.qualityCheck),
     }),
 
     /**
@@ -284,8 +290,26 @@ export function createVision({ config, http = axios, logger }) {
         });
       }
 
+      // Photo quality first: a blurry / dark / overexposed / glary photo is not counted at all
+      // (no model call, no demo counts) and the trap shows CHECK TRAP with how to retake it.
+      let quality = null;
+      if (image && v.qualityCheck) {
+        try {
+          quality = await assessQuality(image.buffer);
+        } catch {
+          return finish({ ...base, status: 'failed', source: 'quality', error: { code: 'image_unreadable', message: 'The photo could not be decoded' } });
+        }
+        if (!quality.ok) {
+          return finish(
+            { ...base, status: 'failed', source: 'quality', error: { code: 'poor_image', message: quality.reason }, quality },
+            image
+          );
+        }
+      }
+
       if (!configured) {
-        return finish(v.demoFallback ? demoFallback({ imageUrl, image }, 'not_configured') : { ...base, status: 'not_configured', source: 'none' }, image);
+        const res = v.demoFallback ? demoFallback({ imageUrl, image }, 'not_configured') : { ...base, status: 'not_configured', source: 'none' };
+        return finish({ ...res, quality }, image);
       }
 
       const started = Date.now();
@@ -310,13 +334,14 @@ export function createVision({ config, http = axios, logger }) {
             image: found.image,
             counts: countPests(found.boxes, v.minConfidence, known),
             latency_ms: Date.now() - started,
+            quality,
           },
           image
         );
       } catch (err) {
         const error = errorInfo(err);
         logger?.warn('vision_failed', { code: error.code, provider: v.provider });
-        if (v.demoFallback) return finish({ ...demoFallback({ imageUrl, image }, 'failed', error), latency_ms: Date.now() - started }, image);
+        if (v.demoFallback) return finish({ ...demoFallback({ imageUrl, image }, 'failed', error), latency_ms: Date.now() - started, quality }, image);
         return finish({ ...base, status: 'failed', source: 'yolo', provider: v.provider, model: v.modelId || null, error, latency_ms: Date.now() - started });
       }
     },

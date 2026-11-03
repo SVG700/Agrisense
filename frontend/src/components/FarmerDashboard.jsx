@@ -74,7 +74,11 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
   };
 
   const stale = latest && Date.now() - new Date(latest.timestamp).getTime() > STALE_AFTER_MS;
-  const vState = VISION_STATES[visionStatus(det)] ?? null;
+  const quality = det?.vision_meta?.quality ?? null;
+  const poorPhoto = det?.vision_meta?.error?.code === 'poor_image';
+  const vState = poorPhoto
+    ? { label: 'Photo rejected', tone: 'bad', help: det.vision_meta.error.message }
+    : VISION_STATES[visionStatus(det)] ?? null;
   const source = DATA_SOURCES[capture?.data_source ?? 'unknown'] ?? DATA_SOURCES.unknown;
 
   return (
@@ -155,6 +159,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
             </Badge>
           )}
           <Badge tone={source.tone}>Readings: {source.label}</Badge>
+          {quality && <QualityBadge quality={quality} />}
         </motion.div>
       )}
 
@@ -215,9 +220,30 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
 
 /* -------------------------------------------------------------------------- */
 
+const ISSUE_LABELS = { blurry: 'blurry', dark: 'too dark', bright: 'overexposed', glare: 'glare' };
+
+/** Photo-quality verdict for an uploaded trap photo (metrics in the tooltip). */
+function QualityBadge({ quality }) {
+  const m = quality.metrics ?? {};
+  const detail = `Sharpness ${m.sharpness}, brightness ${m.brightness}, glare ${Math.round((m.glare_fraction ?? 0) * 100)}% (placeholder thresholds)`;
+  return quality.ok ? (
+    <Badge tone="good" title={detail}>
+      Photo quality OK
+    </Badge>
+  ) : (
+    <Badge tone="bad" title={`${quality.advice?.join(' ') ?? ''} ${detail}`} data-testid="quality-badge">
+      Photo: {quality.issues.map((i) => ISSUE_LABELS[i] ?? i).join(', ')} - retake
+    </Badge>
+  );
+}
+
 /** Summary banner built only from the selected capture's real data. */
 function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin, decision }) {
-  const headline = !capture ? 'Waiting for the first trap capture' : HEADLINES[risk] ?? 'Awaiting pest analysis';
+  const headline = !capture
+    ? 'Waiting for the first trap capture'
+    : decision?.decision === 'CHECK_TRAP'
+      ? 'Check the trap'
+      : HEADLINES[risk] ?? 'Awaiting pest analysis';
   const style = RISK_STYLES[risk];
   const boxes = (capture?.detection?.bounding_boxes ?? []).slice(0, 40);
 

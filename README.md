@@ -322,6 +322,14 @@ ROBOFLOW_API_KEY=<roboflow api key>   # main name; YOLO_API_KEY still works as a
   at a tile edge). Tiles are never smaller than 640 px, so smaller photos use fewer tiles. Each request
   is downscaled to at most 1280 px to keep uploads fast. **Cost:** a 4x4 photo is 17 Roboflow calls.
   URL images (`?image=<url>`) are sent once, untiled.
+- **Photo quality check** (`VISION_QUALITY_CHECK=true`): before detection, every uploaded photo is
+  checked for **blur** (variance of the Laplacian, normalised for exposure), **dark** and **overexposed**
+  (mean brightness) and **glare** (share of near-white pixels). A photo that fails is not sent to the model
+  and gets no demo counts. It is stored as `failed` with `error.code = poor_image` and the metrics in
+  `vision_meta.quality`, and the trap shows **■ CHECK TRAP** with what is wrong and how to retake it
+  (e.g. "too blurry ... hold the phone steady about 30 cm from the card"). The thresholds are in
+  `backend/config/pests.json` → `image_quality` and are **placeholders**, calibrated only on synthetic
+  cards (sharp about 90, slightly soft about 40, blurred below 5), so tune them on real photos.
 - **Annotated image:** for uploaded photos the API response includes `annotated_image` (a JPEG data URL
   with pests boxed in red and predators in green). It is returned to the uploader and not stored, because
   the dashboard draws boxes itself.

@@ -45,5 +45,19 @@
     "_check_trap_after_hours": "PLACEHOLDER. A trap with no capture for this long shows CHECK TRAP (device offline or card not photographed).",
     "count_uncertainty_min": 0.05,
     "count_uncertainty_max": 0.5
+  },
+
+  "image_quality": {
+    "_about": "PLACEHOLDER thresholds - tune on real trap photos. Measured on the photo resized to 1024 px wide. A photo failing any check is not counted and the trap shows CHECK TRAP.",
+    "analysis_width": 1024,
+    "min_sharpness": 30,
+    "_min_sharpness": "Variance of the Laplacian (grayscale), normalised to mid-grey exposure. Synthetic cards: sharp ~90, slightly soft ~40, blurry <5. Below this the photo is too blurry to count small insects.",
+    "min_brightness": 45,
+    "_min_brightness": "Mean luminance 0-255. Below this the photo is too dark.",
+    "max_brightness": 235,
+    "_max_brightness": "Mean luminance 0-255. A well-lit yellow card is about 190-215; above this it is overexposed.",
+    "max_glare_fraction": 0.08,
+    "_max_glare_fraction": "Share of near-white pixels (all channels >= glare_level). Whiteflies are a small share; larger white patches are reflections.",
+    "glare_level": 240
   }
 }

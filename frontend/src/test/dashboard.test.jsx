@@ -210,6 +210,36 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Photo quality', () => {
+  test('a rejected photo says what is wrong and that it must be retaken', () => {
+    const quality = {
+      ok: false,
+      issues: ['blurry'],
+      advice: ['Hold the phone steady.'],
+      metrics: { sharpness: 3, brightness: 190, glare_fraction: 0.01 },
+    };
+    const bad = capture({
+      data_source: 'hardware',
+      detection: {
+        pest_counts: {},
+        bounding_boxes: [],
+        vision_meta: { status: 'failed', error: { code: 'poor_image', message: 'The trap photo is too blurry.' }, quality },
+        ai_advisory: {
+          risk_level: null,
+          summary: 'Pest detection failed.',
+          source: 'none',
+          status: 'skipped',
+          decision: { decision: 'CHECK_TRAP', label: 'CHECK TRAP', reason: 'The trap photo is too blurry. Retake it.', check_trap: true },
+        },
+      },
+    });
+    render(<FarmerDashboard device={DEVICE} telemetry={[bad]} onGoAdmin={() => {}} />);
+    expect(screen.getByText('Photo: blurry - retake')).toBeTruthy();
+    expect(screen.getByText('Detections: Photo rejected')).toBeTruthy();
+    expect(screen.getAllByText('CHECK TRAP').length).toBeGreaterThan(0);
+  });
+});
+
 describe('Demo mode', () => {
   test('simulated captures carry a "Simulated data" + "Demo detector" banner', () => {
     render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} />);

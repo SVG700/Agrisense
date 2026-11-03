@@ -155,7 +155,8 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
         if (!prev) days.push({ date: today, pests, predators, confidence: meanConfidence });
         else if (pests > prev.pests) Object.assign(prev, { pests, predators, confidence: meanConfidence });
       }
-      const decision = withTrapCheck(evaluateDecision(days), { status: result.status, timestamp });
+      // A rejected photo gives CHECK TRAP with the specific retake advice
+      const decision = withTrapCheck(evaluateDecision(days), { status: result.status, timestamp, reason: result.quality?.reason ?? undefined });
 
       let advisory;
       if (result.counts) {
@@ -217,6 +218,7 @@ export function telemetryRouter({ config, store, vision, advisor, logger }) {
             latency_ms: result.latency_ms ?? null,
             totals: result.totals ?? null,
             fallback: result.fallback ?? null,
+            quality: result.quality ?? null,
           },
         },
       });

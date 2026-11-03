@@ -167,7 +167,8 @@ export function mapRouter({ config, store, logger }) {
     const days = [...byDate.values()];
     // The latest real capture decides CHECK TRAP (failed / uncounted photo, or trap gone quiet)
     const last = telemetry.at(-1);
-    const latest = last ? { status: last.detection?.vision_meta?.status, timestamp: last.timestamp } : null;
+    const meta = last?.detection?.vision_meta;
+    const latest = last ? { status: meta?.status, timestamp: last.timestamp, reason: meta?.quality?.reason ?? undefined } : null;
     const result = withTrapCheck(evaluateDecision(days), latest);
     const used = days.filter((d) => result.window.from && d.date >= result.window.from && d.date <= result.window.to);
     res.json({ device_id: deviceId, ...result, simulated: used.some((d) => d.simulated), days: used });
