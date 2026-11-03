@@ -1,0 +1,313 @@
+/**
+ * English / ಕನ್ನಡ for the farmer-facing pages (Farmer Analytics, trap cards,
+ * Phone Check). The map and admin pages stay English: App passes 'en' to them.
+ *
+ * - t('key', {vars}) looks up DICT[lang][key] (falls back to English), and
+ *   replaces {name} placeholders.
+ * - Decision reasons from the engine are English text; in Kannada,
+ *   decisionReason() rebuilds the reason from the same numbers instead.
+ * - The Kannada wording is a first draft: have a native speaker / the IIHR team
+ *   review it before field use.
+ */
+import { createContext, useContext } from 'react';
+
+export const LANGS = { en: 'English', kn: 'ಕನ್ನಡ' };
+
+const DICT = {
+  en: {
+    // decisions
+    'decision.SPRAY': 'SPRAY',
+    'decision.BIOCONTROL': 'RELEASE BIOCONTROL',
+    'decision.WAIT': 'WAIT',
+    'decision.CHECK_TRAP': 'CHECK TRAP',
+    'decision.help.SPRAY': 'Pests are above the action level and predators are too few to keep up.',
+    'decision.help.BIOCONTROL': 'Pests are above the action level, but predators are keeping pace: release more instead of spraying.',
+    'decision.help.WAIT': 'Pests are below the action level. Keep monitoring.',
+    'decision.help.CHECK_TRAP': 'The trap could not be read (failed or missing photo, or no recent capture). Check it in the field.',
+    borderline: 'BORDERLINE',
+    decision: 'Decision',
+    // hero
+    'hero.High': 'Outbreak risk is high',
+    'hero.Medium': 'Pest pressure is building',
+    'hero.Low': 'Pest pressure is low',
+    'hero.check': 'Check the trap',
+    'hero.waiting': 'Waiting for the first trap capture',
+    'hero.awaiting': 'Awaiting pest analysis',
+    'hero.noCapture': 'Send a capture from the edge device or the Hardware tab to start monitoring.',
+    'hero.notCounted': 'Insects were not counted for this capture. Sensor readings and the trap image are still recorded below.',
+    'hero.counted': '{n} insects counted on the {which} sticky-trap image. Review the detections and the advisory below.',
+    'hero.latest': 'latest',
+    'hero.selected': 'selected',
+    'hero.viewDetections': 'View detections',
+    'hero.hardware': 'Hardware control',
+    'hero.lastCapture': 'Last capture {ago}',
+    // KPIs
+    'kpi.insects': 'Insects trapped',
+    'kpi.temperature': 'Temperature',
+    'kpi.humidity': 'Humidity',
+    'kpi.risk': 'Risk level',
+    'kpi.notCounted': 'Not counted',
+    'risk.Low': 'Low',
+    'risk.Medium': 'Medium',
+    'risk.High': 'High',
+    // simulated banner
+    simulatedData: 'Simulated data',
+    demoDetector: 'Demo detector',
+    'banner.simulated': 'This capture was generated for demonstration, not photographed in a field. Counts and decisions show how the system behaves, not a real infestation.',
+    // trap cards
+    'trap.pestsPerDay': '{n} pests/day',
+    'trap.perPredator': '{n} per predator',
+    'trap.noPredators': 'no predators',
+    'trap.dayAvg': '{n}-day avg',
+    'trap.simulated': 'simulated',
+    'trap.viewing': 'viewing',
+    'trap.noData': 'No data yet',
+    'trap.unavailable': 'Unavailable',
+    // card titles
+    'title.advisory': 'Agronomic Advisory',
+    'title.whatIf': 'What if…?',
+    'title.impact': 'Estimated impact',
+    // weather
+    'weather.title': 'Can I spray now?',
+    'weather.yes': 'Yes, conditions are good',
+    'weather.no': 'Not now',
+    'weather.next': 'Next good window: {w}',
+    'weather.until': 'Good until {t}',
+    'weather.none': 'No good window in the next 3 days',
+    'weather.adviseNow': 'Spraying is advised for this trap, and conditions are suitable now.',
+    'weather.adviseWait': 'Spraying is advised for this trap, but wait for the window: {w}.',
+    'weather.adviseNone': 'Spraying is advised for this trap, but no suitable window is forecast yet - check again later.',
+    'weather.rainOk': 'No rain expected in the next 6 h',
+    'weather.rainNo': 'Rain likely within 6 h - it would wash the spray off',
+    'weather.windOk': 'Wind {w} km/h - low drift',
+    'weather.windNo': 'Wind {w} km/h - spray would drift',
+    'weather.daylightOk': 'Daylight',
+    'weather.daylightNo': 'Dark - wait for daylight',
+    'weather.now': 'Now',
+    'weather.today': 'Today',
+    'weather.tomorrow': 'Tomorrow',
+    'weather.defaultLocation': 'Default location',
+    // action log
+    'actions.title': 'What did you do?',
+    'actions.subtitle': 'Log your action against the current advice',
+    'actions.sprayed': 'Sprayed',
+    'actions.released': 'Released predators',
+    'actions.not_yet': 'Not yet',
+    'actions.adviceWas': 'advice was',
+    'actions.note': 'Optional note (product, which rows, why not yet…)',
+    // phone check
+    'check.title': 'Check a sticky trap with your phone',
+    'check.intro': 'Photograph the yellow card and tell us how many days it hung. You get the insect count and what to do. Nothing is saved.',
+    'check.step1': '1. Photo of the card',
+    'check.take': 'Take or choose a photo',
+    'check.takeHint': 'On a phone this opens the camera',
+    'check.change': 'Change',
+    'check.step2': '2. How many days did the card hang?',
+    'check.day': '{n} day',
+    'check.days': '{n} days',
+    'check.lessDay': 'One day less',
+    'check.moreDay': 'One day more',
+    'check.button': 'Check trap',
+    'check.counting': 'Counting insects…',
+    'check.again': 'Start again',
+    'check.badFile': 'That file could not be opened as a photo. Try a JPEG or PNG.',
+    'check.tooMany': 'Too many checks in a short time. Please wait a minute and try again.',
+    'check.tipsTitle': 'Tips for a good photo',
+    'check.tip1': 'Hold the phone about 30 cm from the card, straight on.',
+    'check.tip2': 'Use daylight; avoid shadows and direct sun on the card.',
+    'check.tip3': 'Tilt slightly if the shiny card reflects light.',
+    'check.tip4': 'Fill the photo with the card and tap to focus.',
+    'check.whatToDo': 'What to do',
+    'check.whiteflies': 'Whiteflies (pests)',
+    'check.predators': 'Predators',
+    'check.pestsPerDay': 'Pests per day',
+    'check.perPredator': 'Pests per predator',
+    'check.range': 'range {lo}-{hi}',
+    'check.over': 'over {n} days',
+    'check.noPredators': 'no predators',
+    'check.qualityOk': 'Photo quality OK',
+    'check.qualityBad': 'Photo: {issues} - retake',
+    'issue.blurry': 'blurry',
+    'issue.dark': 'too dark',
+    'issue.bright': 'overexposed',
+    'issue.glare': 'glare',
+    'check.actionLevel': 'Action level {t}/day · ratio {r} (placeholder)',
+    'check.advice': 'Advice',
+    'check.englishNote': '',
+    'check.disclaimer': 'Decision support only: automated counts, not a verified diagnosis. Scout the crop before treating and follow the product label. This check was not saved.',
+  },
+  kn: {
+    'decision.SPRAY': 'ಸಿಂಪಡಿಸಿ',
+    'decision.BIOCONTROL': 'ಜೈವಿಕ ನಿಯಂತ್ರಕ ಬಿಡುಗಡೆ',
+    'decision.WAIT': 'ಕಾಯಿರಿ',
+    'decision.CHECK_TRAP': 'ಬಲೆ ಪರಿಶೀಲಿಸಿ',
+    'decision.help.SPRAY': 'ಕೀಟಗಳು ಕ್ರಿಯಾ ಮಟ್ಟಕ್ಕಿಂತ ಹೆಚ್ಚಿವೆ ಮತ್ತು ಪರಭಕ್ಷಕಗಳು ನಿಯಂತ್ರಿಸಲು ಸಾಕಾಗುವುದಿಲ್ಲ.',
+    'decision.help.BIOCONTROL': 'ಕೀಟಗಳು ಕ್ರಿಯಾ ಮಟ್ಟಕ್ಕಿಂತ ಹೆಚ್ಚಿವೆ, ಆದರೆ ಪರಭಕ್ಷಕಗಳು ಸಾಕಷ್ಟಿವೆ: ಸಿಂಪಡಿಸುವ ಬದಲು ಇನ್ನಷ್ಟು ಬಿಡುಗಡೆ ಮಾಡಿ.',
+    'decision.help.WAIT': 'ಕೀಟಗಳು ಕ್ರಿಯಾ ಮಟ್ಟಕ್ಕಿಂತ ಕಡಿಮೆ ಇವೆ. ಗಮನಿಸುತ್ತಿರಿ.',
+    'decision.help.CHECK_TRAP': 'ಬಲೆಯನ್ನು ಓದಲು ಆಗಲಿಲ್ಲ (ಚಿತ್ರ ಇಲ್ಲ ಅಥವಾ ಸರಿಯಿಲ್ಲ, ಅಥವಾ ಇತ್ತೀಚೆಗೆ ಚಿತ್ರ ಬಂದಿಲ್ಲ). ಹೊಲದಲ್ಲಿ ಪರಿಶೀಲಿಸಿ.',
+    borderline: 'ಗಡಿರೇಖೆ',
+    decision: 'ನಿರ್ಧಾರ',
+    'hero.High': 'ಕೀಟ ಹಾವಳಿಯ ಅಪಾಯ ಹೆಚ್ಚಾಗಿದೆ',
+    'hero.Medium': 'ಕೀಟಗಳ ಒತ್ತಡ ಹೆಚ್ಚುತ್ತಿದೆ',
+    'hero.Low': 'ಕೀಟಗಳ ಒತ್ತಡ ಕಡಿಮೆ ಇದೆ',
+    'hero.check': 'ಬಲೆಯನ್ನು ಪರಿಶೀಲಿಸಿ',
+    'hero.waiting': 'ಮೊದಲ ಬಲೆ ಚಿತ್ರಕ್ಕಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ',
+    'hero.awaiting': 'ಕೀಟ ವಿಶ್ಲೇಷಣೆಗಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ',
+    'hero.noCapture': 'ಮೇಲ್ವಿಚಾರಣೆ ಆರಂಭಿಸಲು ಸಾಧನದಿಂದ ಅಥವಾ ಹಾರ್ಡ್‌ವೇರ್ ಟ್ಯಾಬ್‌ನಿಂದ ಚಿತ್ರ ಕಳುಹಿಸಿ.',
+    'hero.notCounted': 'ಈ ಚಿತ್ರದಲ್ಲಿ ಕೀಟಗಳನ್ನು ಎಣಿಸಲಾಗಿಲ್ಲ. ಸಂವೇದಕ ಮಾಹಿತಿ ಮತ್ತು ಬಲೆಯ ಚಿತ್ರ ಕೆಳಗೆ ದಾಖಲಾಗಿವೆ.',
+    'hero.counted': '{which} ಅಂಟು ಬಲೆಯ ಚಿತ್ರದಲ್ಲಿ {n} ಕೀಟಗಳನ್ನು ಎಣಿಸಲಾಗಿದೆ. ಕೆಳಗೆ ಪತ್ತೆಗಳು ಮತ್ತು ಸಲಹೆಯನ್ನು ನೋಡಿ.',
+    'hero.latest': 'ಇತ್ತೀಚಿನ',
+    'hero.selected': 'ಆಯ್ಕೆಮಾಡಿದ',
+    'hero.viewDetections': 'ಪತ್ತೆಗಳನ್ನು ನೋಡಿ',
+    'hero.hardware': 'ಹಾರ್ಡ್‌ವೇರ್ ನಿಯಂತ್ರಣ',
+    'hero.lastCapture': 'ಕೊನೆಯ ಚಿತ್ರ {ago}',
+    'kpi.insects': 'ಸಿಕ್ಕಿಬಿದ್ದ ಕೀಟಗಳು',
+    'kpi.temperature': 'ತಾಪಮಾನ',
+    'kpi.humidity': 'ತೇವಾಂಶ',
+    'kpi.risk': 'ಅಪಾಯದ ಮಟ್ಟ',
+    'kpi.notCounted': 'ಎಣಿಸಿಲ್ಲ',
+    'risk.Low': 'ಕಡಿಮೆ',
+    'risk.Medium': 'ಮಧ್ಯಮ',
+    'risk.High': 'ಹೆಚ್ಚು',
+    simulatedData: 'ಅನುಕರಿಸಿದ ದತ್ತಾಂಶ',
+    demoDetector: 'ಪ್ರದರ್ಶನ ಪತ್ತೆಕಾರಕ',
+    'banner.simulated': 'ಈ ಚಿತ್ರವನ್ನು ಪ್ರದರ್ಶನಕ್ಕಾಗಿ ರಚಿಸಲಾಗಿದೆ, ಹೊಲದಲ್ಲಿ ತೆಗೆದದ್ದಲ್ಲ. ಎಣಿಕೆಗಳು ಮತ್ತು ಸಲಹೆಗಳು ವ್ಯವಸ್ಥೆ ಹೇಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ ಎಂಬುದನ್ನು ತೋರಿಸುತ್ತವೆ, ನಿಜವಾದ ಹಾವಳಿಯನ್ನಲ್ಲ.',
+    'trap.pestsPerDay': 'ದಿನಕ್ಕೆ {n} ಕೀಟಗಳು',
+    'trap.perPredator': 'ಪ್ರತಿ ಪರಭಕ್ಷಕಕ್ಕೆ {n}',
+    'trap.noPredators': 'ಪರಭಕ್ಷಕಗಳಿಲ್ಲ',
+    'trap.dayAvg': '{n} ದಿನಗಳ ಸರಾಸರಿ',
+    'trap.simulated': 'ಅನುಕರಿಸಿದ',
+    'trap.viewing': 'ನೋಡುತ್ತಿರುವುದು',
+    'trap.noData': 'ಇನ್ನೂ ದತ್ತಾಂಶವಿಲ್ಲ',
+    'trap.unavailable': 'ಲಭ್ಯವಿಲ್ಲ',
+    'title.advisory': 'ಕೃಷಿ ಸಲಹೆ',
+    'title.whatIf': 'ಹೀಗಾದರೆ…?',
+    'title.impact': 'ಅಂದಾಜು ಪರಿಣಾಮ',
+    'weather.title': 'ಈಗ ಸಿಂಪಡಿಸಬಹುದೇ?',
+    'weather.yes': 'ಹೌದು, ಹವಾಮಾನ ಸೂಕ್ತವಾಗಿದೆ',
+    'weather.no': 'ಈಗ ಬೇಡ',
+    'weather.next': 'ಮುಂದಿನ ಸೂಕ್ತ ಸಮಯ: {w}',
+    'weather.until': '{t} ವರೆಗೆ ಸೂಕ್ತ',
+    'weather.none': 'ಮುಂದಿನ 3 ದಿನಗಳಲ್ಲಿ ಸೂಕ್ತ ಸಮಯವಿಲ್ಲ',
+    'weather.adviseNow': 'ಈ ಬಲೆಗೆ ಸಿಂಪಡಣೆ ಸೂಚಿಸಲಾಗಿದೆ, ಮತ್ತು ಈಗ ಹವಾಮಾನ ಸೂಕ್ತವಾಗಿದೆ.',
+    'weather.adviseWait': 'ಈ ಬಲೆಗೆ ಸಿಂಪಡಣೆ ಸೂಚಿಸಲಾಗಿದೆ, ಆದರೆ ಈ ಸಮಯಕ್ಕಾಗಿ ಕಾಯಿರಿ: {w}.',
+    'weather.adviseNone': 'ಈ ಬಲೆಗೆ ಸಿಂಪಡಣೆ ಸೂಚಿಸಲಾಗಿದೆ, ಆದರೆ ಇನ್ನೂ ಸೂಕ್ತ ಸಮಯ ಕಾಣುತ್ತಿಲ್ಲ - ನಂತರ ಮತ್ತೆ ನೋಡಿ.',
+    'weather.rainOk': 'ಮುಂದಿನ 6 ಗಂಟೆಗಳಲ್ಲಿ ಮಳೆ ನಿರೀಕ್ಷೆ ಇಲ್ಲ',
+    'weather.rainNo': 'ಮುಂದಿನ 6 ಗಂಟೆಗಳಲ್ಲಿ ಮಳೆ ಸಾಧ್ಯತೆ - ಔಷಧಿ ತೊಳೆದುಹೋಗುತ್ತದೆ',
+    'weather.windOk': 'ಗಾಳಿ {w} ಕಿ.ಮೀ/ಗಂ - ಔಷಧಿ ಹರಡುವುದು ಕಡಿಮೆ',
+    'weather.windNo': 'ಗಾಳಿ {w} ಕಿ.ಮೀ/ಗಂ - ಔಷಧಿ ಹಾರಿಹೋಗುತ್ತದೆ',
+    'weather.daylightOk': 'ಹಗಲು',
+    'weather.daylightNo': 'ಕತ್ತಲು - ಹಗಲಿಗಾಗಿ ಕಾಯಿರಿ',
+    'weather.now': 'ಈಗ',
+    'weather.today': 'ಇಂದು',
+    'weather.tomorrow': 'ನಾಳೆ',
+    'weather.defaultLocation': 'ಪೂರ್ವನಿಗದಿತ ಸ್ಥಳ',
+    'actions.title': 'ನೀವು ಏನು ಮಾಡಿದಿರಿ?',
+    'actions.subtitle': 'ಈಗಿನ ಸಲಹೆಗೆ ನೀವು ಮಾಡಿದ ಕ್ರಮವನ್ನು ದಾಖಲಿಸಿ',
+    'actions.sprayed': 'ಸಿಂಪಡಿಸಿದೆ',
+    'actions.released': 'ಪರಭಕ್ಷಕ ಬಿಡುಗಡೆ ಮಾಡಿದೆ',
+    'actions.not_yet': 'ಇನ್ನೂ ಇಲ್ಲ',
+    'actions.adviceWas': 'ಆಗಿನ ಸಲಹೆ',
+    'actions.note': 'ಐಚ್ಛಿಕ ಟಿಪ್ಪಣಿ (ಔಷಧಿ, ಯಾವ ಸಾಲುಗಳು, ಏಕೆ ಇನ್ನೂ ಇಲ್ಲ…)',
+    'check.title': 'ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಅಂಟು ಬಲೆಯನ್ನು ಪರಿಶೀಲಿಸಿ',
+    'check.intro': 'ಹಳದಿ ಕಾರ್ಡ್‌ನ ಚಿತ್ರ ತೆಗೆದು, ಅದು ಎಷ್ಟು ದಿನ ನೇತಾಡಿತ್ತು ಎಂದು ತಿಳಿಸಿ. ಕೀಟಗಳ ಎಣಿಕೆ ಮತ್ತು ಏನು ಮಾಡಬೇಕು ಎಂಬುದು ಸಿಗುತ್ತದೆ. ಏನನ್ನೂ ಉಳಿಸಲಾಗುವುದಿಲ್ಲ.',
+    'check.step1': '1. ಕಾರ್ಡ್‌ನ ಚಿತ್ರ',
+    'check.take': 'ಚಿತ್ರ ತೆಗೆಯಿರಿ ಅಥವಾ ಆಯ್ಕೆಮಾಡಿ',
+    'check.takeHint': 'ಫೋನ್‌ನಲ್ಲಿ ಇದು ಕ್ಯಾಮೆರಾ ತೆರೆಯುತ್ತದೆ',
+    'check.change': 'ಬದಲಿಸಿ',
+    'check.step2': '2. ಕಾರ್ಡ್ ಎಷ್ಟು ದಿನ ನೇತಾಡಿತ್ತು?',
+    'check.day': '{n} ದಿನ',
+    'check.days': '{n} ದಿನ',
+    'check.lessDay': 'ಒಂದು ದಿನ ಕಡಿಮೆ',
+    'check.moreDay': 'ಒಂದು ದಿನ ಹೆಚ್ಚು',
+    'check.button': 'ಬಲೆ ಪರಿಶೀಲಿಸಿ',
+    'check.counting': 'ಕೀಟಗಳನ್ನು ಎಣಿಸಲಾಗುತ್ತಿದೆ…',
+    'check.again': 'ಮತ್ತೆ ಆರಂಭಿಸಿ',
+    'check.badFile': 'ಈ ಫೈಲ್ ಅನ್ನು ಚಿತ್ರವಾಗಿ ತೆರೆಯಲು ಆಗಲಿಲ್ಲ. JPEG ಅಥವಾ PNG ಪ್ರಯತ್ನಿಸಿ.',
+    'check.tooMany': 'ಅಲ್ಪ ಸಮಯದಲ್ಲಿ ಹೆಚ್ಚು ಪರಿಶೀಲನೆಗಳು. ಒಂದು ನಿಮಿಷ ಕಾದು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    'check.tipsTitle': 'ಉತ್ತಮ ಚಿತ್ರಕ್ಕೆ ಸಲಹೆಗಳು',
+    'check.tip1': 'ಫೋನ್ ಅನ್ನು ಕಾರ್ಡ್‌ನಿಂದ ಸುಮಾರು 30 ಸೆಂ.ಮೀ. ದೂರದಲ್ಲಿ ನೇರವಾಗಿ ಹಿಡಿಯಿರಿ.',
+    'check.tip2': 'ಹಗಲು ಬೆಳಕನ್ನು ಬಳಸಿ; ಕಾರ್ಡ್ ಮೇಲೆ ನೆರಳು ಮತ್ತು ನೇರ ಬಿಸಿಲು ಬೀಳದಂತೆ ನೋಡಿಕೊಳ್ಳಿ.',
+    'check.tip3': 'ಹೊಳೆಯುವ ಕಾರ್ಡ್ ಬೆಳಕನ್ನು ಪ್ರತಿಫಲಿಸಿದರೆ ಫೋನ್ ಅನ್ನು ಸ್ವಲ್ಪ ಓರೆಯಾಗಿಸಿ.',
+    'check.tip4': 'ಚಿತ್ರದಲ್ಲಿ ಕಾರ್ಡ್ ಪೂರ್ತಿ ತುಂಬಿರಲಿ ಮತ್ತು ಫೋಕಸ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ.',
+    'check.whatToDo': 'ಏನು ಮಾಡಬೇಕು',
+    'check.whiteflies': 'ಬಿಳಿ ನೊಣಗಳು (ಕೀಟ)',
+    'check.predators': 'ಪರಭಕ್ಷಕಗಳು',
+    'check.pestsPerDay': 'ದಿನಕ್ಕೆ ಕೀಟಗಳು',
+    'check.perPredator': 'ಪ್ರತಿ ಪರಭಕ್ಷಕಕ್ಕೆ ಕೀಟಗಳು',
+    'check.range': 'ವ್ಯಾಪ್ತಿ {lo}-{hi}',
+    'check.over': '{n} ದಿನಗಳಲ್ಲಿ',
+    'check.noPredators': 'ಪರಭಕ್ಷಕಗಳಿಲ್ಲ',
+    'check.qualityOk': 'ಚಿತ್ರದ ಗುಣಮಟ್ಟ ಸರಿಯಾಗಿದೆ',
+    'check.qualityBad': 'ಚಿತ್ರ: {issues} - ಮತ್ತೆ ತೆಗೆಯಿರಿ',
+    'issue.blurry': 'ಮಸುಕಾಗಿದೆ',
+    'issue.dark': 'ತುಂಬಾ ಕತ್ತಲು',
+    'issue.bright': 'ಅತಿ ಬೆಳಕು',
+    'issue.glare': 'ಹೊಳಪು',
+    'check.actionLevel': 'ಕ್ರಿಯಾ ಮಟ್ಟ ದಿನಕ್ಕೆ {t} · ಅನುಪಾತ {r} (ತಾತ್ಕಾಲಿಕ)',
+    'check.advice': 'ಸಲಹೆ',
+    'check.englishNote': '(ವಿವರಗಳು ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ)',
+    'check.disclaimer': 'ಇದು ನಿರ್ಧಾರಕ್ಕೆ ಸಹಾಯ ಮಾತ್ರ: ಸ್ವಯಂಚಾಲಿತ ಎಣಿಕೆ, ದೃಢಪಡಿಸಿದ ರೋಗನಿರ್ಣಯವಲ್ಲ. ಔಷಧಿ ಬಳಸುವ ಮೊದಲು ಬೆಳೆಯನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಲೇಬಲ್ ಅನುಸರಿಸಿ. ಈ ಪರಿಶೀಲನೆಯನ್ನು ಉಳಿಸಲಾಗಿಲ್ಲ.',
+  },
+};
+
+export function translate(lang, key, vars = {}) {
+  const s = DICT[lang]?.[key] ?? DICT.en[key] ?? key;
+  return s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
+}
+
+export const LanguageContext = createContext({ lang: 'en', setLang: () => {} });
+
+/** t(key, vars) for the current language (English outside a provider, e.g. in tests). */
+export function useT() {
+  const { lang } = useContext(LanguageContext);
+  const t = (key, vars) => translate(lang, key, vars);
+  t.lang = lang;
+  return t;
+}
+
+export const useLanguage = () => useContext(LanguageContext);
+
+/**
+ * The decision's reason in the current language. English uses the engine's own
+ * text; Kannada rebuilds it from the same numbers (no machine translation).
+ */
+export function decisionReason(lang, d) {
+  if (!d?.decision) return d?.reason ?? '';
+  if (lang !== 'kn') return d.reason ?? '';
+  const T = d.thresholds?.action_threshold_per_day ?? 25;
+  const p = d.avg_pests;
+  let text;
+  if (d.decision === 'CHECK_TRAP') {
+    text = 'ಬಲೆಯ ಚಿತ್ರವನ್ನು ಓದಲು ಆಗಲಿಲ್ಲ ಅಥವಾ ಇತ್ತೀಚೆಗೆ ಚಿತ್ರ ಬಂದಿಲ್ಲ. ಬಲೆ ಮತ್ತು ಕ್ಯಾಮೆರಾವನ್ನು ಪರಿಶೀಲಿಸಿ, ಮತ್ತೆ ಚಿತ್ರ ತೆಗೆಯಿರಿ.';
+  } else if (d.decision === 'WAIT') {
+    text = `ಸರಾಸರಿ ದಿನಕ್ಕೆ ${p} ಕೀಟಗಳು - ಕ್ರಿಯಾ ಮಟ್ಟ ${T} ಕ್ಕಿಂತ ಕಡಿಮೆ. ಬಲೆಯನ್ನು ಗಮನಿಸುತ್ತಿರಿ.`;
+  } else if (d.decision === 'SPRAY') {
+    const ratio = d.no_predators ? 'ಬಲೆಯಲ್ಲಿ ಪರಭಕ್ಷಕಗಳಿಲ್ಲ' : `ಪ್ರತಿ ಪರಭಕ್ಷಕಕ್ಕೆ ಸುಮಾರು ${d.pests_per_predator} ಕೀಟಗಳು`;
+    text = `ಸರಾಸರಿ ದಿನಕ್ಕೆ ${p} ಕೀಟಗಳು - ಕ್ರಿಯಾ ಮಟ್ಟ ${T} ಕ್ಕಿಂತ ಹೆಚ್ಚು, ಮತ್ತು ${ratio}. ಪರಭಕ್ಷಕಗಳು ನಿಯಂತ್ರಿಸಲು ಸಾಕಾಗುವುದಿಲ್ಲ, ಆದ್ದರಿಂದ ಸಿಂಪಡಣೆ ಸೂಚಿಸಲಾಗಿದೆ.`;
+  } else {
+    text = `ಸರಾಸರಿ ದಿನಕ್ಕೆ ${p} ಕೀಟಗಳು - ಕ್ರಿಯಾ ಮಟ್ಟ ${T} ಕ್ಕಿಂತ ಹೆಚ್ಚು, ಆದರೆ ಪ್ರತಿ ಪರಭಕ್ಷಕಕ್ಕೆ ಸುಮಾರು ${d.pests_per_predator} ಕೀಟಗಳು ಮಾತ್ರ: ಪರಭಕ್ಷಕಗಳು ನಿಯಂತ್ರಿಸುತ್ತಿವೆ. ಸಿಂಪಡಿಸುವ ಬದಲು ಜೈವಿಕ ನಿಯಂತ್ರಕಗಳನ್ನು ಬಿಡುಗಡೆ ಮಾಡಿ.`;
+  }
+  if (d.borderline) text += ' ಗಡಿರೇಖೆ: ಎಣಿಕೆಯ ಅನಿಶ್ಚಿತತೆಯೊಳಗೆ ಸಲಹೆ ಬದಲಾಗಬಹುದು.';
+  return text;
+}
+
+/** EN / ಕನ್ನಡ switch. */
+export function LanguageToggle({ className = '' }) {
+  const { lang, setLang } = useLanguage();
+  return (
+    <div className={`inline-flex rounded-full bg-slate-900/70 p-0.5 text-xs ring-1 ring-slate-700 ${className}`} role="group" aria-label="Language">
+      {Object.entries(LANGS).map(([id, name]) => (
+        <button
+          key={id}
+          onClick={() => setLang(id)}
+          aria-pressed={lang === id}
+          lang={id}
+          className={`rounded-full px-2.5 py-1 font-semibold transition ${lang === id ? 'bg-emerald-400 text-slate-950' : 'text-slate-300 hover:text-white'}`}
+        >
+          {id === 'en' ? 'EN' : name}
+        </button>
+      ))}
+    </div>
+  );
+}

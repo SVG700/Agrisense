@@ -18,6 +18,15 @@ import TrapCanvas from './TrapCanvas.jsx';
 import AdvisoryCard from './AdvisoryCard.jsx';
 import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
+import DecisionBadge from './DecisionBadge.jsx';
+import TrapCards from './TrapCards.jsx';
+import { useT } from '../lib/i18n.jsx';
+import WeatherCard from './WeatherCard.jsx';
+import WhatIfCard from './WhatIfCard.jsx';
+import ImpactCard from './ImpactCard.jsx';
+import ActionLogCard from './ActionLogCard.jsx';
+import { api } from '../api.js';
+import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
   DATA_SOURCES,
@@ -27,6 +36,7 @@ import {
   VISION_STATES,
   fmtReading,
   hasCounts,
+  isSimulated,
   pestMeta,
   timeAgo,
   totalOf,
@@ -40,7 +50,8 @@ const HEADLINES = {
 };
 
 /** Farmer-facing analytics view. */
-export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
+export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, onGoAdmin }) {
+  const t = useT();
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
@@ -48,6 +59,25 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
+
+  // Action log for this trap (shared by the log card and the chart markers)
+  const [actions, setActions] = useState([]);
+  const [actionsUnavailable, setActionsUnavailable] = useState(null);
+  const loadActions = async () => {
+    if (!device?.id) return;
+    try {
+      setActions(await api.actions(device.id));
+      setActionsUnavailable(null);
+    } catch (err) {
+      setActions([]);
+      setActionsUnavailable(err.code === 'actions_unavailable' ? err.message : null);
+    }
+  };
+  useEffect(() => {
+    setActions([]);
+    loadActions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [device?.id]);
   const isHistoric = Boolean(capture && latest && capture.id !== latest.id);
   const det = capture?.detection ?? null;
   const countsKnown = hasCounts(det);
@@ -70,7 +100,11 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
   };
 
   const stale = latest && Date.now() - new Date(latest.timestamp).getTime() > STALE_AFTER_MS;
-  const vState = VISION_STATES[visionStatus(det)] ?? null;
+  const quality = det?.vision_meta?.quality ?? null;
+  const poorPhoto = det?.vision_meta?.error?.code === 'poor_image';
+  const vState = poorPhoto
+    ? { label: 'Photo rejected', tone: 'bad', help: det.vision_meta.error.message }
+    : VISION_STATES[visionStatus(det)] ?? null;
   const source = DATA_SOURCES[capture?.data_source ?? 'unknown'] ?? DATA_SOURCES.unknown;
 
   return (
@@ -95,6 +129,22 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         )}
       </AnimatePresence>
 
+      {isSimulated(capture) && (
+        <div
+          role="note"
+          data-testid="simulated-banner"
+          className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100"
+        >
+          <Badge tone="warn">{t('simulatedData')}</Badge>
+          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">{t('demoDetector')}</Badge>}
+          <span className="text-amber-100/80">
+            {capture.detection?.vision_meta?.fallback
+              ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
+              : t('banner.simulated')}
+          </span>
+        </div>
+      )}
+
       <Hero
         device={device}
         capture={capture}
@@ -105,7 +155,12 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         total={total}
         onViewTrap={() => trapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onGoAdmin={onGoAdmin}
+        decision={det?.ai_advisory?.decision}
       />
+
+      <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
+
+      <ImpactCard refreshKey={latest?.id} />
 
       {/* Provenance strip: what the numbers below are */}
       {capture && (
@@ -132,6 +187,7 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
             </Badge>
           )}
           <Badge tone={source.tone}>Readings: {source.label}</Badge>
+          {quality && <QualityBadge quality={quality} />}
         </motion.div>
       )}
 
@@ -139,10 +195,10 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
       <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4" stagger={0.07} delay={0.1}>
         <Stat
           icon={Bug}
-          label="Insects trapped"
+          label={t('kpi.insects')}
           trend={trends.total}
           trendColor="#a3e635"
-          value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : 'Not counted'}
+          value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : t('kpi.notCounted')}
           sub={
             delta !== null ? (
               <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${delta > 0 ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
@@ -155,19 +211,19 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         />
         <Stat
           icon={Thermometer}
-          label="Temperature"
+          label={t('kpi.temperature')}
           trend={trends.temperature}
           trendColor="#fb923c"
           value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
         />
         <Stat
           icon={Droplets}
-          label="Humidity"
+          label={t('kpi.humidity')}
           trend={trends.humidity}
           trendColor="#38bdf8"
           value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
         />
-        <Stat icon={ShieldAlert} label="Risk level" trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ?? '—'}</span>} />
+        <Stat icon={ShieldAlert} label={t('kpi.risk')} trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ? t(`risk.${risk}`) : '—'}</span>} />
       </Stagger>
 
       <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.2}>
@@ -179,12 +235,24 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
         </Item>
         <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <AdvisoryCard advisory={det?.ai_advisory} />
+          <WeatherCard deviceId={device?.id} decision={latest?.detection?.ai_advisory?.decision} />
+          <ActionLogCard
+            deviceId={device?.id}
+            decision={latest?.detection?.ai_advisory?.decision}
+            actions={actions}
+            unavailable={actionsUnavailable}
+            onChanged={loadActions}
+          />
           <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
         </Item>
       </Stagger>
 
       <Reveal>
-        <MicroclimateChart telemetry={telemetry} />
+        <WhatIfCard deviceId={device?.id} />
+      </Reveal>
+
+      <Reveal>
+        <MicroclimateChart telemetry={telemetry} actions={actions} />
       </Reveal>
     </div>
   );
@@ -192,9 +260,33 @@ export default function FarmerDashboard({ device, telemetry, onGoAdmin }) {
 
 /* -------------------------------------------------------------------------- */
 
+const ISSUE_LABELS = { blurry: 'blurry', dark: 'too dark', bright: 'overexposed', glare: 'glare' };
+
+/** Photo-quality verdict for an uploaded trap photo (metrics in the tooltip). */
+function QualityBadge({ quality }) {
+  const m = quality.metrics ?? {};
+  const detail = `Sharpness ${m.sharpness}, brightness ${m.brightness}, glare ${Math.round((m.glare_fraction ?? 0) * 100)}% (placeholder thresholds)`;
+  return quality.ok ? (
+    <Badge tone="good" title={detail}>
+      Photo quality OK
+    </Badge>
+  ) : (
+    <Badge tone="bad" title={`${quality.advice?.join(' ') ?? ''} ${detail}`} data-testid="quality-badge">
+      Photo: {quality.issues.map((i) => ISSUE_LABELS[i] ?? i).join(', ')} - retake
+    </Badge>
+  );
+}
+
 /** Summary banner built only from the selected capture's real data. */
-function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin }) {
-  const headline = !capture ? 'Waiting for the first trap capture' : HEADLINES[risk] ?? 'Awaiting pest analysis';
+function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin, decision }) {
+  const t = useT();
+  const headline = !capture
+    ? t('hero.waiting')
+    : decision?.decision === 'CHECK_TRAP'
+      ? t('hero.check')
+      : HEADLINES[risk]
+        ? t(`hero.${risk}`)
+        : t('hero.awaiting');
   const style = RISK_STYLES[risk];
   const boxes = (capture?.detection?.bounding_boxes ?? []).slice(0, 40);
 
@@ -216,7 +308,8 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
               <span className={`live-dot ${stale ? 'text-amber-400' : 'text-emerald-400'}`} />
               {device?.name ?? 'No trap selected'}
             </span>
-            {latest && <span className="text-slate-500">Last capture {timeAgo(latest.timestamp)}</span>}
+            {latest && <span className="text-slate-500">{t('hero.lastCapture', { ago: timeAgo(latest.timestamp) })}</span>}
+            {decision?.decision && <DecisionBadge decision={decision.decision} borderline={decision.borderline} />}
           </Item>
           <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
             <WordReveal text={headline} wordClassName="text-shine" delay={0.15} />
@@ -224,17 +317,19 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
           </Item>
           <Item as="p" className="text-sm leading-relaxed text-slate-400 sm:text-base">
             {!capture
-              ? 'Send a capture from the edge device or the Hardware tab to start monitoring.'
+              ? t('hero.noCapture')
               : countsKnown
-                ? `${total} insect${total === 1 ? '' : 's'} counted on the ${capture.id === latest?.id ? 'latest' : 'selected'} sticky-trap image. Review the detections and the advisory below.`
-                : 'Insects were not counted for this capture. Sensor readings and the trap image are still recorded below.'}
+                ? t.lang === 'en'
+                  ? `${total} insect${total === 1 ? '' : 's'} counted on the ${capture.id === latest?.id ? 'latest' : 'selected'} sticky-trap image. Review the detections and the advisory below.`
+                  : t('hero.counted', { n: total, which: t(capture.id === latest?.id ? 'hero.latest' : 'hero.selected') })
+                : t('hero.notCounted')}
           </Item>
           <Item className="mt-2 flex flex-wrap gap-3">
             <button onClick={onViewTrap} className="btn btn-primary" disabled={!capture}>
-              <ScanSearch className="h-4 w-4" /> View detections
+              <ScanSearch className="h-4 w-4" /> {t('hero.viewDetections')}
             </button>
             <button onClick={onGoAdmin} className="btn btn-ghost">
-              <Cpu className="h-4 w-4" /> Hardware control <ArrowRight className="h-3.5 w-3.5" />
+              <Cpu className="h-4 w-4" /> {t('hero.hardware')} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </Item>
         </Stagger>
@@ -388,6 +483,7 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
           <AnimatePresence initial={false}>
             {recent.map((t, i) => {
               const risk = t.detection?.ai_advisory?.risk_level;
+              const dec = decisionStyle(t.detection?.ai_advisory?.decision?.decision);
               const vs = visionStatus(t.detection);
               const selected = t.id === selectedId;
               return (
@@ -404,7 +500,13 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
                       selected ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40' : 'hover:translate-x-0.5 hover:bg-slate-800/60'
                     }`}
                   >
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-500'}`} />
+                    {dec ? (
+                      <span className="w-3 shrink-0 text-center text-xs leading-none" style={{ color: dec.color }} title={dec.label}>
+                        {dec.shape}
+                      </span>
+                    ) : (
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-500'}`} />
+                    )}
                     <span className="tabular-nums text-slate-300">{new Date(t.timestamp).toLocaleTimeString()}</span>
                     {vs === 'simulated' && <span className="text-[10px] uppercase tracking-wide text-amber-300/80">sim</span>}
                     <span className="ml-auto truncate tabular-nums text-slate-400">

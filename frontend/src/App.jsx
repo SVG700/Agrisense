@@ -16,19 +16,33 @@ import {
 import { api } from './api.js';
 import { LOW_BATTERY } from './lib/pests.js';
 import { EASE, WordReveal, pageTransition } from './lib/motion.jsx';
+import { LanguageContext, LanguageToggle } from './lib/i18n.jsx';
 import { BackToTop, InteractionEffects, ScrollProgress } from './components/InteractionEffects.jsx';
 import FarmerDashboard from './components/FarmerDashboard.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
+import PhoneCheckPage from './components/PhoneCheckPage.jsx';
 import AmbientBackground from './components/AmbientBackground.jsx';
 import { DashboardSkeleton } from './components/Skeletons.jsx';
 
 // The map page (and everything kepler.gl pulls in) is a separate chunk, loaded on first visit
 const PestMapPage = lazy(() => import('./map/PestMapPage.jsx'));
 
+const LANG_KEY = 'agrisense.lang';
+// EN / Kannada applies to the farmer-facing pages only; the map and admin pages stay English
+const TRANSLATED_TABS = ['farmer', 'check'];
+const storedLang = () => {
+  try {
+    return localStorage.getItem(LANG_KEY) === 'kn' ? 'kn' : 'en';
+  } catch {
+    return 'en';
+  }
+};
+
 const POLL_MS = Number(import.meta.env.VITE_POLL_MS) || 5000;
 
 const TABS = [
   { id: 'farmer', label: 'Farmer Analytics', short: 'Analytics', icon: LineChart, blurb: 'Trap insights & advisory' },
+  { id: 'check', label: 'Phone Check', short: 'Check', icon: Camera, blurb: 'Photo a trap card, get advice' },
   { id: 'map', label: 'Pest Surveillance Map', short: 'Map', icon: MapIcon, blurb: 'Trap network & outbreak replay' },
   { id: 'admin', label: 'Admin & Hardware Control', short: 'Hardware', icon: Cpu, blurb: 'Devices, battery & capture' },
 ];
@@ -43,6 +57,21 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [manualRefresh, setManualRefresh] = useState(false);
+  const [lang, setLangState] = useState(storedLang);
+  const setLang = useCallback((l) => {
+    setLangState(l);
+    try {
+      localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  }, []);
+  const translated = TRANSLATED_TABS.includes(tab);
+  const effectiveLang = translated ? lang : 'en';
+  const langValue = useMemo(() => ({ lang: effectiveLang, setLang }), [effectiveLang, setLang]);
+  useEffect(() => {
+    document.documentElement.lang = effectiveLang;
+  }, [effectiveLang]);
 
   const seq = useRef(0); // only the newest response may update state
   const inFlight = useRef(null); // device id of the poll currently running
@@ -108,6 +137,7 @@ export default function App() {
   const current = TABS.find((t) => t.id === tab);
 
   return (
+    <LanguageContext.Provider value={langValue}>
     <MotionConfig reducedMotion="user">
       <AmbientBackground />
       <InteractionEffects />
@@ -162,6 +192,7 @@ export default function App() {
               </motion.div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+                {translated && <LanguageToggle />}
                 <AnimatePresence>
                   {lowBattery.length > 0 && (
                     <motion.button
@@ -199,13 +230,13 @@ export default function App() {
             {/* Mobile / tablet: segmented nav + device picker + compact status */}
             <div className="flex flex-col gap-3 lg:hidden">
               <LayoutGroup id="top-nav">
-                <nav className="relative grid grid-cols-3 rounded-2xl bg-slate-900/70 p-1 ring-1 ring-emerald-900/40" aria-label="Main">
+                <nav className="relative grid grid-cols-4 rounded-2xl bg-slate-900/70 p-1 ring-1 ring-emerald-900/40" aria-label="Main">
                   {TABS.map(({ id, short, icon: Icon }) => (
                     <button
                       key={id}
                       onClick={() => setTab(id)}
                       aria-current={tab === id ? 'page' : undefined}
-                      className={`relative flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors duration-200 ${
+                      className={`relative flex items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-xs font-medium transition-colors duration-200 sm:gap-2 sm:px-3 sm:text-sm ${
                         tab === id ? 'text-slate-950' : 'text-slate-400 hover:text-slate-100'
                       }`}
                     >
@@ -253,7 +284,15 @@ export default function App() {
             <AnimatePresence mode="wait">
               <motion.div key={tab} {...pageTransition}>
                 {tab === 'farmer' ? (
-                  <FarmerDashboard device={device} telemetry={telemetry} onGoAdmin={() => setTab('admin')} />
+                  <FarmerDashboard
+                    device={device}
+                    devices={devices}
+                    onSelectDevice={selectDevice}
+                    telemetry={telemetry}
+                    onGoAdmin={() => setTab('admin')}
+                  />
+                ) : tab === 'check' ? (
+                  <PhoneCheckPage />
                 ) : tab === 'map' ? (
                   <Suspense fallback={<DashboardSkeleton />}>
                     <PestMapPage />
@@ -273,6 +312,7 @@ export default function App() {
         </main>
       </div>
     </MotionConfig>
+    </LanguageContext.Provider>
   );
 }
 

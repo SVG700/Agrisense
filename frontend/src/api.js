@@ -57,7 +57,25 @@ export const api = {
   devices: () => request('/api/devices'),
   telemetry: (deviceId, limit = 50) =>
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),
+  decision: (deviceId) => request(`/api/decision?device_id=${encodeURIComponent(deviceId)}`),
   mapData: (days = 14) => request(`/api/map-data?days=${encodeURIComponent(days)}`),
+  actions: (deviceId, limit = 50) => request(`/api/actions?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`),
+  logAction: (payload) => request('/api/actions', { method: 'POST', body: payload, admin: true }),
+  deleteAction: (id) => request(`/api/actions/${encodeURIComponent(id)}`, { method: 'DELETE', admin: true }),
+  impact: (days = 30) => request(`/api/impact?days=${encodeURIComponent(days)}`),
+  simulate: ({ pests, predators, confidence }) =>
+    request(`/api/decision/simulate?pests=${pests}&predators=${predators}${confidence != null ? `&confidence=${confidence}` : ''}`),
+  decisionRegions: (maxPests = 150, maxPredators = 30, steps = 50) =>
+    request(`/api/decision/regions?max_pests=${maxPests}&max_predators=${maxPredators}&steps=${steps}`),
+  weather: (deviceId) => request(`/api/weather${deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ''}`),
+  check: (payload) => request('/api/check', { method: 'POST', body: payload }),
+  telegramStatus: () => request('/api/admin/telegram', { admin: true }),
+  telegramPreview: () => request('/api/admin/telegram/preview', { admin: true }),
+  telegramTest: () => request('/api/admin/telegram/test', { method: 'POST', admin: true }),
+  telegramSummary: () => request('/api/admin/telegram/summary', { method: 'POST', admin: true }),
+  telegramChats: () => request('/api/admin/telegram/chats', { admin: true }),
+  resetDemo: () => request('/api/admin/demo/reset', { method: 'POST', admin: true }),
+  clearDemo: () => request('/api/admin/demo', { method: 'DELETE', admin: true }),
   setBattery: (device_id, battery_level) =>
     request('/api/device/battery', { method: 'PATCH', body: { device_id, battery_level }, admin: true }),
   // Dashboard captures are always labelled as simulated readings

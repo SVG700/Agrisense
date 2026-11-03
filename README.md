@@ -114,10 +114,142 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## English / ಕನ್ನಡ
+
+An **EN | ಕನ್ನಡ** switch in the header translates the farmer-facing pages: **Farmer Analytics** (headline, KPIs,
+simulated banner, decision panel, *Can I spray now?*, *What did you do?*, card titles), the **trap cards**
+and **Phone Check**. The map and admin pages stay English, and the switch is hidden there. The choice is
+remembered per browser.
+
+- Decision reasons come from the engine in English. In Kannada they are **rebuilt from the same numbers**
+  (pests/day, per predator, the action level, BORDERLINE), not machine-translated.
+- Gemini advice steps stay in English, marked *(ವಿವರಗಳು ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ)*.
+- Text lives in `frontend/src/lib/i18n.jsx`. A test fails if any English key lacks a Kannada one.
+- Kannada renders with system fonts (Noto Sans Kannada on Android, Nirmala UI or Tunga on Windows).
+- **The Kannada wording is a first draft: have a native speaker or the IIHR team review it.**
+
+## Telegram summaries and alerts (English + ಕನ್ನಡ)
+
+- **Daily summary** at `TELEGRAM_SUMMARY_TIME` (default 07:00 IST): every trap's traffic-light decision
+  (🔴▲ SPRAY, 🟠◆ RELEASE BIOCONTROL, 🟢● WAIT, ⚪■ CHECK TRAP), with pests per day, pests per predator, and
+  BORDERLINE / simulated tags, most urgent first, plus the spray window. It is sent in English and Kannada
+  (`TELEGRAM_LANGUAGE=en|kn|both`).
+- **Instant alert** when a capture changes a trap's advice to SPRAY, RELEASE BIOCONTROL or CHECK TRAP. It is
+  sent once per trap and decision per 6 h, never for WAIT, and never delays ingestion.
+- **Setup:**
+  1. Create a bot with **@BotFather** and put the token in `TELEGRAM_BOT_TOKEN`.
+  2. Send the bot a message (or add it to a group) and restart the backend.
+  3. Go to *Admin & Hardware Control → Telegram alerts → Find my chat id*, put that number in
+     `TELEGRAM_CHAT_ID`, restart, and press **Send test**.
+- The same card has *Preview summary* (works before setup), *Send test* and *Send summary now*.
+- The bot token is used by the backend only. Telegram puts it in the request URL, so errors are reduced to a
+  status code before logging; it never appears in logs, API responses or the browser.
+- The **Kannada wording is a first draft**: have a native speaker or the IIHR team review it
+  (`backend/src/services/telegram.js` → `TEXT.kn`).
+
+## Action log
+
+The **What did you do?** card (Farmer Analytics, under the spray-window card) lets the farmer log
+**Sprayed**, **Released predators** or **Not yet**, with an optional note, against the trap's current advice.
+The advice at that moment is computed and stored by the server ('advice was ▲ SPRAY'), never taken from the
+browser. The last 5 entries are listed (the newest can be undone), and every entry appears as a labelled,
+coloured **marker on the trap chart** at the capture it followed, so the effect of a spray or release is
+visible. Logging needs the admin key, like other dashboard writes. *Reset demo data* seeds two story
+entries: Polyhouse 1 *Not yet* (waiting for dry weather) and Polyhouse 2 *Released*.
+
+**Needs schema v4:** run `supabase/migrations/v4_action_log.sql` once in the Supabase SQL editor (it is also
+folded into `supabase/schema.sql`). Until then the card says exactly that, and everything else keeps working.
+
+## Impact estimate
+
+The **Estimated impact** card (Farmer Analytics, under the trap cards; `GET /api/impact?days=30`) compares
+the traps' decisions with **routine calendar spraying** (every 7 days whatever the pest level), over
+**all** traps for the last 14 or 30 days:
+
+- **Calendar:** one spray per 7 days per trap.
+- **AgriSense:** one spray when a trap turns SPRAY, and another if it is still SPRAY 7 days later. WAIT and
+  RELEASE BIOCONTROL days are not sprayed; biocontrol releases are counted separately.
+- **Sprays avoided** = calendar - AgriSense (never negative per trap), plus the percentage fewer, **litres of
+  pesticide product** and **rupees** (product + labour) at 0.5 acre per trap, 0.25 L and ₹1,500 per acre per
+  spray, and the **trap-days on which predators were spared** (RELEASE BIOCONTROL).
+- It is **always labelled ESTIMATE**, with *Simulated data* when the inputs are simulated. The assumptions
+  sit under *How this is estimated*, and live in `backend/config/pests.json` → `impact` as placeholders to
+  confirm with the IIHR mentor and local farmers. **It is not a measured result.**
+
+## What-if simulator
+
+The **What if…?** card on Farmer Analytics starts from the selected trap's real 3-day averages and lets you
+move **pests/day**, **predators/day** and **detector confidence**, or try quick scenarios (*release
+predators*, *pests double*, *after a spray*, *low detector confidence*). Every answer comes from the
+backend's decision engine (`GET /api/decision/simulate`), the same function that decides for real traps.
+Nothing is re-implemented in the browser. The decision map shades the WAIT, RELEASE BIOCONTROL and
+SPRAY regions computed by that engine, with the 25/day action line and the 10:1 ratio line. A white dot
+marks the what-if and a ring marks the trap now. It shows judges at a glance why releasing predators
+changes the advice.
+
+## Weather: spray window and degree-days
+
+The dashboard's **Can I spray now?** card uses the free [Open-Meteo](https://open-meteo.com) forecast
+(no API key; called from the backend; `GET /api/weather?device_id=` or `?lat=&lon=`) at the trap's
+coordinates, or the IIHR default location (labelled as such).
+
+- **Spray now?** Checked hour by hour. You can spray only when **no rain is expected in the next 6 h**
+  (chance below 40%, under 0.2 mm), **wind is at most 15 km/h** (gusts at most 25) so it won't drift, and
+  it is **daylight**. Heat above 32 °C and very still air are shown as cautions. If you can't spray now,
+  the card shows the **next good window** (at least 2 good hours in a row, searching 72 h ahead). When the
+  trap's decision is SPRAY, it says *"Spraying is advised, but wait for the window: Tomorrow 06:00-09:00"*.
+- **Degree-days:** daily degree-days = max(0, min(mean temperature, 32) - 10 °C) from the forecast daily
+  max/min. One whitefly generation takes about 300 degree-days, so at the forecast rate the card says how
+  many days a generation takes and when eggs laid today would become adults.
+- The rules are in `backend/config/pests.json` (`spray_window`, `degree_days`) and are **placeholders**,
+  to confirm with the IIHR mentor and the product label.
+- **Never blocks:** a 4 s timeout and a 30-minute cache per location (about 1 km cell). The last good
+  forecast is served, labelled *stale*, for up to 6 h if Open-Meteo is down; otherwise the card shows a quiet
+  note. Pest decisions never depend on weather.
+
+## Phone check
+
+*Phone Check* (sidebar / **Check** tab) lets a farmer photograph a yellow sticky card and enter how many days
+it hung. On a phone, **Take or choose a photo** opens the camera. The photo is corrected for orientation and
+resized to at most 2600 px in the browser, so uploads stay small on rural connections.
+
+The backend (`POST /api/check`) runs the same pipeline as a trap capture: the quality check, then Roboflow
+with tiling, then the predator-aware decision, then the Gemini advisory that explains it. Counts are divided
+by the days hung to give **pests per day**, so the same card means a lower daily rate the longer it hung.
+The answer shows the traffic-light decision with its reason, count range and BORDERLINE tag, the whitefly
+and predator (MR/NC) counts, the annotated photo, the photo-quality verdict and the advice. A card that hung
+only 1-2 days is flagged as a short window. A rejected photo gives **CHECK TRAP** with retake advice.
+**Nothing is stored.** The endpoint is public but rate-limited (`RATE_LIMIT_CHECK_MAX`, default 20 per
+window per IP), because each check can cost vision and LLM calls.
+
+## Demo mode
+
+One click loads four **DEMO** traps with 14 days of simulated captures (two per day: 08:00 and 17:00 IST),
+built so that every decision appears:
+
+| Trap | Story | Ends as |
+|---|---|---|
+| DEMO · Polyhouse 1 (tomato) | whitefly climbing, almost no predators | ▲ SPRAY |
+| DEMO · Polyhouse 2 (tomato) | whitefly high, but Macrolophus/Nesidiocoris build up | ◆ RELEASE BIOCONTROL |
+| DEMO · Net-house (capsicum) | hovering just under 25/day | ● WAIT, BORDERLINE |
+| DEMO · Polyhouse 3 (cucumber) | last photo unreadable (fogged lens) | ■ CHECK TRAP |
+
+- **Dashboard:** *Admin & Hardware Control → Demo mode → Reset demo data* (needs the admin key).
+- **Terminal:** `cd backend && npm run demo:reset` (reads `ADMIN_API_KEY` from `backend/.env`; add `-- --clear` to remove them).
+- Reset any time: it deletes the DEMO traps and re-seeds them, ending at the current time. Run it again before a
+  presentation, because a trap with no capture for 48 hours turns grey (CHECK TRAP).
+- Nothing is passed off as real. Every DEMO capture is `data_source: simulator`, its detections come from the
+  **demo detector** (synthetic sticky-card images whose boxes are generated), and its advisory is the rule engine
+  labelled *demo*. The dashboard shows a **Simulated data / Demo detector** banner on these captures. A reset makes
+  no vision or LLM calls, so it costs nothing and works offline.
+
 ## Pest Surveillance Map
 
 The **Pest Surveillance Map** page (sidebar → *Pest Surveillance Map*) shows every trap on a kepler.gl map:
-- **Colour** shows the decision: red **SPRAY**, amber **BIOCONTROL**, green **WAIT**.
+- **Colour** shows the predator-aware decision: red **SPRAY**, amber **BIOCONTROL** (release biocontrol), green **WAIT**.
+  The decision averages the last 3 days: at least 25 pests/day with 10+ pests per predator means SPRAY; at least 25/day with
+  fewer pests per predator means RELEASE BIOCONTROL; otherwise WAIT. The thresholds in `backend/config/pests.json` are
+  **placeholders to confirm with the IIHR mentor** (see DECISIONS.md D7).
 - **Size** shows the pest count.
 - **Time filter:** a one-day filter on `date`; press ▷ on the timeline to replay an outbreak day by day.
 - **Trap list:** a table under the map lists every trap for any day, with or without the map.
@@ -277,18 +409,46 @@ output.
 
 ## Vision provider configuration
 
-**Roboflow** (hosted Serverless API, format checked against Roboflow's docs in Oct 2026):
+**Roboflow** (default): the yellow-sticky-trap model `yellow-sticky-traps-bwxut-ieond/1` on
+`https://serverless.roboflow.com`. Only the key is required:
 
 ```
 VISION_PROVIDER=roboflow
-YOLO_API_URL=https://serverless.roboflow.com/<project-id>/<version>
-YOLO_API_KEY=<roboflow api key>        # sent as Authorization: Bearer
-VISION_MODEL_ID=<project-id>/<version>
+ROBOFLOW_API_KEY=<roboflow api key>   # main name; YOLO_API_KEY still works as a fallback
+# optional: ROBOFLOW_MODEL=<project>/<version>, ROBOFLOW_API_URL=<host or full model URL>
 ```
 
-Uploaded photos are sent as a base64 body (`application/x-www-form-urlencoded`). URL images are sent as
-`?image=<url>`. The response's `predictions[].x/y` are box **centres** in pixels and are converted to
-normalized corner boxes using `image.width/height`.
+- The key is sent as Roboflow's `api_key` parameter, from the backend only. It is never logged, stored or
+  returned; `/api/health` shows only which env var NAME supplied it.
+- **Classes:** the model's labels `WF` (whitefly, pest), `MR` (Macrolophus, predator) and `NC`
+  (Nesidiocoris, predator) are mapped through `backend/config/pests.json`. Every detection stores
+  `counts` per class and `vision_meta.totals` = `{pests, predators}`, which feed the decision engine.
+- **Tiling (SAHI):** whiteflies are a few pixels wide on a phone photo, and the model sees 640 px. Uploaded
+  photos therefore get one full-image pass **plus** a `VISION_TILES` x `VISION_TILES` grid (default 4x4)
+  of tiles with `VISION_TILE_OVERLAP` (0.2) overlap. Tile boxes are mapped back to the whole photo, and
+  duplicates are merged per class (IoU >= 0.5, or a box mostly inside another, which catches insects cut
+  at a tile edge). Tiles are never smaller than 640 px, so smaller photos use fewer tiles. Each request
+  is downscaled to at most 1280 px to keep uploads fast. **Cost:** a 4x4 photo is 17 Roboflow calls.
+  URL images (`?image=<url>`) are sent once, untiled.
+- **Photo quality check** (`VISION_QUALITY_CHECK=true`): before detection, every uploaded photo is
+  checked for **blur** (variance of the Laplacian, normalised for exposure), **dark** and **overexposed**
+  (mean brightness) and **glare** (share of near-white pixels). A photo that fails is not sent to the model
+  and gets no demo counts. It is stored as `failed` with `error.code = poor_image` and the metrics in
+  `vision_meta.quality`, and the trap shows **■ CHECK TRAP** with what is wrong and how to retake it
+  (e.g. "too blurry ... hold the phone steady about 30 cm from the card"). The thresholds are in
+  `backend/config/pests.json` → `image_quality` and are **placeholders**, calibrated only on synthetic
+  cards (sharp about 90, slightly soft about 40, blurred below 5), so tune them on real photos.
+- **Annotated image:** for uploaded photos the API response includes `annotated_image` (a JPEG data URL
+  with pests boxed in red and predators in green). It is returned to the uploader and not stored, because
+  the dashboard draws boxes itself.
+- **Demo fallback** (`VISION_DEMO_FALLBACK=true`, the default): with no key, or when Roboflow fails, the
+  photo is counted by the labelled **demo detector**. Its status is `simulated`, `vision_meta.fallback` says
+  why, there are no boxes on the real photo, the annotated image carries a "DEMO DETECTOR" banner, and the
+  dashboard shows a *Simulated data* banner. Set it to `false` in the field: a failure is then stored as
+  `failed` and the trap shows ■ CHECK TRAP.
+- **Live check, 2026-11-03:** on a synthetic 2600x1950 card, the full pass plus 4x4 tiles found 48
+  whiteflies (47 with the full image only) in about 4 s. Thresholds and tiling should be re-checked on
+  real IIHR trap photos.
 
 **Generic** endpoint: `POST` either `{"image_url"}` or `{"image_base64", "content_type"}`, and return
 `{"detections":[{"label","confidence","bbox":[x1,y1,x2,y2]}], "image_width"?, "image_height"?}`. Without
@@ -296,8 +456,8 @@ the image size, the coordinates must already be normalized.
 
 All boxes are validated: finite numbers, confidence between 0 and 1, sensible labels, and at least partly
 inside the image (partly-outside boxes are clipped). Rejected boxes are counted in `vision_meta.rejected`.
-An empty result is stored as **zero detections**. A failed call is stored as `failed`, with no boxes and no
-advisory, and is never replaced by simulated data. Check with
+An empty result is stored as **zero detections**. With the demo fallback off, a failed call is stored as
+`failed`, with no boxes and no advisory. Check with
 `npm run verify:vision -- --image path/to/trap.jpg`.
 
 ---
@@ -317,6 +477,18 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
+| POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
+| POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
+| GET | `/api/admin/telegram` (+ `/preview`, `/chats`) | admin | Telegram status (no token), summary preview, chats that messaged the bot |
+| POST | `/api/admin/telegram/test`, `/api/admin/telegram/summary` | admin | Send a test message / the trap summary now |
+| GET | `/api/actions?device_id=` | – | Action log, newest first (needs schema v4) |
+| POST | `/api/actions` | admin | `{device_id, action: sprayed|released|not_yet, note?, acted_at?}`; stores the advice at the time |
+| DELETE | `/api/actions/:id` | admin | Undo an entry |
+| GET | `/api/impact?days=30` | – | Impact ESTIMATE vs calendar spraying over all traps: sprays avoided, %, litres, cost, biocontrol releases, assumptions |
+| GET | `/api/decision/simulate?pests=&predators=&confidence=` | – | What-if: the same decision engine on hypothetical per-day averages (nothing stored) |
+| GET | `/api/decision/regions?max_pests=&max_predators=&steps=` | – | Decision map: grid of decisions over pests/day x predators/day |
+| GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |
 | GET | `/api/map-data?days=14` | – | One row per trap per day: `trap_id, trap_name, latitude, longitude, date, pest_count, predator_count, decision` (plus `dominant_pest, simulated, source`), with `meta` |
 | POST | `/api/admin/map-seed` | admin | `{traps, observations}`. Simulated data only; decisions computed server-side |
 | DELETE | `/api/admin/map-seed` | admin | Removes all simulated traps and their observations |

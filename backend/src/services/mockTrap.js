@@ -17,6 +17,25 @@ export const SPECIES = {
   fungus_gnat: { color: '#1c1917', rx: 6, ry: 4, weight: 0.1 },
 };
 
+/** Natural enemies (demo mode only; never drawn unless a predator share is requested). */
+export const PREDATOR_SPECIES = {
+  macrolophus: { color: '#16a34a', rx: 12, ry: 4, weight: 0.6 },
+  nesidiocoris: { color: '#3f6212', rx: 11, ry: 3.5, weight: 0.4 },
+};
+
+/** Species mixes: 'default' keeps the original simulator; 'wf' is a whitefly-dominated greenhouse card. */
+const MIXES = {
+  default: SPECIES,
+  wf: {
+    whitefly: { weight: 0.82 },
+    thrips: { weight: 0.08 },
+    fungus_gnat: { weight: 0.06 },
+    aphid: { weight: 0.04 },
+  },
+};
+
+const drawing = (label) => SPECIES[label] ?? PREDATOR_SPECIES[label];
+
 /** Small, fast seeded PRNG (mulberry32). */
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -39,28 +58,32 @@ export function hashSeed(input) {
   return h >>> 0;
 }
 
-function pickSpecies(rand) {
+function pickFrom(table, rand, fallback) {
   let r = rand();
-  for (const [name, s] of Object.entries(SPECIES)) {
+  for (const [name, s] of Object.entries(table)) {
     if ((r -= s.weight) <= 0) return name;
   }
-  return 'aphid';
+  return fallback;
 }
 
 /**
  * @param {string} seed      any string
- * @param {number} density   0..1 - scales how many insects are stuck to the trap
+ * @param {number} density   0..2 - scales how many insects are stuck to the trap (1 is a busy card)
+ * @param {{mix?: string, predators?: number}} [opts]  species mix and share of natural enemies (0..0.6)
  * @returns {{label, confidence, x, y, width, height, cx, cy, angle}[]} boxes normalized to 0..1
  */
-export function generateTrap(seed, density = 0.4) {
+export function generateTrap(seed, density = 0.4, { mix = 'default', predators = 0 } = {}) {
   const rand = mulberry32(hashSeed(seed));
-  const d = Math.min(1, Math.max(0, Number(density) || 0));
+  const d = Math.min(2, Math.max(0, Number(density) || 0));
+  const p = Math.min(0.6, Math.max(0, Number(predators) || 0));
+  const table = MIXES[mix] ?? SPECIES;
   const count = Math.round(4 + d * 56 + rand() * 6);
   const insects = [];
 
   for (let i = 0; i < count; i++) {
-    const label = pickSpecies(rand);
-    const { rx, ry } = SPECIES[label];
+    // Only draw the extra random number when predators were asked for, so old seeds render identically
+    const label = p > 0 && rand() < p ? pickFrom(PREDATOR_SPECIES, rand, 'macrolophus') : pickFrom(table, rand, 'aphid');
+    const { rx, ry } = drawing(label);
     const scale = 0.8 + rand() * 0.6;
     const cx = 40 + rand() * (TRAP_WIDTH - 80);
     const cy = 40 + rand() * (TRAP_HEIGHT - 80);
@@ -85,8 +108,8 @@ export function generateTrap(seed, density = 0.4) {
 }
 
 /** Renders the trap as an SVG string (yellow sticky card with grid + insects). */
-export function renderTrapSvg(seed, density) {
-  const insects = generateTrap(seed, density);
+export function renderTrapSvg(seed, density, opts) {
+  const insects = generateTrap(seed, density, opts);
   const grid = [];
   for (let x = 50; x < TRAP_WIDTH; x += 50) {
     grid.push(`<line x1="${x}" y1="0" x2="${x}" y2="${TRAP_HEIGHT}" />`);
@@ -97,7 +120,7 @@ export function renderTrapSvg(seed, density) {
 
   const bugs = insects
     .map(({ label, cx, cy, angle, scale }) => {
-      const { color, rx, ry } = SPECIES[label];
+      const { color, rx, ry } = drawing(label);
       const wings =
         label === 'whitefly'
           ? `<ellipse cx="-4" cy="0" rx="${rx * 0.9}" ry="${ry * 1.3}" fill="#ffffff" opacity="0.85"/>`
@@ -121,8 +144,8 @@ export function renderTrapSvg(seed, density) {
 }
 
 /**
- * Detects our own mock-trap URLs: /api/mock-trap/<seed>.svg?d=<density>
- * @returns {{seed: string, density: number} | null}
+ * Detects our own mock-trap URLs: /api/mock-trap/<seed>.svg?d=<density>[&m=<mix>&p=<predator share>]
+ * @returns {{seed: string, density: number, opts: {mix: string, predators: number}} | null}
  */
 export function parseMockTrapUrl(url) {
   if (!url) return null;
@@ -130,7 +153,11 @@ export function parseMockTrapUrl(url) {
     const u = new URL(url);
     const m = u.pathname.match(/\/mock-trap\/([\w.-]+)\.svg$/);
     if (!m) return null;
-    return { seed: m[1], density: Number(u.searchParams.get('d') ?? 0.4) };
+    return {
+      seed: m[1],
+      density: Number(u.searchParams.get('d') ?? 0.4),
+      opts: { mix: u.searchParams.get('m') ?? 'default', predators: Number(u.searchParams.get('p') ?? 0) },
+    };
   } catch {
     return null;
   }

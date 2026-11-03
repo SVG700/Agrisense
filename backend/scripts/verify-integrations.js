@@ -10,7 +10,7 @@
  *   npm run verify:supabase                   # read-only: tables, RPC grant, bucket privacy
  *   npm run verify:supabase -- --write        # writes ONE test capture twice (checks idempotency)
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { DEMO_DEVICE_ID, loadConfig } from '../src/config.js';
@@ -94,14 +94,21 @@ async function verifyGemini() {
 }
 
 async function verifyVision() {
-  if (!config.vision.url) return fail('YOLO_API_URL is not set');
+  if (!config.vision.url) return fail('ROBOFLOW_API_KEY (or YOLO_API_KEY) is not set');
   const path = flagValue('--image');
   const url = flagValue('--url');
   if (!path && !url) return fail('pass --image <file.jpg> or --url <public image url>');
-  const vision = createVision({ config, logger });
+  // A verification must see real failures, never the demo fallback
+  const vision = createVision({ config: { ...config, vision: { ...config.vision, demoFallback: false } }, logger });
   const image = path ? decodeImage(readFileSync(path).toString('base64'), config.maxImageBytes) : null;
   const res = await vision.detect({ imageUrl: url ?? null, image });
-  console.log(JSON.stringify({ ...res, boxes: res.boxes.slice(0, 10), total_boxes: res.boxes.length }, null, 2));
+  const { annotated_image: annotated, ...shown } = res;
+  console.log(JSON.stringify({ ...shown, boxes: res.boxes.slice(0, 10), total_boxes: res.boxes.length }, null, 2));
+  if (annotated && path) {
+    const out = path.replace(/.[^.]+$/, '') + '.annotated.jpg';
+    writeFileSync(out, Buffer.from(annotated.split(',')[1], 'base64'));
+    console.log(`INFO  annotated image written to ${out}`);
+  }
   res.status === 'ok'
     ? pass(`${res.boxes.length} boxes, ${res.rejected} rejected, image ${JSON.stringify(res.image)}, ${res.latency_ms} ms`)
     : fail(`vision ${res.status}: ${res.error?.code}`);

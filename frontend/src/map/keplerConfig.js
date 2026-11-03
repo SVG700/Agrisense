@@ -2,6 +2,7 @@
  * Pure helpers that turn /api/map-data rows into a kepler.gl dataset + saved
  * map config. Kept free of kepler imports so they're cheap to unit-test.
  */
+import { DECISION_STYLES } from '../lib/decision.js';
 
 export const DATASET_ID = 'trap_observations';
 export const MAP_ID = 'surveillance';
@@ -25,11 +26,11 @@ export function buildCustomMapStyles(mapboxToken) {
   ];
 }
 
-/** Decision colours (shared with the trap table). */
+/** Decision colours for map points: the same traffic-light palette as the rest of the app. */
 export const DECISION_COLORS = {
-  SPRAY: '#ef4444',
-  BIOCONTROL: '#f59e0b',
-  WAIT: '#22c55e',
+  SPRAY: DECISION_STYLES.SPRAY.color,
+  BIOCONTROL: DECISION_STYLES.BIOCONTROL.color,
+  WAIT: DECISION_STYLES.WAIT.color,
 };
 
 const FIELDS = [

@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import { RISK_STYLES } from '../lib/pests.js';
 import { EASE } from '../lib/motion.jsx';
 import Badge from './Badge.jsx';
+import DecisionBadge from './DecisionBadge.jsx';
+import { decisionStyle } from '../lib/decision.js';
+import { decisionReason, useT } from '../lib/i18n.jsx';
 
 const RISK_ICON = { Low: ShieldCheck, Medium: ShieldQuestion, High: ShieldAlert };
 
@@ -27,12 +30,20 @@ function sourceBadge(advisory) {
       </Badge>
     );
   }
+  if (advisory.source === 'rule-engine' && advisory.status === 'demo') {
+    return (
+      <Badge tone="warn" title="Seeded demo advisory from the rule engine (no LLM call)">
+        Rule engine · demo
+      </Badge>
+    );
+  }
   if (advisory.source === 'rule-engine') return <Badge tone="muted">Rule engine</Badge>;
   return <Badge tone="muted">No advisory</Badge>;
 }
 
 /** Prominent widget for the capture's advisory (Claude or rule engine). */
 export default function AdvisoryCard({ advisory }) {
+  const t = useT();
   if (!advisory) {
     return (
       <section className="card flex flex-col items-center justify-center gap-3 py-12 text-center text-sm text-slate-500">
@@ -50,7 +61,7 @@ export default function AdvisoryCard({ advisory }) {
         <span className="icon-chip h-8! w-8! rounded-lg!">
           <BrainCircuit className="h-4 w-4" />
         </span>
-        Agronomic Advisory
+        {t('title.advisory')}
       </h2>
       {sourceBadge(advisory)}
     </div>
@@ -65,6 +76,7 @@ export default function AdvisoryCard({ advisory }) {
           <TriangleAlert className="h-4 w-4 shrink-0 text-amber-300" />
           {advisory.summary || 'No advisory is available for this capture.'}
         </p>
+        <DecisionPanel decision={advisory.decision} />
       </section>
     );
   }
@@ -98,6 +110,8 @@ export default function AdvisoryCard({ advisory }) {
         {risk === 'High' && <span className={`live-dot ml-auto self-start ${style.text}`} />}
       </motion.div>
 
+      <DecisionPanel decision={advisory.decision} />
+
       {advisory.summary && <p className="text-sm text-slate-300">{advisory.summary}</p>}
 
       <div>
@@ -126,6 +140,53 @@ export default function AdvisoryCard({ advisory }) {
         {advisory.generated_at && <> · Generated {new Date(advisory.generated_at).toLocaleTimeString()}</>}
       </p>
     </section>
+  );
+}
+
+/** The predator-aware rule's decision that the advisory explains (older captures have none). */
+export function DecisionPanel({ decision }) {
+  const t = useT();
+  const style = decisionStyle(decision?.decision);
+  if (!style) return null;
+  const [lo, hi] = decision.range?.pests ?? [];
+  return (
+    <motion.div
+      key={decision.decision}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: EASE }}
+      className={`rounded-xl p-3 ring-1 ${style.panel}`}
+      data-testid="decision-panel"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-widest text-slate-400">{t('decision')}</span>
+        <DecisionBadge decision={decision.decision} borderline={decision.borderline} size="lg" />
+      </div>
+      <p className="mt-2 text-sm text-slate-300">{decisionReason(t.lang, decision)}</p>
+      {decision.check_trap ? (
+        decision.last_counted && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            Last counted advice: <DecisionBadge decision={decision.last_counted.decision} size="sm" />
+          </p>
+        )
+      ) : (
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+        <span>
+          Avg {decision.avg_pests} pests/day
+          {lo !== undefined && ` (range ${lo}-${hi})`}
+        </span>
+        <span>
+          {decision.no_predators ? 'No predators seen' : `${decision.pests_per_predator} pests per predator`}
+        </span>
+        <span>
+          {decision.window?.days} of {decision.window?.requested} days
+        </span>
+        <span title="Thresholds are placeholders until confirmed with the ICAR-IIHR mentor">
+          Thresholds: {decision.thresholds?.action_threshold_per_day}/day, ratio {decision.thresholds?.spray_ratio} (placeholder)
+        </span>
+      </div>
+      )}
+    </motion.div>
   );
 }
 

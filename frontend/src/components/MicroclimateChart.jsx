@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Area, Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, Bar, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity } from 'lucide-react';
 import { LayoutGroup, motion } from 'framer-motion';
 import { PESTS, hasCounts, totalOf } from '../lib/pests.js';
+import { ACTION_TYPES } from './ActionLogCard.jsx';
 
 /** Shared Recharts animation: one smooth draw, no bounce. */
 const ANIM = { isAnimationActive: true, animationDuration: 900, animationEasing: 'ease-out' };
@@ -10,8 +11,10 @@ const ANIM = { isAnimationActive: true, animationDuration: 900, animationEasing:
 /**
  * Temperature & humidity (left axis) against pest counts (right axis) over time,
  * so microclimate spikes can be visually correlated with population surges.
+ * Logged actions (Sprayed / Released / Not yet) appear as labelled markers at the
+ * capture they followed, so the effect of a spray or release is visible.
  */
-export default function MicroclimateChart({ telemetry }) {
+export default function MicroclimateChart({ telemetry, actions = [] }) {
   const [mode, setMode] = useState('total'); // total | species
 
   // Polls return a new array every few seconds; only rebuild (and re-animate) when captures change
@@ -20,6 +23,7 @@ export default function MicroclimateChart({ telemetry }) {
     () =>
       telemetry.map((t) => ({
         time: new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        ts: Date.parse(t.timestamp),
         // null = not measured / not counted: the chart leaves a gap instead of plotting a fake zero
         temperature: t.temperature === null ? null : Number(t.temperature.toFixed(1)),
         humidity: t.humidity === null ? null : Number(t.humidity.toFixed(1)),
@@ -29,6 +33,22 @@ export default function MicroclimateChart({ telemetry }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [signature]
   );
+
+  // One marker per capture slot: the last capture at or before each action (same-slot actions are merged)
+  const markers = useMemo(() => {
+    if (data.length < 2) return [];
+    const bySlot = new Map();
+    for (const a of actions) {
+      const at = Date.parse(a.acted_at);
+      if (!(at >= data[0].ts) || at > data.at(-1).ts + 86_400_000) continue;
+      let idx = 0;
+      for (let i = 0; i < data.length && data[i].ts <= at; i++) idx = i;
+      const slot = bySlot.get(idx) ?? { x: data[idx].time, kinds: [] };
+      if (!slot.kinds.includes(a.action)) slot.kinds.push(a.action);
+      bySlot.set(idx, slot);
+    }
+    return [...bySlot.values()];
+  }, [actions, data]);
 
   const correlation = useMemo(() => {
     const pairs = data.filter((d) => d.humidity !== null && d.total !== null);
@@ -106,11 +126,36 @@ export default function MicroclimateChart({ telemetry }) {
               )}
 
               <Area yAxisId="env" type="monotone" dataKey="humidity" name="Humidity (%)" stroke="#38bdf8" fill="url(#hum)" strokeWidth={2} {...ANIM} />
+              {markers.map((m) => {
+                const t = ACTION_TYPES[m.kinds[0]] ?? ACTION_TYPES.not_yet;
+                const label = m.kinds.map((k) => (ACTION_TYPES[k] ?? ACTION_TYPES.not_yet).label.split(' ')[0]).join(' + ');
+                return (
+                  <ReferenceLine
+                    key={m.x}
+                    yAxisId="env"
+                    x={m.x}
+                    stroke={t.color}
+                    strokeWidth={2}
+                    strokeDasharray="4 3"
+                    label={{ value: label, position: 'insideTopLeft', fill: t.color, fontSize: 11, fontWeight: 700 }}
+                  />
+                );
+              })}
               <Line yAxisId="env" type="monotone" dataKey="temperature" name="Temperature (°C)" stroke="#f97316" strokeWidth={2.25} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} {...ANIM} />
             </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
+      {markers.length > 0 && (
+        <p className="flex flex-wrap gap-3 text-[11px] text-slate-400" data-testid="chart-action-legend">
+          Your actions:
+          {Object.entries(ACTION_TYPES).map(([k, t]) => (
+            <span key={k} className="inline-flex items-center gap-1">
+              <span className="inline-block h-3 w-0.5" style={{ background: t.color }} /> {t.label}
+            </span>
+          ))}
+        </p>
+      )}
     </section>
   );
 }

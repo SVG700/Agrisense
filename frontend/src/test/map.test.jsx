@@ -103,7 +103,7 @@ describe('PestMapPage', () => {
     // Latest day is listed by default
     const table = screen.getByRole('table');
     expect(within(table).getByText('SIM · Malur tomato')).toBeTruthy();
-    expect(within(table).getByText('BIOCONTROL')).toBeTruthy();
+    expect(within(table).getByText('RELEASE BIOCONTROL')).toBeTruthy();
 
     // Earlier days stay reachable
     fireEvent.change(screen.getByLabelText('Day'), { target: { value: '2026-10-17' } });

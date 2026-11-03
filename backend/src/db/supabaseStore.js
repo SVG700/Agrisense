@@ -94,6 +94,28 @@ export function createSupabaseStore({ config, client, logger }) {
       return run('deleteSimulatedDevices', supabase.from('devices').delete().eq('simulated', true).select('id'));
     },
 
+    /** Removes the given devices; captures, detections and observations cascade (demo reset). */
+    /** Newest first. Requires schema v4 (trap_actions). */
+    async listActions({ deviceId, limit = 50 } = {}) {
+      let q = supabase.from('trap_actions').select('*').order('acted_at', { ascending: false }).order('id', { ascending: false }).limit(limit);
+      if (deviceId) q = q.eq('device_id', deviceId);
+      return run('listActions', q);
+    },
+
+    async addActions(rows) {
+      return run('addActions', supabase.from('trap_actions').insert(rows).select());
+    },
+
+    async deleteAction(id) {
+      const rows = await run('deleteAction', supabase.from('trap_actions').delete().eq('id', id).select());
+      return rows?.[0] ?? null;
+    },
+
+    async deleteDevices(ids) {
+      if (!ids.length) return [];
+      return run('deleteDevices', supabase.from('devices').delete().in('id', ids).select('id'));
+    },
+
     async getDevice(id) {
       return run('getDevice', supabase.from('devices').select('*').eq('id', id).maybeSingle());
     },

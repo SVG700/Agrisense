@@ -18,6 +18,8 @@ export function createMemoryStore() {
   let telemetrySeq = 1;
   let detectionSeq = 1;
   let observationSeq = 1;
+  const actions = []; // trap_actions rows
+  let actionSeq = 1;
 
   const now = () => new Date().toISOString();
   const clone = (o) => structuredClone(o);
@@ -83,6 +85,43 @@ export function createMemoryStore() {
       for (const { id } of removed) {
         devices.delete(id);
         for (const [k, o] of observations) if (o.device_id === id) observations.delete(k);
+      }
+      return removed;
+    },
+
+    /** Removes the given devices with all their captures and observations (demo reset). */
+    /** Newest first. */
+    async listActions({ deviceId, limit = 50 } = {}) {
+      return actions
+        .filter((a) => !deviceId || a.device_id === deviceId)
+        .sort((a, b) => b.acted_at.localeCompare(a.acted_at) || b.id - a.id)
+        .slice(0, limit)
+        .map(clone);
+    },
+
+    async addActions(rows) {
+      const added = rows.map((r) => ({ id: actionSeq++, created_at: now(), note: null, decision: null, ...clone(r) }));
+      actions.push(...added);
+      return added.map(clone);
+    },
+
+    async deleteAction(id) {
+      const i = actions.findIndex((a) => a.id === id);
+      return i < 0 ? null : clone(actions.splice(i, 1)[0]);
+    },
+
+    async deleteDevices(ids) {
+      const drop = new Set(ids);
+      for (let i = actions.length - 1; i >= 0; i--) if (drop.has(actions[i].device_id)) actions.splice(i, 1);
+      const removed = ids.filter((id) => devices.delete(id)).map((id) => ({ id }));
+      for (const [k, o] of observations) if (drop.has(o.device_id)) observations.delete(k);
+      for (let i = telemetry.length - 1; i >= 0; i--) {
+        const t = telemetry[i];
+        if (!drop.has(t.device_id)) continue;
+        telemetry.splice(i, 1);
+        byCaptureId.delete(t.capture_id);
+        detections.delete(t.id);
+        if (t.image_path) images.delete(t.image_path);
       }
       return removed;
     },

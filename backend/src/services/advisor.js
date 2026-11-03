@@ -53,7 +53,16 @@ Rules:
 - Never state exact pesticide doses, mixing rates or product brand names. Refer to "the product label rate" and local extension guidance instead.
 - Prefer monitoring, cultural, mechanical and biological controls. Mention chemical control only for High risk, and always mention label instructions and pre-harvest intervals.
 - Recommend in-field scouting to confirm the detector's findings before any treatment.
-- Keep each step under 30 words.`;
+- Keep each step under 30 words.
+
+Decision (when provided):
+- "decision" is the output of a fixed, predator-aware rule (average pests/day over the last days vs. an action level,
+  then pests per predator vs. a spray ratio). It is SPRAY, BIOCONTROL (release more natural enemies) or WAIT.
+- Do NOT change or contradict the decision. Explain it in plain language a farmer understands: say why, using the
+  averages, the predator ratio and the thresholds given. Make the recommendation carry out that decision.
+- Match the risk level to it: SPRAY -> High, BIOCONTROL -> Medium, WAIT -> Low.
+- If "borderline" is true, say clearly that the counts are close to a threshold and ask for a re-check / scouting first.
+- For BIOCONTROL, stress protecting the predators already present (avoid broad-spectrum sprays).`;
 
 // Dose-like phrases ("2 ml/L", "500 g per ha") are replaced so no invented dosage is ever stored
 const DOSE_RE = /\b\d+(?:[.,]\d+)?\s?(?:ml|mL|l|L|g|kg|oz|lb|cc)\s?(?:\/|per)\s?(?:l|L|litre|liter|ha|hectare|acre|gal|gallon|m²|m2|100\s?m²)\b/g;
@@ -115,7 +124,7 @@ export function classifyClaudeError(err) {
 const fmt = (n, digits = 1) => (n === null || n === undefined ? null : Number(n.toFixed(digits)));
 
 /** Deterministic fallback advisor based on simple IPM heuristics. */
-export function ruleBasedAdvisory({ pest_counts, temperature, humidity, history = [], detection = {} }) {
+export function ruleBasedAdvisory({ pest_counts, temperature, humidity, history = [], detection = {}, decision = null }) {
   const total = Object.values(pest_counts).reduce((a, b) => a + b, 0);
   const prevTotals = history.map((h) => h.total).filter((n) => Number.isFinite(n));
   const prev = prevTotals.length ? prevTotals[prevTotals.length - 1] : null;
@@ -161,6 +170,44 @@ export function ruleBasedAdvisory({ pest_counts, temperature, humidity, history 
   }[risk_level];
 
   const climate = climateKnown ? `${temperature.toFixed(1)}°C / ${humidity.toFixed(0)}% RH` : 'microclimate not measured';
+
+  // With a predator-aware decision, the advisory explains and carries it out
+  if (decision?.decision) {
+    const check = decision.borderline
+      ? ['Counts are close to a threshold: re-check the trap and scout plants before acting.']
+      : [];
+    const plan = {
+      SPRAY: [
+        `Scout within 24h to confirm ${pest} on plants; predators are too few to keep up.`,
+        'If confirmed, spray a registered product at the product label rate, respecting the pre-harvest interval.',
+        'Spray in calm, dry conditions and target the infested area rather than the whole field.',
+        'Keep the trap in place and compare counts 3-5 days after spraying.',
+      ],
+      BIOCONTROL: [
+        'Release more natural enemies (e.g. predator bugs or parasitoids) instead of spraying.',
+        'Avoid broad-spectrum sprays that would kill the predators already on the trap.',
+        `Scout to confirm ${pest} hot spots and release beneficials there first.`,
+        'Keep counting daily; if pests per predator rise past the spray level, reconsider.',
+      ],
+      WAIT: [
+        'No action needed yet: keep the trap in place and count daily.',
+        `Scout 10 random plants for early ${pest} colonies on leaf undersides.`,
+        'Maintain ventilation to keep relative humidity below about 70%.',
+      ],
+    }[decision.decision];
+    const all = [...check, ...plan];
+    const risk = { SPRAY: 'High', BIOCONTROL: 'Medium', WAIT: 'Low' }[decision.decision];
+    return {
+      risk_level: risk,
+      confidence: decision.borderline && confidence === 'High' ? 'Medium' : confidence,
+      summary: `${decision.label}: ${decision.reason} Latest capture: ${total} insects (mostly ${pest}), ${climate}.${
+        limits.length ? ` Limited evidence: ${limits.join('; ')}.` : ''
+      }`,
+      recommendation: all[0],
+      mitigation_strategy: all.slice(0, MAX_STEPS),
+    };
+  }
+
   return {
     risk_level,
     confidence,
@@ -190,6 +237,22 @@ function buildPrompt(ctx) {
     relative_humidity_pct: ctx.humidity ?? 'not measured',
     recent_history_oldest_first: ctx.history,
   };
+  if (ctx.decision?.decision) {
+    const d = ctx.decision;
+    payload.decision = {
+      decision: d.decision,
+      label: d.label,
+      avg_pests_per_day: d.avg_pests,
+      avg_predators_per_day: d.avg_predators,
+      pests_per_predator: d.no_predators ? 'no predators seen' : d.pests_per_predator,
+      days_averaged: d.window.days,
+      borderline: d.borderline,
+      could_also_be: d.possible_decisions.slice(1),
+      count_range: d.range,
+      thresholds: d.thresholds,
+      rule_reason: d.reason,
+    };
+  }
   return `Latest sticky-trap capture:\n${JSON.stringify(payload, null, 2)}\n\nReturn the advisory JSON.`;
 }
 

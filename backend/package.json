@@ -12,7 +12,8 @@
     "verify:claude": "node scripts/verify-integrations.js claude",
     "verify:vision": "node scripts/verify-integrations.js vision",
     "verify:supabase": "node scripts/verify-integrations.js supabase",
-    "verify:gemini": "node scripts/verify-integrations.js gemini"
+    "verify:gemini": "node scripts/verify-integrations.js gemini",
+    "demo:reset": "node scripts/demo-reset.mjs"
   },
   "engines": {
     "node": ">=20"
@@ -24,6 +25,7 @@
     "axios": "^1.21.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "sharp": "0.35.5"
   }
 }

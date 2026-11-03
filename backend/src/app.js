@@ -9,16 +9,21 @@ import { LOW_BATTERY_THRESHOLD, SENSOR_LIMITS, integrationFlags } from './config
 import { telemetryRouter } from './routes/telemetry.js';
 import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
 import { mapRouter } from './routes/map.js';
+import { demoRouter } from './routes/demo.js';
+import { checkRouter } from './routes/check.js';
+import { weatherRouter } from './routes/weather.js';
+import { actionsRouter } from './routes/actions.js';
+import { telegramRouter } from './routes/telegram.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
 const REQUEST_ID_RE = /^[\w-]{8,64}$/;
 
 /**
- * @param {{config, store, vision, advisor, logger}} deps
+ * @param {{config, store, vision, advisor, weather?, telegram?, logger}} deps
  */
 export function createApp(deps) {
-  const { config, store, vision, advisor, logger } = deps;
+  const { config, store, vision, advisor, weather, telegram, logger } = deps;
   const app = express();
   const startedAt = Date.now();
 
@@ -72,7 +77,7 @@ export function createApp(deps) {
       mode: config.demoMode ? 'demo' : 'standard',
       store: store.kind,
       integrations: integrationFlags(config),
-      services: { vision: vision.describe(), advisor: advisor.describe() },
+      services: { vision: vision.describe(), advisor: advisor.describe(), weather: weather?.describe() ?? { state: 'disabled' }, telegram: telegram?.describe() ?? { state: 'not_configured' } },
       auth: {
         device: config.auth.deviceKeys.length ? 'required' : 'disabled',
         admin: config.auth.adminKey ? 'required' : 'disabled',
@@ -98,14 +103,20 @@ export function createApp(deps) {
   app.get('/api/mock-trap/:seed.svg', (req, res) => {
     const seed = String(req.params.seed).slice(0, 64);
     const density = Number(req.query.d ?? 0.4);
+    const opts = { mix: String(req.query.m ?? 'default'), predators: Number(req.query.p ?? 0) };
     res.type('image/svg+xml').set('Cache-Control', 'public, max-age=31536000, immutable');
-    res.send(renderTrapSvg(seed, density));
+    res.send(renderTrapSvg(seed, density, opts));
   });
 
   app.use('/api/telemetry', telemetryRouter(deps));
   app.use('/api/devices', devicesRouter(deps));
   app.use('/api/device', deviceAdminRouter(deps));
   app.use('/api', mapRouter(deps));
+  app.use('/api', demoRouter(deps));
+  app.use('/api', checkRouter(deps));
+  if (weather) app.use('/api', weatherRouter(deps));
+  app.use('/api', actionsRouter(deps));
+  if (telegram) app.use('/api', telegramRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));
