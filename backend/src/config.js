@@ -148,6 +148,17 @@ export function loadConfig(env = process.env) {
       qualityCheck: !['0', 'false', 'no', 'off'].includes(str('VISION_QUALITY_CHECK', 'true').toLowerCase()),
     }),
 
+    // Open-Meteo (free, no key): spray window + degree-days. Never blocks anything.
+    weather: {
+      enabled: !['0', 'false', 'no', 'off'].includes(str('WEATHER_ENABLED', 'true').toLowerCase()),
+      // Used when a trap has no coordinates (default: ICAR-IIHR, Hesaraghatta, Bengaluru)
+      defaultLat: Number(str('WEATHER_DEFAULT_LAT', '13.1352')),
+      defaultLon: Number(str('WEATHER_DEFAULT_LON', '77.4846')),
+      defaultLabel: str('WEATHER_DEFAULT_LABEL', 'ICAR-IIHR, Hesaraghatta (default location)'),
+      cacheMs: int('WEATHER_CACHE_MINUTES', 30, 1, 24 * 60) * 60_000,
+      timeoutMs: int('WEATHER_TIMEOUT_MS', 4000, 500, 30_000),
+    },
+
     // Which LLM writes advisories: auto = Gemini if GEMINI_API_KEY is set, else Claude if
     // ANTHROPIC_API_KEY is set, else the rule engine only.
     advisor: { provider: str('ADVISOR_PROVIDER', 'auto').toLowerCase() },

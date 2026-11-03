@@ -11,16 +11,17 @@ import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
 import { mapRouter } from './routes/map.js';
 import { demoRouter } from './routes/demo.js';
 import { checkRouter } from './routes/check.js';
+import { weatherRouter } from './routes/weather.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
 const REQUEST_ID_RE = /^[\w-]{8,64}$/;
 
 /**
- * @param {{config, store, vision, advisor, logger}} deps
+ * @param {{config, store, vision, advisor, weather?, logger}} deps
  */
 export function createApp(deps) {
-  const { config, store, vision, advisor, logger } = deps;
+  const { config, store, vision, advisor, weather, logger } = deps;
   const app = express();
   const startedAt = Date.now();
 
@@ -74,7 +75,7 @@ export function createApp(deps) {
       mode: config.demoMode ? 'demo' : 'standard',
       store: store.kind,
       integrations: integrationFlags(config),
-      services: { vision: vision.describe(), advisor: advisor.describe() },
+      services: { vision: vision.describe(), advisor: advisor.describe(), weather: weather?.describe() ?? { state: 'disabled' } },
       auth: {
         device: config.auth.deviceKeys.length ? 'required' : 'disabled',
         admin: config.auth.adminKey ? 'required' : 'disabled',
@@ -111,6 +112,7 @@ export function createApp(deps) {
   app.use('/api', mapRouter(deps));
   app.use('/api', demoRouter(deps));
   app.use('/api', checkRouter(deps));
+  if (weather) app.use('/api', weatherRouter(deps));
 
   app.use(notFound);
   app.use(errorHandler(logger));

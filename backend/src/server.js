@@ -6,6 +6,7 @@ import { createLogger } from './utils/logger.js';
 import { createStore } from './db/index.js';
 import { createVision } from './services/vision.js';
 import { createAdvisor } from './services/advisor.js';
+import { createWeather } from './services/weather.js';
 import { createApp } from './app.js';
 
 const logger = createLogger();
@@ -21,7 +22,8 @@ for (const w of warnings) logger.warn('config_notice', { notice: w });
 const store = await createStore({ config, logger });
 const vision = createVision({ config, logger });
 const advisor = createAdvisor({ config, logger });
-const app = createApp({ config, store, vision, advisor, logger });
+const weather = createWeather({ config, logger });
+const app = createApp({ config, store, vision, advisor, weather, logger });
 
 const server = app.listen(config.port, () => {
   logger.info('server_started', {

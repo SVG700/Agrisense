@@ -114,6 +114,26 @@ captures (labelled `dashboard`), with an auto-stream mode.
 
 ---
 
+## Weather: spray window and degree-days
+
+The dashboard's **Can I spray now?** card uses the free [Open-Meteo](https://open-meteo.com) forecast
+(no API key; called from the backend; `GET /api/weather?device_id=` or `?lat=&lon=`) at the trap's
+coordinates, or the IIHR default location (labelled as such).
+
+- **Spray now?** Checked hour by hour. You can spray only when **no rain is expected in the next 6 h**
+  (chance below 40%, under 0.2 mm), **wind is at most 15 km/h** (gusts at most 25) so it won't drift, and
+  it is **daylight**. Heat above 32 °C and very still air are shown as cautions. If you can't spray now,
+  the card shows the **next good window** (at least 2 good hours in a row, searching 72 h ahead). When the
+  trap's decision is SPRAY, it says *"Spraying is advised, but wait for the window: Tomorrow 06:00-09:00"*.
+- **Degree-days:** daily degree-days = max(0, min(mean temperature, 32) - 10 °C) from the forecast daily
+  max/min. One whitefly generation takes about 300 degree-days, so at the forecast rate the card says how
+  many days a generation takes and when eggs laid today would become adults.
+- The rules are in `backend/config/pests.json` (`spray_window`, `degree_days`) and are **placeholders**,
+  to confirm with the IIHR mentor and the product label.
+- **Never blocks:** a 4 s timeout and a 30-minute cache per location (about 1 km cell). The last good
+  forecast is served, labelled *stale*, for up to 6 h if Open-Meteo is down; otherwise the card shows a quiet
+  note. Pest decisions never depend on weather.
+
 ## Phone check
 
 *Phone Check* (sidebar / **Check** tab) lets a farmer photograph a yellow sticky card and enter how many days
@@ -384,6 +404,7 @@ All errors use one shape: `{ "error": "message", "code": "machine_code", "detail
 | POST | `/api/devices` | admin | `{name}` |
 | PATCH | `/api/device/battery` | admin | `{device_id, battery_level 0-100}`, stored as `manual` |
 | GET | `/api/mock-trap/:seed.svg?d=0..1` | – | Synthetic trap image |
+| GET | `/api/weather?device_id=` or `?lat=&lon=` | – | Open-Meteo: `spray.can_spray_now`, `spray.checks`, `spray.next_window`, `degree_days`, `current`, `next_24h`. Always 200 (`available:false` when unreachable) |
 | POST | `/api/check` | – | Phone check: `{image_base64, days_hung (1-30), temperature?, humidity?}` -> `counts, totals, per_day, decision, advisory, quality, annotated_image, vision`. Not stored; rate-limited |
 | POST | `/api/admin/demo/reset` | admin | Re-seed the 4 DEMO traps (14 days, simulated). `DELETE /api/admin/demo` removes them; `GET /api/demo` lists them |
 | GET | `/api/decision?device_id=` | – | Current predator-aware decision for one trap: `decision, label, reason, avg_pests, pests_per_predator, range, borderline, window, thresholds, days` |

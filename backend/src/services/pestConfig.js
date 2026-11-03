@@ -44,6 +44,27 @@ export const DECISION_CONFIG = Object.freeze({
   placeholder: true, // every threshold is a placeholder until confirmed with the IIHR mentor
 });
 
+const sw = raw.spray_window ?? {};
+export const SPRAY_CONFIG = Object.freeze({
+  rainLookaheadHours: Number(sw.rain_lookahead_hours ?? 6),
+  maxRainProbability: Number(sw.max_rain_probability ?? 40),
+  maxRainMm: Number(sw.max_rain_mm ?? 0.2),
+  maxWindKmh: Number(sw.max_wind_kmh ?? 15),
+  minWindKmh: Number(sw.min_wind_kmh ?? 2),
+  maxGustKmh: Number(sw.max_gust_kmh ?? 25),
+  maxTempC: Number(sw.max_temp_c ?? 32),
+  minWindowHours: Number(sw.min_window_hours ?? 2),
+  searchHours: Number(sw.search_hours ?? 72),
+});
+
+const dd = raw.degree_days ?? {};
+export const DEGREE_DAY_CONFIG = Object.freeze({
+  pest: String(dd.pest ?? 'whitefly'),
+  baseTempC: Number(dd.base_temp_c ?? 10),
+  upperTempC: Number(dd.upper_temp_c ?? 32),
+  generationDegreeDays: Number(dd.generation_degree_days ?? 300),
+});
+
 const q = raw.image_quality ?? {};
 export const QUALITY_CONFIG = Object.freeze({
   analysisWidth: Number(q.analysis_width ?? 1024),

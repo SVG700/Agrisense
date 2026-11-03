@@ -1,37 +1,112 @@
 {
   "_about": "Pest/predator classes and decision thresholds. Values marked PLACEHOLDER must be confirmed with the ICAR-IIHR mentor before field use. Loaded by backend/src/services/pestConfig.js at startup.",
-
   "classes": [
     {
       "id": "whitefly",
       "category": "pest",
       "label_en": "Whitefly",
       "label_kn": "ಬಿಳಿ ನೊಣ",
-      "aliases": ["WF", "whitefly", "whiteflies", "white_fly", "trialeurodes", "bemisia"]
+      "aliases": [
+        "WF",
+        "whitefly",
+        "whiteflies",
+        "white_fly",
+        "trialeurodes",
+        "bemisia"
+      ]
     },
     {
       "id": "macrolophus",
       "category": "predator",
       "label_en": "Macrolophus (predator bug)",
       "label_kn": "ಮ್ಯಾಕ್ರೊಲೋಫಸ್ (ಪರಭಕ್ಷಕ ತಿಗಣೆ)",
-      "aliases": ["MR", "macrolophus", "macrolophus_pygmaeus"]
+      "aliases": [
+        "MR",
+        "macrolophus",
+        "macrolophus_pygmaeus"
+      ]
     },
     {
       "id": "nesidiocoris",
       "category": "predator",
       "label_en": "Nesidiocoris (predator bug)",
       "label_kn": "ನೆಸಿಡಿಯೊಕೊರಿಸ್ (ಪರಭಕ್ಷಕ ತಿಗಣೆ)",
-      "aliases": ["NC", "nesidiocoris", "nesidiocoris_tenuis"]
+      "aliases": [
+        "NC",
+        "nesidiocoris",
+        "nesidiocoris_tenuis"
+      ]
     },
-    { "id": "aphid", "category": "pest", "label_en": "Aphid", "label_kn": "ಸಸ್ಯಹೇನು", "aliases": ["aphid", "aphids"] },
-    { "id": "thrips", "category": "pest", "label_en": "Thrips", "label_kn": "ಥ್ರಿಪ್ಸ್", "aliases": ["thrips"] },
-    { "id": "fungus_gnat", "category": "pest", "label_en": "Fungus gnat", "label_kn": "ಶಿಲೀಂಧ್ರ ನೊಣ", "aliases": ["fungus_gnat", "fungus gnat"] },
-    { "id": "ladybird", "category": "predator", "label_en": "Ladybird", "label_kn": "ಗುಲಗಂಜಿ ಹುಳು", "aliases": ["ladybird", "ladybug", "lady_beetle"] },
-    { "id": "lacewing", "category": "predator", "label_en": "Lacewing", "label_kn": "ಲೇಸ್‌ವಿಂಗ್", "aliases": ["lacewing"] },
-    { "id": "spider", "category": "predator", "label_en": "Spider", "label_kn": "ಜೇಡ", "aliases": ["spider", "spiders"] },
-    { "id": "encarsia", "category": "predator", "label_en": "Encarsia (parasitoid)", "label_kn": "ಎನ್‌ಕಾರ್ಸಿಯಾ", "aliases": ["encarsia", "parasitoid_wasp"] }
+    {
+      "id": "aphid",
+      "category": "pest",
+      "label_en": "Aphid",
+      "label_kn": "ಸಸ್ಯಹೇನು",
+      "aliases": [
+        "aphid",
+        "aphids"
+      ]
+    },
+    {
+      "id": "thrips",
+      "category": "pest",
+      "label_en": "Thrips",
+      "label_kn": "ಥ್ರಿಪ್ಸ್",
+      "aliases": [
+        "thrips"
+      ]
+    },
+    {
+      "id": "fungus_gnat",
+      "category": "pest",
+      "label_en": "Fungus gnat",
+      "label_kn": "ಶಿಲೀಂಧ್ರ ನೊಣ",
+      "aliases": [
+        "fungus_gnat",
+        "fungus gnat"
+      ]
+    },
+    {
+      "id": "ladybird",
+      "category": "predator",
+      "label_en": "Ladybird",
+      "label_kn": "ಗುಲಗಂಜಿ ಹುಳು",
+      "aliases": [
+        "ladybird",
+        "ladybug",
+        "lady_beetle"
+      ]
+    },
+    {
+      "id": "lacewing",
+      "category": "predator",
+      "label_en": "Lacewing",
+      "label_kn": "ಲೇಸ್‌ವಿಂಗ್",
+      "aliases": [
+        "lacewing"
+      ]
+    },
+    {
+      "id": "spider",
+      "category": "predator",
+      "label_en": "Spider",
+      "label_kn": "ಜೇಡ",
+      "aliases": [
+        "spider",
+        "spiders"
+      ]
+    },
+    {
+      "id": "encarsia",
+      "category": "predator",
+      "label_en": "Encarsia (parasitoid)",
+      "label_kn": "ಎನ್‌ಕಾರ್ಸಿಯಾ",
+      "aliases": [
+        "encarsia",
+        "parasitoid_wasp"
+      ]
+    }
   ],
-
   "decision": {
     "action_threshold_per_day": 25,
     "_action_threshold_per_day": "PLACEHOLDER - to confirm with IIHR mentor. Average pests per trap per day (over the rolling window) that triggers action.",
@@ -46,7 +121,6 @@
     "count_uncertainty_min": 0.05,
     "count_uncertainty_max": 0.5
   },
-
   "image_quality": {
     "_about": "PLACEHOLDER thresholds - tune on real trap photos. Measured on the photo resized to 1024 px wide. A photo failing any check is not counted and the trap shows CHECK TRAP.",
     "analysis_width": 1024,
@@ -59,5 +133,30 @@
     "max_glare_fraction": 0.08,
     "_max_glare_fraction": "Share of near-white pixels (all channels >= glare_level). Whiteflies are a small share; larger white patches are reflections.",
     "glare_level": 240
+  },
+  "spray_window": {
+    "_about": "PLACEHOLDER spray-condition rules - to confirm with the IIHR mentor and the product label. Checked hour by hour on the Open-Meteo forecast.",
+    "rain_lookahead_hours": 6,
+    "max_rain_probability": 40,
+    "_max_rain_probability": "Percent. Rain this likely within the look-ahead washes the spray off.",
+    "max_rain_mm": 0.2,
+    "max_wind_kmh": 15,
+    "_max_wind_kmh": "Above this, spray drifts off target.",
+    "min_wind_kmh": 2,
+    "_min_wind_kmh": "Below this in the evening/night, an inversion can hold fine droplets in the air (caution only).",
+    "max_gust_kmh": 25,
+    "max_temp_c": 32,
+    "_max_temp_c": "Above this, droplets evaporate fast and plants are stressed (caution only).",
+    "min_window_hours": 2,
+    "_min_window_hours": "A good window must last this many hours in a row.",
+    "search_hours": 72
+  },
+  "degree_days": {
+    "_about": "PLACEHOLDER whitefly development model - to confirm with the IIHR mentor. Daily degree-days = max(0, min(mean, upper) - base) using the daily max/min temperature.",
+    "pest": "whitefly",
+    "base_temp_c": 10,
+    "upper_temp_c": 32,
+    "generation_degree_days": 300,
+    "_generation_degree_days": "Approximate degree-days for one whitefly generation (egg to adult) above the base temperature."
   }
 }

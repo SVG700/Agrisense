@@ -210,6 +210,47 @@ describe('Provenance labels', () => {
   });
 });
 
+describe('Weather card', () => {
+  const weather = (over = {}) => ({
+    available: true,
+    source: 'open-meteo',
+    fetched_at: new Date().toISOString(),
+    timezone: 'Asia/Kolkata',
+    location: { lat: 13.1352, lon: 77.4846, label: 'ICAR-IIHR', default: true },
+    current: { temperature: 27.4, humidity: 71, wind_kmh: 9 },
+    spray: {
+      can_spray_now: false,
+      checks: [
+        { id: 'rain', ok: false, label: 'Rain likely within 6 h (80% chance, 3 mm) - it would wash the spray off' },
+        { id: 'wind', ok: true, label: 'Wind 9 km/h - low drift' },
+        { id: 'daylight', ok: true, label: 'Daylight' },
+      ],
+      cautions: [],
+      next_window: { start: new Date(Date.now() + 5 * 3_600_000).toISOString(), end: new Date(Date.now() + 8 * 3_600_000).toISOString(), hours: 3 },
+    },
+    degree_days: { per_day: 15, generation_degree_days: 300, base_temp_c: 10, days_per_generation: 20, next_adults_around: '2026-11-23', last_14_days: 210 },
+    ...over,
+  });
+
+  test('not now: says why, when to spray instead, and when the next generation emerges', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse(weather())));
+    const { default: WeatherCard } = await import('../components/WeatherCard.jsx');
+    render(<WeatherCard deviceId={DEVICE.id} decision={{ decision: 'SPRAY' }} />);
+    expect((await screen.findByTestId('spray-verdict')).textContent).toBe('Not now');
+    expect(screen.getByText(/Rain likely within 6 h/)).toBeTruthy();
+    expect(screen.getByTestId('spray-timing').textContent).toMatch(/Spraying is advised for this trap, but wait for the window/);
+    expect(screen.getByTestId('degree-days').textContent).toMatch(/~20 days/);
+    expect(screen.getByText('Default location')).toBeTruthy();
+  });
+
+  test('weather unavailable never blocks: a quiet note only', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ available: false, reason: 'Weather service unreachable right now.' })));
+    const { default: WeatherCard } = await import('../components/WeatherCard.jsx');
+    render(<WeatherCard deviceId={DEVICE.id} />);
+    expect(await screen.findByText(/Pest decisions are not affected/)).toBeTruthy();
+  });
+});
+
 describe('Phone check', () => {
   test('photo + days hung -> decision, counts and advice; sends days_hung', async () => {
     vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 4000, height: 3000, close() {} })));

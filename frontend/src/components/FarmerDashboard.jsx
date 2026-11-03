@@ -20,6 +20,7 @@ import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
+import WeatherCard from './WeatherCard.jsx';
 import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
 import {
@@ -207,6 +208,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
         </Item>
         <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <AdvisoryCard advisory={det?.ai_advisory} />
+          <WeatherCard deviceId={device?.id} decision={latest?.detection?.ai_advisory?.decision} />
           <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
         </Item>
       </Stagger>
