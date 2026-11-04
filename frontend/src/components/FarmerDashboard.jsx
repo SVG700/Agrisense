@@ -26,6 +26,7 @@ import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
 import ManualSprayCard from './ManualSprayCard.jsx';
+import Field3D from './Field3D.jsx';
 import { decisionReason, useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -255,6 +256,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
       {/* ---------- All traps ---------- */}
       <section aria-labelledby="traps-title" className="flex flex-col gap-4">
         <SectionHead id="traps-title" label={t('section.traps')} />
+        <Field3D devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
         <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
         <ImpactCard refreshKey={latest?.id} />
       </section>
