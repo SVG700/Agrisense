@@ -180,4 +180,35 @@ describe('Telegram API + alerts', () => {
       await app.close();
     }
   });
+
+  test('manual spray: logs the action and sends a Telegram message; failure is reported, not fatal', async () => {
+    const tg = fakeTelegram();
+    const app = await startApp({ env, telegramHttp: tg });
+    try {
+      await app.request('POST', '/api/telemetry', { body: { temperature: 26 }, headers: admin });
+      await new Promise((r) => setTimeout(r, 50)); // let the capture's own decision alert go first
+      const before = tg.sent.length;
+      const r = await app.request('POST', '/api/actions', { body: { device_id: DEVICE, action: 'sprayed', note: 'east rows', notify: true }, headers: admin });
+      assert.equal(r.status, 201);
+      assert.deepEqual(r.body.telegram, { ok: true, code: null });
+      assert.equal(tg.sent.length, before + 1);
+      assert.match(tg.sent.at(-1).text, /Manual spray started/);
+      assert.match(tg.sent.at(-1).text, /east rows/);
+      // Without notify nothing is sent
+      await app.request('POST', '/api/actions', { body: { device_id: DEVICE, action: 'sprayed' }, headers: admin });
+      assert.equal(tg.sent.length, before + 1);
+    } finally {
+      await app.close();
+    }
+    const down = await startApp({ env, telegramHttp: fakeTelegram({ fail: true }) });
+    try {
+      await down.request('POST', '/api/telemetry', { body: { temperature: 26 }, headers: admin });
+      const r = await down.request('POST', '/api/actions', { body: { device_id: DEVICE, action: 'sprayed', notify: true }, headers: admin });
+      assert.equal(r.status, 201); // still logged
+      assert.equal(r.body.telegram.ok, false);
+      assert.equal(r.body.telegram.code, 'telegram_http_403');
+    } finally {
+      await down.close();
+    }
+  });
 });

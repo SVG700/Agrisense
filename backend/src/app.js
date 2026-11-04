@@ -14,13 +14,15 @@ import { checkRouter } from './routes/check.js';
 import { weatherRouter } from './routes/weather.js';
 import { actionsRouter } from './routes/actions.js';
 import { telegramRouter } from './routes/telegram.js';
+import { controlsRouter } from './routes/controls.js';
+import { createControls } from './services/controls.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
 const REQUEST_ID_RE = /^[\w-]{8,64}$/;
 
 /**
- * @param {{config, store, vision, advisor, weather?, telegram?, logger}} deps
+ * @param {{config, store, vision, advisor, weather?, telegram?, controls?, logger}} deps
  */
 export function createApp(deps) {
   const { config, store, vision, advisor, weather, telegram, logger } = deps;
@@ -117,6 +119,7 @@ export function createApp(deps) {
   if (weather) app.use('/api', weatherRouter(deps));
   app.use('/api', actionsRouter(deps));
   if (telegram) app.use('/api', telegramRouter(deps));
+  app.use('/api', controlsRouter({ ...deps, controls: deps.controls ?? createControls() }));
 
   app.use(notFound);
   app.use(errorHandler(logger));

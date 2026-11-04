@@ -1,7 +1,8 @@
 /**
  * Action log: what the farmer actually did after the advice.
  *   GET    /api/actions?device_id=&limit=   newest first (public read, like the dashboard)
- *   POST   /api/actions                     {device_id, action: sprayed|released|not_yet, note?, acted_at?} (admin)
+ *   POST   /api/actions                     {device_id, action: sprayed|released|not_yet, note?, acted_at?, notify?} (admin)
+ *                                           notify: true on "sprayed" also sends a Telegram message (the Manual spray button)
  *   DELETE /api/actions/:id                 undo a mistaken entry (admin)
  *
  * Each entry stores the advice shown at that moment (computed here, never taken
@@ -31,7 +32,7 @@ async function guarded(fn) {
   }
 }
 
-export function actionsRouter({ config, store, logger }) {
+export function actionsRouter({ config, store, telegram, logger }) {
   const router = Router();
   const adminLimit = rateLimit({ name: 'admin', windowMs: config.rateLimit.windowMs, max: config.rateLimit.adminMax });
 
@@ -73,7 +74,17 @@ export function actionsRouter({ config, store, logger }) {
       ])
     );
     logger.info('action_logged', { request_id: req.id, device_id: deviceId, action: body.action, decision: advice.decision });
-    res.status(201).json(row);
+
+    // Manual spray: the log entry is saved either way; Telegram's result is reported, never fatal
+    let notified;
+    if (body.notify === true && body.action === 'sprayed') {
+      const device = await store.getDevice(deviceId);
+      notified = telegram
+        ? await telegram.notifySpray({ device, decision: advice.decision, note: row.note }).catch(() => ({ ok: false, code: 'telegram_failed' }))
+        : { ok: false, code: 'not_configured' };
+      notified = { ok: notified.ok, code: notified.code ?? null };
+    }
+    res.status(201).json(notified ? { ...row, telegram: notified } : row);
   });
 
   router.delete('/actions/:id', adminLimit, requireAdmin(config), async (req, res) => {

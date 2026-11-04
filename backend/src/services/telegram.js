@@ -42,6 +42,9 @@ export const TEXT = {
     became: (trap, now) => `${trap}: advice is now ${now}`,
     open: 'Open dashboard',
     test: 'AgriSense is connected. Trap alerts and a daily summary will arrive here.',
+    sprayTitle: 'Manual spray started',
+    sprayLine: (trap, advice) => `${trap}: spraying now (advice was ${advice}).`,
+    sprayNote: 'Note',
   },
   kn: {
     decision: { SPRAY: 'ಸಿಂಪಡಿಸಿ', BIOCONTROL: 'ಜೈವಿಕ ನಿಯಂತ್ರಕ ಬಿಡುಗಡೆ ಮಾಡಿ', WAIT: 'ಕಾಯಿರಿ', CHECK_TRAP: 'ಬಲೆಯನ್ನು ಪರಿಶೀಲಿಸಿ' },
@@ -62,11 +65,25 @@ export const TEXT = {
     became: (trap, now) => `${trap}: ಈಗಿನ ಸಲಹೆ ${now}`,
     open: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ತೆರೆಯಿರಿ',
     test: 'ಅಗ್ರಿಸೆನ್ಸ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ. ಬಲೆ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ದೈನಂದಿನ ಸಾರಾಂಶ ಇಲ್ಲಿ ಬರುತ್ತವೆ.',
+    sprayTitle: 'ಕೈಯಾರೆ ಸಿಂಪಡಣೆ ಪ್ರಾರಂಭವಾಗಿದೆ',
+    sprayLine: (trap, advice) => `${trap}: ಈಗ ಸಿಂಪಡಿಸಲಾಗುತ್ತಿದೆ (ಸಲಹೆ: ${advice}).`,
+    sprayNote: 'ಟಿಪ್ಪಣಿ',
   },
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 const label = (lang, d) => TEXT[lang].decision[d] ?? d ?? '-';
+
+/** "Manual spray" message: who sprayed which trap, against what advice. */
+export function sprayText({ name, decision, note, languages, dashboardUrl }) {
+  const blocks = languages.map((l) => {
+    const lines = [`<b>💧 ${esc(TEXT[l].sprayTitle)}</b>`, esc(TEXT[l].sprayLine(name, label(l, decision)))];
+    if (note) lines.push(`${esc(TEXT[l].sprayNote)}: ${esc(note)}`);
+    return lines.join('\n');
+  });
+  if (dashboardUrl) blocks.push(`<a href="${esc(dashboardUrl)}">${esc(TEXT[languages[0]].open)}</a>`);
+  return blocks.join('\n\n');
+}
 
 /** Splits on line breaks so no message exceeds Telegram's limit. */
 export function chunk(text, max = MAX_LEN) {
@@ -218,6 +235,11 @@ export function createTelegram({ config, store, weather, http = axios, logger })
       if (Date.now() - (lastAlert.get(key) ?? 0) < ALERT_REPEAT_MS) return null;
       lastAlert.set(key, Date.now());
       return send(alertText({ name: device.name, previous, decision, languages, dashboardUrl: tg.dashboardUrl }));
+    },
+
+    /** Farmer pressed "Manual spray": tell the group straight away (not throttled). */
+    notifySpray({ device, decision, note }) {
+      return send(sprayText({ name: device.name, decision, note, languages, dashboardUrl: tg.dashboardUrl }));
     },
 
     /** Chats that have messaged the bot recently - to find TELEGRAM_CHAT_ID. Works with only the token set. */
