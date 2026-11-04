@@ -23,7 +23,8 @@ import {
 import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
 import { hasCounts, pestMeta } from '../lib/pests.js';
-import { useLiquid } from '../lib/motion.jsx';
+import { AnimatedNumber, useLiquid } from '../lib/motion.jsx';
+import LocationPicker from './LocationPicker.jsx';
 import { haptic } from '../lib/theme.js';
 import { decisionReason, useT } from '../lib/i18n.jsx';
 
@@ -305,10 +306,10 @@ function TrapRail({ devices, activeId, onSelect, onAdd }) {
 /*  Right half: the reference's card grid                                     */
 /* ========================================================================== */
 
-export function HeroCards({ device, capture, telemetry, decision, events, onSeeAll, onSelectCapture }) {
+export function HeroCards({ device, capture, telemetry, decision, events, onSeeAll, onSelectCapture, weather }) {
   return (
     <div className="grid gap-4 sm:grid-cols-[1.75fr_1fr]">
-      <TrapHealthCard device={device} capture={capture} onSeeAll={() => onSeeAll('glance')} />
+      <TrapHealthCard device={device} capture={capture} weather={weather} onSeeAll={() => onSeeAll('glance')} />
       <PressureCard telemetry={telemetry} decision={decision} />
       <ListenCard capture={capture} decision={decision} />
       <GuideCard />
@@ -334,13 +335,13 @@ function Card({ className = '', children, ...rest }) {
 
 function SeeAll({ onClick, children }) {
   return (
-    <button type="button" onClick={onClick} className="text-sm text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-slate-600">
+    <button type="button" onClick={onClick} className="shrink-0 whitespace-nowrap text-sm text-ink underline decoration-1 underline-offset-4 transition-colors hover:text-slate-600">
       {children}
     </button>
   );
 }
 
-function TrapHealthCard({ device, capture, onSeeAll }) {
+function TrapHealthCard({ device, capture, weather, onSeeAll }) {
   const t = useT();
   const [light, setLight] = useState(null);
   useEffect(() => {
@@ -354,29 +355,47 @@ function TrapHealthCard({ device, capture, onSeeAll }) {
       off = true;
     };
   }, [device?.id]);
+  // Humidity and temperature are the live outdoor values at the chosen place; the trap's own sensor reading is shown under them
+  const w = weather?.data?.available ? weather.data : null;
+  const trapRh = capture?.humidity != null ? `${t('place.trap')} ${Math.round(capture.humidity)}%` : null;
+  const trapT = capture?.temperature != null ? `${t('place.trap')} ${Math.round(capture.temperature)}°C` : null;
   const tiles = [
     { icon: BatteryMedium, label: t('status.battery'), value: device ? `${device.battery_level}%` : '—' },
-    { icon: Droplets, label: t('kpi.humidity'), value: capture?.humidity != null ? `${Math.round(capture.humidity)}%` : '—' },
-    { icon: Thermometer, label: t('kpi.temperature'), value: capture?.temperature != null ? `${Math.round(capture.temperature)}°C` : '—' },
+    { icon: Droplets, label: t('kpi.humidity'), value: w ? <AnimatedNumber value={w.humidity} suffix="%" /> : '—', sub: trapRh, live: Boolean(w) },
+    { icon: Thermometer, label: t('kpi.temperature'), value: w ? <AnimatedNumber value={w.temperature} decimals={1} suffix="°C" /> : '—', sub: trapT, live: Boolean(w) },
     { icon: Lightbulb, label: t('card.trapLight'), value: light === null ? '—' : light ? t('card.on') : t('card.off') },
   ];
+  const updated = w?.fetched_at ? Math.max(0, Math.round((Date.now() - Date.parse(w.fetched_at)) / 60_000)) : null;
   return (
     <Card aria-labelledby="health-title">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 id="health-title" className="text-xl font-medium tracking-tight text-ink">
-          {t('card.health')}
-        </h2>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="health-title" className="text-xl font-medium tracking-tight text-ink">
+            {t('card.health')}
+          </h2>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <LocationPicker label={weather?.data?.location?.label ?? weather?.place?.label} />
+            {w && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500" title={w.time ? `Open-Meteo · ${w.time} ${w.timezone ?? ''}` : undefined}>
+                <span className="live-dot text-emerald-500" aria-hidden="true" />
+                {updated === 0 ? t('place.justNow') : t('place.minAgo', { n: updated })}
+              </span>
+            )}
+          </div>
+        </div>
         <SeeAll onClick={onSeeAll}>{t('card.seeAll')}</SeeAll>
       </div>
       <ul className="grid grid-cols-2 gap-3">
-        {tiles.map(({ icon: Icon, label, value }) => (
+        {tiles.map(({ icon: Icon, label, value, sub, live }) => (
           <li key={label} className="flex items-center gap-3 rounded-2xl p-3 ring-1 ring-line transition-colors hover:bg-slate-50">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-butter-soft text-[#8a6a00] [:root[data-theme=dark]_&]:text-butter">
+            <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-butter-soft text-[#8a6a00] [:root[data-theme=dark]_&]:text-butter">
               <Icon className="h-4 w-4" aria-hidden="true" />
+              {live && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" aria-hidden="true" />}
             </span>
             <div className="min-w-0">
               <div className="truncate text-xs text-slate-500">{label}</div>
-              <div className="truncate text-sm font-medium text-ink">{value}</div>
+              <div className="truncate text-sm font-medium tabular-nums text-ink">{value}</div>
+              {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
             </div>
           </li>
         ))}

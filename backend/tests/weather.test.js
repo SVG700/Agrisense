@@ -163,3 +163,66 @@ describe('GET /api/weather', () => {
     }
   });
 });
+
+describe('live conditions and place search', () => {
+  const fakeHttp = () => {
+    const calls = [];
+    return {
+      calls,
+      get: async (url, opts) => {
+        calls.push({ url, params: opts?.params });
+        if (url.includes('geocoding-api')) return { data: { results: [{ name: 'Hesaraghatta', admin2: 'Bengaluru Urban', admin1: 'Karnataka', country: 'India', latitude: 13.14, longitude: 77.48 }] } };
+        if (url.includes('nominatim') && url.endsWith('/reverse')) return { data: { address: { suburb: 'Ashokanagar', city: 'Bengaluru', state: 'Karnataka' } } };
+        if (url.includes('nominatim')) return { data: [{ display_name: '12, MG Road, Ashok Nagar, Bengaluru, Karnataka, India', lat: '12.97', lon: '77.60' }] };
+        if (opts?.params?.current) return { data: { timezone: 'Asia/Kolkata', current: { time: '2026-11-04T16:30', temperature_2m: 24.6, relative_humidity_2m: 77, apparent_temperature: 27.1, weather_code: 53, wind_speed_10m: 11, is_day: 1, precipitation: 0.2 } } };
+        throw new Error('unexpected');
+      },
+    };
+  };
+
+  test('GET /api/weather/now returns live temperature and humidity, cached for 5 minutes', async () => {
+    const http = fakeHttp();
+    const app = await startApp({ weatherHttp: http });
+    try {
+      const r = await app.request('GET', '/api/weather/now?lat=13.1352&lon=77.4846&label=Hesaraghatta');
+      assert.equal(r.status, 200);
+      assert.equal(r.body.available, true);
+      assert.equal(r.body.temperature, 24.6);
+      assert.equal(r.body.humidity, 77);
+      assert.equal(r.body.location.label, 'Hesaraghatta');
+      const again = await app.request('GET', '/api/weather/now?lat=13.1352&lon=77.4846');
+      assert.equal(again.body.cached, true);
+      assert.equal(http.calls.filter((c) => c.params?.current).length, 1);
+      assert.equal((await app.request('GET', '/api/weather/now?lat=200&lon=1')).status, 400);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('places: villages via Open-Meteo, street addresses via OpenStreetMap, reverse lookup', async () => {
+    const app = await startApp({ weatherHttp: fakeHttp() });
+    try {
+      const village = (await app.request('GET', '/api/places?q=Hesaraghatta')).body;
+      assert.equal(village[0].label, 'Hesaraghatta, Bengaluru Urban, Karnataka');
+      const street = (await app.request('GET', '/api/places?q=12 MG Road, Bengaluru')).body;
+      assert.equal(street[0].source, 'openstreetmap');
+      assert.match(street[0].label, /MG Road/);
+      const rev = (await app.request('GET', '/api/places/reverse?lat=12.97&lon=77.59')).body;
+      assert.equal(rev.label, 'Ashokanagar, Bengaluru, Karnataka');
+      assert.equal((await app.request('GET', '/api/places?q=x')).status, 400);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('when the weather service is down, live conditions say so (no crash)', async () => {
+    const app = await startApp();
+    try {
+      const r = await app.request('GET', '/api/weather/now?lat=13&lon=77');
+      assert.equal(r.status, 200);
+      assert.equal(r.body.available, false);
+    } finally {
+      await app.close();
+    }
+  });
+});

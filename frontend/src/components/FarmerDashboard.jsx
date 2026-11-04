@@ -23,6 +23,7 @@ import LiveVision from './LiveVision.jsx';
 import { HeroCards, TrapStage, VISION_LAYOUT_ID } from './FieldHero.jsx';
 import { LayoutGroup } from 'framer-motion';
 import { buildEvents } from '../lib/events.js';
+import { useLiveWeather } from '../lib/place.js';
 import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -78,6 +79,8 @@ export default function FarmerDashboard({
   const trapRef = useRef(null);
   const sectionRefs = useRef({});
   const [vision, setVision] = useState(null); // {x, y} press point while Live Vision is open
+  const weather = useLiveWeather();
+  const outside = weather.data?.available ? weather.data : null;
 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
@@ -196,6 +199,7 @@ export default function FarmerDashboard({
             trend={trends.temperature}
             trendColor="#f97316"
             value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
+            sub={outside ? <OutsideNow value={`${outside.temperature.toFixed(1)}°C`} where={outside.location?.label} /> : null}
           />
           <Stat
             icon={Droplets}
@@ -203,6 +207,7 @@ export default function FarmerDashboard({
             trend={trends.humidity}
             trendColor="#0ea5e9"
             value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
+            sub={outside ? <OutsideNow value={`${Math.round(outside.humidity)}%`} where={outside.location?.label} /> : null}
           />
           <Stat
             icon={ShieldAlert}
@@ -304,7 +309,7 @@ export default function FarmerDashboard({
             onOpenVision={setVision}
             visionOpen={Boolean(vision)}
           />
-          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} />
+          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} weather={weather} />
         </div>
         <LiveVision open={Boolean(vision)} origin={vision} onClose={() => setVision(null)} device={device} capture={capture} layoutId={VISION_LAYOUT_ID} />
       </LayoutGroup>
@@ -323,6 +328,20 @@ export default function FarmerDashboard({
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** "Outside now 24.6°C · Hesaraghatta" under a trap reading (live Open-Meteo value). */
+function OutsideNow({ value, where }) {
+  const t = useT();
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-slate-500" title={where ?? undefined}>
+      <span className="live-dot text-emerald-500" aria-hidden="true" />
+      <span className="truncate">
+        {t('place.outside')} <b className="font-semibold text-ink">{value}</b>
+        {where ? ` · ${where.split(',')[0]}` : ''}
+      </span>
+    </span>
+  );
+}
 
 function SectionHead({ id, label, children }) {
   return (

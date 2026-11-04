@@ -169,9 +169,112 @@ export function summarize(forecast, now = Date.now(), cfg = SPRAY_CONFIG) {
 /**
  * @param {{config: object, http?: object, logger?: object}} deps
  */
+const NOW_TTL_MS = 5 * 60_000; // Open-Meteo updates "current" every 15 min; 5 min keeps it fresh
+const PLACE_TTL_MS = 24 * 3_600_000;
+const GEOCODE_API = 'https://geocoding-api.open-meteo.com/v1/search';
+const NOMINATIM = 'https://nominatim.openstreetmap.org';
+const UA = 'AgriSense/1.0 (insect-monitoring hackathon project)';
+
+/** Short "Village, District, State" label from an Open-Meteo / Nominatim result. */
+function placeLabel(p) {
+  const parts = [p.name, p.admin2 ?? p.admin3, p.admin1, p.country].filter(Boolean);
+  return [...new Set(parts)].slice(0, 3).join(', ');
+}
+
 export function createWeather({ config, http = axios, logger }) {
   const w = config.weather;
   const cache = new Map(); // "lat,lon" -> {at, forecast}
+  const nowCache = new Map(); // "lat,lon" -> {at, now}
+  const placeCache = new Map(); // query -> {at, places}
+
+  /** Live conditions at a point (Open-Meteo "current"). Never throws; null if unreachable. */
+  async function currentAt(lat, lon) {
+    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    const hit = nowCache.get(key);
+    if (hit && Date.now() - hit.at < NOW_TTL_MS) return { ...hit.now, cached: true };
+    try {
+      const { data } = await http.get(API, {
+        timeout: w.timeoutMs,
+        params: {
+          latitude: lat,
+          longitude: lon,
+          current: 'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,precipitation',
+          timezone: 'auto',
+          wind_speed_unit: 'kmh',
+        },
+      });
+      const c = data?.current;
+      if (!c || typeof c.temperature_2m !== 'number') throw Object.assign(new Error('no current block'), { code: 'bad_response' });
+      const now = {
+        time: c.time,
+        timezone: data.timezone ?? null,
+        temperature: c.temperature_2m,
+        humidity: c.relative_humidity_2m,
+        feels_like: c.apparent_temperature,
+        weather_code: c.weather_code,
+        wind_kmh: c.wind_speed_10m,
+        precipitation_mm: c.precipitation,
+        is_day: c.is_day === 1,
+        fetched_at: new Date().toISOString(),
+      };
+      nowCache.set(key, { at: Date.now(), now });
+      if (nowCache.size > 300) nowCache.delete(nowCache.keys().next().value);
+      return { ...now, cached: false };
+    } catch (err) {
+      logger?.warn('weather_now_failed', { code: err.code ?? err.response?.status ?? 'error' });
+      if (hit) return { ...hit.now, cached: true, stale: true };
+      return null;
+    }
+  }
+
+  /** Place search: Open-Meteo for towns/villages, OpenStreetMap for street addresses. */
+  async function searchPlaces(q) {
+    const key = q.toLowerCase();
+    const hit = placeCache.get(key);
+    if (hit && Date.now() - hit.at < PLACE_TTL_MS) return hit.places;
+    let places = [];
+    try {
+      const { data } = await http.get(GEOCODE_API, { timeout: w.timeoutMs, params: { name: q.split(',')[0].trim(), count: 6, language: 'en', format: 'json' } });
+      places = (data?.results ?? []).map((p) => ({ label: placeLabel(p), lat: p.latitude, lon: p.longitude, source: 'open-meteo' }));
+    } catch (err) {
+      logger?.warn('geocode_failed', { code: err.code ?? err.response?.status ?? 'error' });
+    }
+    // Full addresses ("12 MG Road, Bengaluru") or no match: ask OpenStreetMap
+    if (!places.length || /\d|,/.test(q)) {
+      try {
+        const { data } = await http.get(`${NOMINATIM}/search`, {
+          timeout: w.timeoutMs,
+          headers: { 'User-Agent': UA },
+          params: { q, format: 'jsonv2', limit: 6, addressdetails: 0 },
+        });
+        const osm = (Array.isArray(data) ? data : []).map((p) => ({ label: p.display_name.split(', ').slice(0, 4).join(', '), lat: Number(p.lat), lon: Number(p.lon), source: 'openstreetmap' }));
+        places = [...osm, ...places].slice(0, 6);
+      } catch (err) {
+        logger?.warn('geocode_osm_failed', { code: err.code ?? err.response?.status ?? 'error' });
+      }
+    }
+    placeCache.set(key, { at: Date.now(), places });
+    if (placeCache.size > 300) placeCache.delete(placeCache.keys().next().value);
+    return places;
+  }
+
+  /** Name for a point (for "Use my location"); falls back to the coordinates. */
+  async function placeName(lat, lon) {
+    const key = `rev:${lat.toFixed(3)},${lon.toFixed(3)}`;
+    const hit = placeCache.get(key);
+    if (hit && Date.now() - hit.at < PLACE_TTL_MS) return hit.places;
+    let label = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+    try {
+      const { data } = await http.get(`${NOMINATIM}/reverse`, { timeout: w.timeoutMs, headers: { 'User-Agent': UA }, params: { lat, lon, format: 'jsonv2', zoom: 14 } });
+      const a = data?.address ?? {};
+      const parts = [a.village ?? a.suburb ?? a.town ?? a.city_district ?? a.hamlet, a.city ?? a.county ?? a.state_district, a.state].filter(Boolean);
+      if (parts.length) label = [...new Set(parts)].join(', ');
+    } catch (err) {
+      logger?.warn('reverse_geocode_failed', { code: err.code ?? err.response?.status ?? 'error' });
+    }
+    placeCache.set(key, { at: Date.now(), places: label });
+    return label;
+  }
 
   async function forecastFor(lat, lon) {
     const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
@@ -206,6 +309,17 @@ export function createWeather({ config, http = axios, logger }) {
 
   return {
     describe: () => ({ state: w.enabled ? 'configured' : 'disabled', provider: w.enabled ? 'open-meteo' : null }),
+
+    /** Live temperature / humidity at a point. Never throws. */
+    async now({ lat, lon, label }) {
+      const base = { source: 'open-meteo', location: { lat, lon, label } };
+      if (!w.enabled) return { ...base, available: false, reason: 'Weather is turned off (WEATHER_ENABLED=false).' };
+      const c = await currentAt(lat, lon);
+      return c ? { ...base, available: true, ...c } : { ...base, available: false, reason: 'Live weather unreachable right now.' };
+    },
+
+    searchPlaces,
+    placeName,
 
     /** Never throws. */
     async forLocation({ lat, lon, label, default: isDefault = false }) {

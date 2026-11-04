@@ -72,6 +72,11 @@ export const api = {
   health: () => request('/api/health'),
   voice,
   voices: () => request('/api/voice'),
+  // Live weather at a place (null = the farm's default location) and place search
+  weatherNow: (p) =>
+    request(p ? `/api/weather/now?lat=${p.lat}&lon=${p.lon}&label=${encodeURIComponent(p.label ?? '')}` : '/api/weather/now'),
+  places: (q) => request(`/api/places?q=${encodeURIComponent(q)}`),
+  placeName: (lat, lon) => request(`/api/places/reverse?lat=${lat}&lon=${lon}`),
   devices: () => request('/api/devices'),
   telemetry: (deviceId, limit = 50) =>
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),

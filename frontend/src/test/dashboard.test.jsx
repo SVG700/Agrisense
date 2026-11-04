@@ -913,3 +913,33 @@ describe('Voice picker', () => {
     localStorage.removeItem('agrisense.voice');
   });
 });
+
+describe('Live weather by location', () => {
+  test('searching an address and choosing it switches the live weather to that place', async () => {
+    localStorage.removeItem('agrisense.place');
+    const { HeroCards } = await import('../components/FieldHero.jsx');
+    const { useLiveWeather } = await import('../lib/place.js');
+    const fetchMock = vi.fn((url) => {
+      const u = String(url);
+      if (u.includes('/api/places?')) return jsonResponse([{ label: 'Mysuru, Karnataka, India', lat: 12.31, lon: 76.65 }]);
+      if (u.includes('/api/weather/now?lat=12.31'))
+        return jsonResponse({ available: true, temperature: 23.7, humidity: 82, fetched_at: new Date().toISOString(), location: { label: 'Mysuru, Karnataka, India' } });
+      if (u.includes('/api/weather/now'))
+        return jsonResponse({ available: true, temperature: 24.6, humidity: 77, fetched_at: new Date().toISOString(), location: { label: 'Farm default' } });
+      return jsonResponse({ switches: { trap_light: { on: true } } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    function Wrapper() {
+      const weather = useLiveWeather();
+      return <HeroCards device={DEVICE} capture={capture()} telemetry={[capture()]} decision={null} events={[]} onSeeAll={() => {}} onSelectCapture={() => {}} weather={weather} />;
+    }
+    render(<Wrapper />);
+    expect(await screen.findByText('77%')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Farm default/ }));
+    fireEvent.change(screen.getByPlaceholderText('Search an address or village'), { target: { value: 'Mysuru' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Mysuru, Karnataka, India' }, { timeout: 2000 }));
+    expect(await screen.findByText('82%')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('agrisense.place'))).toMatchObject({ lat: 12.31, lon: 76.65 });
+    localStorage.removeItem('agrisense.place');
+  });
+});
