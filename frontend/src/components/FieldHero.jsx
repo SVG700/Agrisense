@@ -475,93 +475,268 @@ function PressureCard({ telemetry, decision }) {
   );
 }
 
-/** Reference "Smart Analysis": the AI advice read aloud (Web Speech), with a waveform. */
+/**
+ * Reference "Smart Analysis": the AI advice read aloud in a natural Gemini voice
+ * (POST /api/voice). The text is split into sentences: the first plays as soon
+ * as it is ready while the rest are generated in parallel and queued, so it
+ * starts in seconds. The waveform is drawn from the real audio. If the natural
+ * voice is unavailable, the browser's voice is used instead.
+ */
+const BARS = 56;
+const CHUNK_CHARS = 1100; // first sentence + the rest: at most 2 voice calls per advice (TTS quotas are tight)
+const voiceParts = new Map(); // `${lang}|${chunk}` -> Promise<{url, duration, peaks}> (shared across remounts)
+
+/** Sentence-sized pieces (whole sentences, at most ~CHUNK_CHARS each). */
+export function splitForSpeech(text) {
+  const sentences = text.match(/[^.!?।]+[.!?।]+["')\]]*\s*|[^.!?।]+$/g) ?? [text];
+  const out = [];
+  let cur = '';
+  for (const s of sentences) {
+    // The first piece is a single sentence, so playback can start as soon as possible
+    if (cur && (out.length === 0 || (cur + s).length > CHUNK_CHARS)) {
+      out.push(cur.trim());
+      cur = '';
+    }
+    cur += s;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+/** Peaks (0-1, unnormalised) and duration from decoded audio. */
+async function decode(blob) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return {};
+    const ctx = new Ctx();
+    const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+    ctx.close?.();
+    const data = buf.getChannelData(0);
+    const n = Math.max(4, Math.round(buf.duration * 3)); // ~3 bars per second
+    const step = Math.floor(data.length / n);
+    const peaks = [];
+    for (let i = 0; i < n; i++) {
+      let m = 0;
+      for (let j = i * step; j < (i + 1) * step; j += 32) m = Math.max(m, Math.abs(data[j]));
+      peaks.push(m);
+    }
+    return { peaks, duration: buf.duration };
+  } catch {
+    return {};
+  }
+}
+
+function fetchPart(chunk, lang) {
+  const key = `${lang}|${chunk}`;
+  if (!voiceParts.has(key)) {
+    const p = api.voice(chunk, lang).then(async (blob) => ({ url: URL.createObjectURL(blob), ...(await decode(blob)) }));
+    p.catch(() => voiceParts.delete(key)); // let a later press retry
+    voiceParts.set(key, p);
+  }
+  return voiceParts.get(key);
+}
+
+/** Resample concatenated per-part peaks to exactly `BARS` bars. */
+function toBars(parts) {
+  const all = parts.flatMap((p) => p?.peaks ?? []);
+  if (!all.length) return null;
+  const top = Math.max(...all, 0.01);
+  return Array.from({ length: BARS }, (_, i) => all[Math.floor((i / BARS) * all.length)] / top);
+}
+
 function ListenCard({ capture, decision }) {
   const t = useT();
   const adv = capture?.detection?.ai_advisory;
   const text = useMemo(() => {
     if (!adv) return '';
     const steps = (adv.mitigation_strategy?.length ? adv.mitigation_strategy : [adv.recommendation]).filter(Boolean).slice(0, 3);
-    return [decision ? decisionReason(t.lang, decision) : '', adv.summary ?? '', ...steps].filter(Boolean).join(' ');
+    return [decision ? decisionReason(t.lang, decision) : '', adv.summary ?? '', ...steps].filter(Boolean).join(' ').slice(0, 1200);
   }, [adv, decision, t.lang]);
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window;
-  const [state, setState] = useState('idle'); // idle | playing | paused
+  const chunks = useMemo(() => (text ? splitForSpeech(text) : []), [text]);
+  const speechOK = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  // idle | loading | playing | paused
+  const [state, setState] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [rate, setRate] = useState(1);
-  const utter = useRef(null);
-  const seconds = Math.round(text.split(/\s+/).filter(Boolean).length / 2.6 / rate);
-  const bars = useMemo(() => {
+  const [parts, setParts] = useState([]); // resolved parts, by index
+  const [mode, setMode] = useState('natural'); // natural | browser
+  const [note, setNote] = useState(null);
+  const audio = useRef(null);
+  const run = useRef(0); // bumps on stop/restart so stale playback chains end
+  const rateRef = useRef(rate);
+  rateRef.current = rate;
+
+  const fallbackBars = useMemo(() => {
     let h = 7;
-    return Array.from({ length: 56 }, (_, i) => {
+    return Array.from({ length: BARS }, (_, i) => {
       h = (h * 31 + text.charCodeAt(i % Math.max(1, text.length)) + i) % 97;
-      return 18 + (h % 70) * (0.4 + 0.6 * Math.sin((i / 56) * Math.PI));
+      return (0.25 + (h % 70) / 100) * (0.45 + 0.55 * Math.sin((i / BARS) * Math.PI));
     });
   }, [text]);
+  const realBars = parts.length === chunks.length && chunks.length ? toBars(parts) : null;
+  const bars = realBars ?? fallbackBars;
 
-  useEffect(() => () => supported && window.speechSynthesis.cancel(), [supported]);
+  const stopAll = () => {
+    run.current++;
+    audio.current?.pause();
+    audio.current = null;
+    if (speechOK) window.speechSynthesis.cancel();
+  };
+  useEffect(() => () => stopAll(), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (supported) window.speechSynthesis.cancel();
+    stopAll();
+    setParts([]);
     setState('idle');
     setProgress(0);
-  }, [text, supported]);
+    setMode('natural');
+    setNote(null);
+  }, [text, t.lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const play = () => {
-    if (!supported || !text) return;
-    haptic();
-    const s = window.speechSynthesis;
-    if (state === 'playing') {
-      s.pause();
-      setState('paused');
-      return;
-    }
-    if (state === 'paused') {
-      s.resume();
-      setState('playing');
-      return;
-    }
-    s.cancel();
-    const u = new SpeechSynthesisUtterance(text);
+  /** Starts generating every piece (first one first); resolves when the first is ready. */
+  const prepare = () => {
+    if (!chunks.length) return Promise.reject(new Error('no text'));
+    // One after another (not in parallel) to stay inside the per-minute voice quota
+    let prev = Promise.resolve();
+    const promises = chunks.map((c, i) => {
+      const p = prev.then(() => fetchPart(c, t.lang));
+      prev = p.catch(() => {});
+      p.then((part) => setParts((prev) => {
+        const next = [...prev];
+        next[i] = part;
+        return next;
+      })).catch(() => {});
+      return p;
+    });
+    return promises[0].then(() => promises);
+  };
+
+  const estimate = (i) => (parts[i]?.duration ?? chunks[i].length / 15); // ~15 chars/s before decoding
+  const totalSecs = chunks.reduce((a, _, i) => a + estimate(i), 0);
+
+  const speakWithBrowser = (say = text) => {
+    if (!speechOK) return setState('idle');
+    const u = new SpeechSynthesisUtterance(say);
     u.lang = t.lang === 'kn' ? 'kn-IN' : 'en-IN';
-    u.rate = rate;
-    u.onboundary = (e) => setProgress(Math.min(1, e.charIndex / text.length));
+    u.rate = rateRef.current;
+    const offset = text.length - say.length;
+    u.onboundary = (e) => setProgress(Math.min(1, (offset + e.charIndex) / text.length));
     u.onend = () => (setState('idle'), setProgress(1));
     u.onerror = () => setState('idle');
-    utter.current = u;
-    s.speak(u);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
     setState('playing');
   };
+
+  const playFrom = async (promises, i, token) => {
+    if (token !== run.current) return;
+    if (i >= promises.length) return (setState('idle'), setProgress(1));
+    let part;
+    try {
+      part = await promises[i];
+    } catch (err) {
+      // Quota or network trouble mid-way: finish the rest with the browser voice
+      setNote(t('card.voiceFallback', { why: err.code ?? 'error' }));
+      setMode('browser');
+      return speakWithBrowser(chunks.slice(i).join(' '));
+    }
+    if (token !== run.current) return;
+    const done = chunks.slice(0, i).reduce((a, _, k) => a + estimate(k), 0);
+    const a = new Audio(part.url);
+    a.playbackRate = rateRef.current;
+    a.ontimeupdate = () => totalSecs && setProgress(Math.min(1, (done + a.currentTime) / totalSecs));
+    a.onended = () => playFrom(promises, i + 1, token);
+    audio.current = a;
+    await a.play();
+    setState('playing');
+  };
+
+  const play = async () => {
+    if (!text) return;
+    haptic();
+    if (state === 'playing') {
+      if (mode === 'browser') window.speechSynthesis.pause();
+      else audio.current?.pause();
+      return setState('paused');
+    }
+    if (state === 'paused') {
+      if (mode === 'browser') window.speechSynthesis.resume();
+      else await audio.current?.play();
+      return setState('playing');
+    }
+    stopAll();
+    const token = run.current;
+    setState('loading');
+    setProgress(0);
+    try {
+      const promises = await prepare();
+      setMode('natural');
+      await playFrom(promises, 0, token);
+    } catch (err) {
+      if (token !== run.current) return;
+      // Natural voice unavailable (no key, quota, offline): fall back to the browser voice
+      setMode('browser');
+      setNote(t('card.voiceFallback', { why: err.code ?? 'error' }));
+      speakWithBrowser();
+    }
+  };
+
   const reset = () => {
-    if (supported) window.speechSynthesis.cancel();
+    stopAll();
     setState('idle');
     setProgress(0);
   };
   const nextRate = () => {
     const r = { 1: 1.25, 1.25: 1.5, 1.5: 2, 2: 1 }[rate];
     setRate(r);
-    if (state !== 'idle') reset();
+    if (audio.current) audio.current.playbackRate = r;
+    if (mode === 'browser' && state !== 'idle') reset();
   };
-  const mmss = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const remaining = Math.max(0, Math.round((totalSecs * (state === 'idle' && progress >= 1 ? 1 : 1 - progress)) / rate));
+  const mmss = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`;
+  const warm = () => prepare().catch(() => {});
+
+  // Quietly prepare just the first sentence once the advice is on screen (one short,
+  // cached clip per new advice), so pressing play starts at once
+  useEffect(() => {
+    if (!chunks.length) return undefined;
+    const id = setTimeout(() => fetchPart(chunks[0], t.lang).catch(() => {}), 1500);
+    return () => clearTimeout(id);
+  }, [chunks, t.lang]);
 
   return (
     <Card aria-labelledby="listen-title" className="flex flex-col">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 id="listen-title" className="text-xl font-medium tracking-tight text-ink">
             {t('title.advisory')}
           </h2>
-          <p className="text-xs text-slate-500">{t('card.listen')}</p>
+          <p className="text-xs text-slate-500">
+            {t('card.listen')} · <span className="font-medium text-[#8a6a00] [:root[data-theme=dark]_&]:text-butter">{mode === 'browser' ? t('card.browserVoice') : t('card.naturalVoice')}</span>
+          </p>
         </div>
         <motion.button
           type="button"
           whileTap={{ scale: 0.88 }}
           onClick={play}
-          disabled={!supported || !text}
-          className="grid h-11 w-11 place-items-center rounded-full bg-surface text-ink shadow-[var(--elev-2)] ring-1 ring-line disabled:opacity-40"
-          aria-label={state === 'playing' ? t('card.pause') : t('card.play')}
+          onPointerEnter={warm}
+          onFocus={warm}
+          disabled={!text}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-surface text-ink shadow-[var(--elev-2)] ring-1 ring-line disabled:opacity-40"
+          aria-label={state === 'playing' ? t('card.pause') : state === 'loading' ? t('card.preparing') : t('card.play')}
+          aria-busy={state === 'loading'}
         >
-          {state === 'playing' ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
+          {state === 'loading' ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+          ) : state === 'playing' ? (
+            <Pause className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Play className="h-4 w-4" aria-hidden="true" />
+          )}
         </motion.button>
       </div>
+
       <div className="my-4 flex h-16 items-center gap-[3px]" aria-hidden="true">
         {bars.map((h, i) => {
           const played = i / bars.length < progress;
@@ -569,13 +744,22 @@ function ListenCard({ capture, decision }) {
             <motion.span
               key={i}
               className={`w-[3px] flex-1 rounded-full ${played ? 'bg-[#c9a227]' : 'bg-[#e8d9a8] [:root[data-theme=dark]_&]:bg-[#5a4c22]'}`}
-              style={{ height: `${h}%` }}
-              animate={state === 'playing' ? { scaleY: [1, 0.6 + ((i * 7) % 5) / 10, 1] } : { scaleY: 1 }}
-              transition={state === 'playing' ? { duration: 0.6 + (i % 4) * 0.15, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.2 }}
+              initial={false}
+              animate={
+                state === 'loading'
+                  ? { height: `${18 + ((i * 13) % 40)}%`, opacity: [0.35, 1, 0.35] }
+                  : { height: `${Math.max(10, h * 100)}%`, opacity: 1, scaleY: state === 'playing' && mode === 'browser' ? [1, 0.7, 1] : 1 }
+              }
+              transition={
+                state === 'loading'
+                  ? { opacity: { duration: 1.1, repeat: Infinity, delay: (i % 12) * 0.05 }, height: { type: 'spring', stiffness: 200, damping: 20 } }
+                  : { type: 'spring', stiffness: 220, damping: 24, delay: realBars ? i * 0.006 : 0 }
+              }
             />
           );
         })}
       </div>
+
       <div className="mt-auto flex items-center gap-3 text-sm text-slate-600">
         <button type="button" onClick={reset} className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-100" aria-label={t('card.restart')}>
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -583,9 +767,9 @@ function ListenCard({ capture, decision }) {
         <button type="button" onClick={nextRate} className="min-h-9 rounded-full px-2 tabular-nums hover:bg-slate-100" aria-label={`${t('card.speed')} ${rate}x`}>
           {rate}x
         </button>
-        <span className="ml-auto font-medium tabular-nums text-ink">{text ? mmss : '—'}</span>
+        <span className="ml-auto font-medium tabular-nums text-ink">{state === 'loading' ? t('card.preparing') : text ? mmss : '—'}</span>
       </div>
-      {!supported && <p className="mt-2 text-[11px] text-slate-500">{t('card.noSpeech')}</p>}
+      {note && <p className="mt-2 text-[11px] text-slate-500">{note}</p>}
     </Card>
   );
 }

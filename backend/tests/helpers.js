@@ -25,7 +25,7 @@ export const PNG_BASE64 = Buffer.concat([
 ]).toString('base64');
 export const GIF_BASE64 = Buffer.concat([Buffer.from('GIF89a'), Buffer.alloc(32)]).toString('base64');
 
-export async function startApp({ env = {}, store, visionHttp, llmClient, weatherHttp, telegramHttp } = {}) {
+export async function startApp({ env = {}, store, visionHttp, llmClient, weatherHttp, telegramHttp, voice } = {}) {
   // Tiling and the demo fallback have their own tests; the rest exercise the plain provider path
   const { config, errors } = loadConfig({ DEMO_MODE: 'true', VISION_TILES: '1', VISION_DEMO_FALLBACK: 'false', VISION_QUALITY_CHECK: 'false', ...env });
   if (errors.length) throw new Error(`Invalid test config: ${errors.join('; ')}`);
@@ -36,7 +36,7 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
   // No real network in tests: weather fails fast unless a fake is given
   const weather = createWeather({ config, logger, http: weatherHttp ?? { get: async () => { throw new Error('offline'); } } });
   const telegram = createTelegram({ config, store, weather, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } });
-  const app = createApp({ config, store, vision, advisor, weather, telegram, logger });
+  const app = createApp({ config, store, vision, advisor, weather, telegram, voice, logger });
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;

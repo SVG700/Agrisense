@@ -847,3 +847,38 @@ describe('Live Vision (Raspberry Pi OpenCV)', () => {
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith('Polyhouse 4'));
   });
 });
+
+describe('Natural voice', () => {
+  test('advice is split into sentence-sized pieces so the first can play quickly', async () => {
+    const { splitForSpeech } = await import('../components/FieldHero.jsx');
+    const text = 'Average 47 pests per day. Spray the east rows tonight. Check the trap tomorrow. ' + 'Keep monitoring the west side of the greenhouse every morning before nine. '.repeat(4);
+    const parts = splitForSpeech(text);
+    expect(parts).toHaveLength(2); // first sentence, then the rest (at most 2 voice calls)
+    expect(parts[0]).toBe('Average 47 pests per day.');
+    expect(parts.join(' ').replace(/\s+/g, ' ')).toBe(text.trim().replace(/\s+/g, ' '));
+  });
+
+  test('play asks the backend for the natural voice of the first piece', async () => {
+    const { HeroCards } = await import('../components/FieldHero.jsx');
+    const fetchMock = vi.fn((url) =>
+      String(url).endsWith('/api/voice')
+        ? Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new Blob(['RIFF'], { type: 'audio/wav' })) })
+        : jsonResponse({ switches: { trap_light: { on: true } } })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:voice' }));
+    const play = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('Audio', function FakeAudio(src) {
+      this.src = src;
+      this.play = play;
+      this.pause = () => {};
+    });
+    const c = capture({ detection: { ...capture().detection, ai_advisory: { risk_level: 'High', summary: 'Whitefly pressure is high. Spray tonight.', mitigation_strategy: ['Spray the east rows.'] } } });
+    render(<HeroCards device={DEVICE} capture={c} telemetry={[c]} decision={null} events={[]} onSeeAll={() => {}} onSelectCapture={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Read the advice aloud' }));
+    await waitFor(() => expect(play).toHaveBeenCalled());
+    const voiceCall = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/api/voice'));
+    expect(JSON.parse(voiceCall[1].body)).toMatchObject({ lang: 'en' });
+    expect(screen.getByText(/Natural voice/)).toBeTruthy();
+  });
+});

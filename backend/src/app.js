@@ -16,6 +16,8 @@ import { actionsRouter } from './routes/actions.js';
 import { telegramRouter } from './routes/telegram.js';
 import { controlsRouter } from './routes/controls.js';
 import { createControls } from './services/controls.js';
+import { voiceRouter } from './routes/voice.js';
+import { createVoice } from './services/voice.js';
 import { renderTrapSvg } from './services/mockTrap.js';
 import { errorHandler, notFound } from './middleware/errors.js';
 
@@ -120,6 +122,7 @@ export function createApp(deps) {
   app.use('/api', actionsRouter(deps));
   if (telegram) app.use('/api', telegramRouter(deps));
   app.use('/api', controlsRouter({ ...deps, controls: deps.controls ?? createControls() }));
+  app.use('/api', voiceRouter({ ...deps, voice: deps.voice ?? createVoice({ config, logger }) }));
 
   app.use(notFound);
   app.use(errorHandler(logger));

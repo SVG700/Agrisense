@@ -284,7 +284,7 @@ export function classifyGeminiError(err) {
   return { code: `api_error_${status}`, message: 'Gemini API error' };
 }
 
-async function createGeminiClient(g) {
+export async function createGeminiClient(g) {
   const { GoogleGenAI } = await import('@google/genai');
   return new GoogleGenAI({
     apiKey: g.apiKey,

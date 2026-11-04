@@ -187,6 +187,13 @@ export function loadConfig(env = process.env) {
       maxRetries: int('GEMINI_MAX_RETRIES', 2, 0, 5),
     },
 
+    // Natural voice for "listen to the advice" (Gemini text-to-speech, same GEMINI_API_KEY)
+    voice: {
+      model: str('GEMINI_TTS_MODEL', 'gemini-3.8-flash-tts'),
+      voice: str('GEMINI_TTS_VOICE', 'Kore'),
+      maxChars: int('VOICE_MAX_CHARS', 1200, 100, 5000),
+    },
+
     claude: {
       apiKey: str('ANTHROPIC_API_KEY'),
       model: str('CLAUDE_MODEL', 'claude-opus-5-5'),
@@ -214,6 +221,8 @@ export function loadConfig(env = process.env) {
   if (!EFFORTS.includes(config.claude.effort)) errors.push(`CLAUDE_EFFORT must be one of: ${EFFORTS.join(', ')}`);
   if (!/^[a-z0-9][a-z0-9.-]{2,80}$/i.test(config.claude.model)) errors.push('CLAUDE_MODEL is not a valid model id');
   if (!/^[a-z0-9][a-z0-9.-]{2,80}$/i.test(config.gemini.model)) errors.push('GEMINI_MODEL is not a valid model id');
+  if (!/^[a-z0-9][a-z0-9.-]{2,80}$/i.test(config.voice.model)) errors.push('GEMINI_TTS_MODEL is not a valid model id');
+  if (!/^[A-Za-z][A-Za-z-]{1,30}$/.test(config.voice.voice)) errors.push('GEMINI_TTS_VOICE is not a valid voice name');
 
   // Resolve the advisor provider
   const requested = config.advisor.provider;
