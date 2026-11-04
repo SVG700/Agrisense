@@ -726,3 +726,76 @@ describe('3D farm view', () => {
     expect(onSelect).toHaveBeenCalledWith(DEVICE.id);
   });
 });
+
+describe('Customize, quick actions, timeline, day strip', () => {
+  test('a hidden section is not rendered, and the order is followed', () => {
+    const layout = { order: ['log', 'glance', 'timeline', 'detections', 'field3d', 'traps', 'whatif', 'climate'], hidden: ['glance'] };
+    render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} layout={layout} />);
+    expect(screen.queryByText('Today at a glance')).toBeNull();
+    const log = screen.getByText('Recent Captures');
+    const timeline = screen.getByText('Daily timeline');
+    expect(log.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('day strip steps through captures with the arrow buttons and keys', () => {
+    const rows = [capture({ id: 'c1', timestamp: '2026-11-03T08:00:00Z' }), capture({ id: 'c2', timestamp: '2026-11-03T12:00:00Z' })];
+    render(<FarmerDashboard device={DEVICE} telemetry={rows} onGoAdmin={() => {}} />);
+    const strip = screen.getByRole('group', { name: /Captures: use the arrows/ });
+    expect(strip.textContent).toMatch(/2\s*\/\s*2/);
+    expect(screen.getByRole('button', { name: 'Next capture' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Previous capture' }));
+    expect(strip.textContent).toMatch(/1\s*\/\s*2/);
+    expect(screen.getByText('Viewing historical capture', { exact: false })).toBeTruthy();
+    fireEvent.keyDown(strip, { key: 'ArrowRight' });
+    expect(strip.textContent).toMatch(/2\s*\/\s*2/);
+  });
+
+  test('timeline lists the day’s captures and actions in time order', async () => {
+    const DailyTimeline = (await import('../components/DailyTimeline.jsx')).default;
+    const rows = [capture({ id: 'c1', timestamp: '2026-11-03T08:00:00Z' }), capture({ id: 'c2', timestamp: '2026-11-03T12:00:00Z' })];
+    const actions = [{ id: 7, action: 'sprayed', acted_at: '2026-11-03T10:00:00Z', note: 'rows 1-4' }];
+    const onSelect = vi.fn();
+    render(<DailyTimeline telemetry={rows} actions={actions} capture={rows[1]} onSelectCapture={onSelect} />);
+    expect(screen.getByText(/3 events/)).toBeTruthy();
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(items.findIndex((x) => x.includes('Sprayed'))).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole('button')[0]);
+    expect(onSelect).toHaveBeenCalledWith('c1');
+  });
+
+  test('quick actions filter as you type and run with Enter', async () => {
+    const CommandPalette = (await import('../components/CommandPalette.jsx')).default;
+    const run = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onClose={onClose}
+        commands={[
+          { id: 'a', group: 'Go to', label: 'Dashboard', run: () => {} },
+          { id: 'b', group: 'Appearance', label: 'Light theme', run },
+        ]}
+      />
+    );
+    fireEvent.change(screen.getByRole('combobox', { name: 'Search actions' }), { target: { value: 'light' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Enter' });
+    expect(run).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  test('theme choice is applied to <html> and remembered', async () => {
+    const { useTheme } = await import('../lib/theme.js');
+    function Probe() {
+      const { theme, setTheme } = useTheme();
+      return <button onClick={() => setTheme('light')}>{theme}</button>;
+    }
+    localStorage.removeItem('agrisense.theme');
+    render(<Probe />);
+    expect(document.documentElement.dataset.theme).toBe('dark'); // default
+    fireEvent.click(screen.getByRole('button', { name: 'dark' }));
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(localStorage.getItem('agrisense.theme')).toBe('"light"');
+    localStorage.removeItem('agrisense.theme');
+  });
+});

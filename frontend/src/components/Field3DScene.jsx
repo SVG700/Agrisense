@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import DeckGL from '@deck.gl/react';
 import { COORDINATE_SYSTEM, OrbitView } from '@deck.gl/core';
 import { ColumnLayer, PathLayer, SolidPolygonLayer, TextLayer } from '@deck.gl/layers';
+import { useResolvedTheme } from '../lib/theme.js';
 
 const SPACING = 14;
 const COLORS = {
@@ -15,9 +16,15 @@ const COLORS = {
   CHECK_TRAP: [100, 116, 139],
 };
 const NO_DATA = [203, 213, 225];
+// Ground, rows and labels per theme (WebGL can't read CSS variables)
+const PALETTE = {
+  light: { ground: [214, 226, 205], rows: [134, 168, 112], label: [51, 65, 85], labelActive: [14, 27, 18], labelBg: [255, 255, 255, 220], line: [14, 27, 18] },
+  dark: { ground: [28, 38, 30], rows: [56, 92, 62], label: [210, 210, 218], labelActive: [255, 255, 255], labelBg: [20, 20, 23, 225], line: [245, 245, 247] },
+};
 const LABELS = { SPRAY: 'SPRAY', BIOCONTROL: 'RELEASE BIOCONTROL', WAIT: 'WAIT', CHECK_TRAP: 'CHECK TRAP' };
 
 export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
+  const pal = PALETTE[useResolvedTheme()];
   const cols = Math.max(1, Math.ceil(Math.sqrt(traps.length)));
   const rows = Math.max(1, Math.ceil(traps.length / cols));
   const width = (cols - 1) * SPACING;
@@ -67,7 +74,8 @@ export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
       id: 'ground',
       data: [{ polygon: [[field.x0, field.y0], [field.x1, field.y0], [field.x1, field.y1], [field.x0, field.y1]] }],
       getPolygon: (d) => d.polygon,
-      getFillColor: [214, 226, 205],
+      getFillColor: pal.ground,
+      updateTriggers: { getFillColor: pal.ground },
       extruded: true,
       getElevation: -0.01,
       coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
@@ -77,7 +85,8 @@ export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
       id: 'crop-rows',
       data: cropRows,
       getPath: (d) => d.path,
-      getColor: [134, 168, 112],
+      getColor: pal.rows,
+      updateTriggers: { getColor: pal.rows },
       getWidth: 0.5,
       widthUnits: 'common',
       coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
@@ -88,7 +97,7 @@ export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
       getPosition: (d) => d.position,
       getElevation: (d) => d.height,
       getFillColor: (d) => d.color,
-      getLineColor: [14, 27, 18],
+      getLineColor: pal.line,
       getLineWidth: (d) => (d.id === activeId ? 0.5 : 0),
       lineWidthUnits: 'common',
       stroked: true,
@@ -101,7 +110,7 @@ export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
       highlightColor: [255, 255, 255, 90],
       coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       onClick: ({ object }) => object && onSelect?.(object.id),
-      updateTriggers: { getLineWidth: activeId },
+      updateTriggers: { getLineWidth: activeId, getLineColor: pal.line },
       transitions: { getElevation: { duration: 700 } },
     }),
     // The action level: a translucent sheet across the field
@@ -119,17 +128,17 @@ export default function Field3DScene({ traps, activeId, threshold, onSelect }) {
       getPosition: (d) => [d.position[0], d.position[1], d.height + 2.2],
       getText: (d) => `${shortName(d.name)} · ${d.pests !== null ? `${Math.round(d.pests)}/day` : 'no data'}`,
       getSize: 11,
-      getColor: (d) => (d.id === activeId ? [14, 27, 18] : [51, 65, 85]),
+      getColor: (d) => (d.id === activeId ? pal.labelActive : pal.label),
       getTextAnchor: 'middle',
       getAlignmentBaseline: 'bottom',
       fontFamily: 'Inter, system-ui, sans-serif',
       fontWeight: 600,
       background: true,
-      getBackgroundColor: [255, 255, 255, 220],
+      getBackgroundColor: pal.labelBg,
       backgroundPadding: [4, 2],
       billboard: true,
       coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-      updateTriggers: { getColor: activeId },
+      updateTriggers: { getColor: [activeId, pal.label], getBackgroundColor: pal.labelBg },
       characterSet: 'auto',
     }),
   ];

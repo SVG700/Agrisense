@@ -211,7 +211,7 @@ function Switch({ on, busy, labelledBy, onClick }) {
       disabled={busy}
       className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-60 ${on ? 'bg-brand' : 'bg-slate-300'}`}
     >
-      <span className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${on ? 'translate-x-6' : 'translate-x-1'}`} />
+      <span className={`inline-block h-5 w-5 rounded-full bg-[#fff] shadow transition-transform duration-200 ${on ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   );
 }

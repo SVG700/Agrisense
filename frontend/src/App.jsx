@@ -1,16 +1,19 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'framer-motion';
-import { Bug, Camera, Cpu, LayoutDashboard, Map as MapIcon, RefreshCw, Sprout, TriangleAlert, WifiOff } from 'lucide-react';
+import { AnimatePresence, LayoutGroup, MotionConfig, motion, useScroll, useMotionValueEvent } from 'framer-motion';
+import { Bell, Bug, Camera, ChevronDown, Command, Cpu, LayoutDashboard, Map as MapIcon, Moon, RefreshCw, Sprout, Sun, WifiOff } from 'lucide-react';
 import { api } from './api.js';
 import { LOW_BATTERY } from './lib/pests.js';
-import { EASE, pageTransition } from './lib/motion.jsx';
+import { pageTransition } from './lib/motion.jsx';
 import { LanguageContext, LanguageToggle } from './lib/i18n.jsx';
+import { haptic, useLayout, useTheme } from './lib/theme.js';
 import { BackToTop, InteractionEffects, ScrollProgress } from './components/InteractionEffects.jsx';
 import FarmerDashboard from './components/FarmerDashboard.jsx';
 import AdminPanel from './components/AdminPanel.jsx';
 import PhoneCheckPage from './components/PhoneCheckPage.jsx';
 import { DashboardSkeleton } from './components/Skeletons.jsx';
 import { StatusChips } from './components/SystemStatus.jsx';
+import CustomizeSheet from './components/CustomizeSheet.jsx';
+import CommandPalette from './components/CommandPalette.jsx';
 
 // The map page (and everything kepler.gl pulls in) is a separate chunk, loaded on first visit
 const PestMapPage = lazy(() => import('./map/PestMapPage.jsx'));
@@ -27,6 +30,8 @@ const storedLang = () => {
 };
 
 const POLL_MS = Number(import.meta.env.VITE_POLL_MS) || 5000;
+// One spring for the whole app: quick to respond, settles without bounce (Apple-like)
+const APP_SPRING = { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 };
 
 const TABS = [
   { id: 'farmer', label: 'Dashboard', short: 'Dashboard', icon: LayoutDashboard },
@@ -45,6 +50,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [manualRefresh, setManualRefresh] = useState(false);
+  const [live, setLive] = useState(true);
+  const [customizing, setCustomizing] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { theme, resolved, setTheme } = useTheme();
+  const { layout, setLayout, reset: resetLayout } = useLayout();
   const [lang, setLangState] = useState(storedLang);
   const setLang = useCallback((l) => {
     setLangState(l);
@@ -60,6 +71,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.lang = effectiveLang;
   }, [effectiveLang]);
+
+  // The header gains elevation once the page scrolls under it
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, 'change', (y) => setScrolled(y > 8));
 
   const seq = useRef(0); // only the newest response may update state
   const inFlight = useRef(null); // device id of the poll currently running
@@ -89,12 +104,13 @@ export default function App() {
     }
   }, [deviceId]);
 
-  // Live polling (one interval per selected device; cleaned up on change/unmount)
+  // Live polling (paused from the Insects card; one interval per selected device)
   useEffect(() => {
     refresh();
+    if (!live) return undefined;
     const t = setInterval(refresh, POLL_MS);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, live]);
 
   // Integration status: refreshed every minute so a backend restart with new keys shows up
   useEffect(() => {
@@ -115,25 +131,61 @@ export default function App() {
   }, []);
 
   const onManualRefresh = async () => {
+    haptic();
     setManualRefresh(true);
     await refresh();
     setManualRefresh(false);
   };
 
-  const goTab = (id) => {
+  const goTab = useCallback((id) => {
+    haptic();
     setTab(id);
-    window.scrollTo?.({ top: 0 });
-  };
+    window.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Keyboard: Ctrl/⌘+K or "/" opens quick actions (not while typing in a field)
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable;
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPalette((p) => !p);
+      } else if (e.key === '/' && !typing) {
+        e.preventDefault();
+        setPalette(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const device = devices.find((d) => d.id === deviceId) ?? null;
   const lowBattery = useMemo(() => devices.filter((d) => d.battery_level < LOW_BATTERY), [devices]);
+  const nextTheme = resolved === 'dark' ? 'light' : 'dark';
+
+  const commands = useMemo(
+    () => [
+      ...TABS.map((t) => ({ id: `go-${t.id}`, group: 'Go to', label: t.label, run: () => goTab(t.id) })),
+      ...devices.map((d) => ({ id: `trap-${d.id}`, group: 'Trap', label: `Open ${d.name}`, hint: `${d.battery_level}% battery`, run: () => selectDevice(d.id) })),
+      { id: 'refresh', group: 'Data', label: 'Refresh now', run: onManualRefresh },
+      { id: 'live', group: 'Data', label: live ? 'Pause live updates' : 'Resume live updates', run: () => setLive((l) => !l) },
+      { id: 'customize', group: 'View', label: 'Customize dashboard', run: () => (goTab('farmer'), setCustomizing(true)) },
+      { id: 'theme-dark', group: 'Appearance', label: 'Dark theme', run: () => setTheme('dark') },
+      { id: 'theme-light', group: 'Appearance', label: 'Light theme', run: () => setTheme('light') },
+      { id: 'theme-auto', group: 'Appearance', label: 'Match system theme', run: () => setTheme('auto') },
+      { id: 'lang-en', group: 'Language', label: 'English', run: () => setLang('en') },
+      { id: 'lang-kn', group: 'Language', label: 'ಕನ್ನಡ (Kannada)', run: () => setLang('kn') },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [devices, live, goTab, setTheme, setLang]
+  );
 
   return (
     <LanguageContext.Provider value={langValue}>
-      <MotionConfig reducedMotion="user">
+      <MotionConfig reducedMotion="user" transition={APP_SPRING}>
         <a
           href="#main"
-          className="sr-only z-[60] rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+          className="sr-only z-[90] rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
         >
           Skip to content
         </a>
@@ -144,75 +196,70 @@ export default function App() {
         {/* Background refresh indicator */}
         <div className="fixed inset-x-0 top-0 z-50 h-0.5">{manualRefresh && <div className="progress-indeterminate" />}</div>
 
-        {/* ---------- Top bar ---------- */}
-        <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md">
-          <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+        {/* ---------- Top bar (glass; lifts once content scrolls under it) ---------- */}
+        <header
+          className={`glass sticky top-0 z-40 border-b transition-[box-shadow,border-color] duration-500 ${
+            scrolled ? 'border-line shadow-[var(--elev-2)]' : 'border-transparent'
+          }`}
+        >
+          <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-8">
             <Brand />
 
             <LayoutGroup id="top-nav">
-              <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Main">
+              <nav className="ml-6 hidden items-center gap-1 lg:flex" aria-label="Main">
                 {TABS.map((t) => (
                   <NavLink key={t.id} item={t} active={tab === t.id} onClick={() => goTab(t.id)} />
                 ))}
               </nav>
             </LayoutGroup>
 
-            <div className="ml-auto flex items-center gap-2 text-xs">
+            <div className="ml-auto flex min-w-0 items-center gap-1.5 text-xs sm:gap-2">
               {translated && <LanguageToggle />}
-              <AnimatePresence>
-                {lowBattery.length > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2, ease: EASE }}
-                    onClick={() => goTab('admin')}
-                    className="hidden items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 font-semibold text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-100 sm:flex"
-                  >
-                    <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-                    {lowBattery.length} trap{lowBattery.length > 1 ? 's' : ''} low on battery
-                  </motion.button>
-                )}
-              </AnimatePresence>
               <span
                 role="status"
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 font-medium ring-1 ${
-                  error ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-brand-soft text-brand ring-emerald-200'
+                className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 font-medium ring-1 ${
+                  error ? 'bg-rose-50 text-rose-700 ring-rose-200' : !live ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-brand-soft text-brand ring-emerald-200'
                 }`}
               >
-                {error ? <WifiOff className="h-3.5 w-3.5" aria-hidden="true" /> : <span className="live-dot text-emerald-500" aria-hidden="true" />}
-                {error ? 'Offline' : lastSync ? <span>Live<span className="hidden sm:inline"> · {lastSync.toLocaleTimeString()}</span></span> : 'Connecting…'}
+                {error ? <WifiOff className="h-3.5 w-3.5" aria-hidden="true" /> : <span className={live ? 'live-dot text-emerald-500' : 'h-2 w-2 rounded-full bg-amber-500'} aria-hidden="true" />}
+                {error ? 'Offline' : !live ? 'Paused' : lastSync ? <span>Live<span className="hidden md:inline"> · {lastSync.toLocaleTimeString()}</span></span> : 'Connecting…'}
               </span>
-              <button onClick={onManualRefresh} className="btn btn-ghost h-9 min-h-0 w-9 p-0" title="Refresh now" aria-label="Refresh now">
-                <RefreshCw className={`h-3.5 w-3.5 ${manualRefresh ? 'animate-spin' : ''}`} aria-hidden="true" />
-              </button>
+              <IconButton label="Quick actions (Ctrl+K)" onClick={() => setPalette(true)} className="hidden! sm:grid!">
+                <Command className="h-4 w-4" aria-hidden="true" />
+              </IconButton>
+              <IconButton label={`Switch to ${nextTheme} theme`} onClick={() => (haptic(), setTheme(nextTheme))}>
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={resolved}
+                    initial={{ rotate: -90, scale: 0.5, opacity: 0 }}
+                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                    exit={{ rotate: 90, scale: 0.5, opacity: 0 }}
+                    className="grid place-items-center"
+                  >
+                    {resolved === 'dark' ? <Moon className="h-4 w-4" aria-hidden="true" /> : <Sun className="h-4 w-4" aria-hidden="true" />}
+                  </motion.span>
+                </AnimatePresence>
+              </IconButton>
+              <IconButton
+                label={lowBattery.length ? `${lowBattery.length} trap${lowBattery.length > 1 ? 's' : ''} low on battery` : 'No alerts'}
+                onClick={() => goTab('admin')}
+                badge={lowBattery.length || null}
+              >
+                <Bell className="h-4 w-4" aria-hidden="true" />
+              </IconButton>
+              <IconButton label="Refresh now" onClick={onManualRefresh} className="hidden! sm:grid!">
+                <RefreshCw className={`h-4 w-4 ${manualRefresh ? 'animate-spin' : ''}`} aria-hidden="true" />
+              </IconButton>
+              {devices.length > 0 && tab !== 'map' && <TrapPicker devices={devices} deviceId={deviceId} onSelect={selectDevice} className="hidden lg:flex" />}
             </div>
           </div>
-
-          {/* Mobile / tablet nav */}
-          <nav className="mx-auto flex max-w-[1320px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:hidden" aria-label="Main">
-            {TABS.map(({ id, short, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => goTab(id)}
-                aria-current={tab === id ? 'page' : undefined}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
-                  tab === id ? 'bg-ink text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
-                }`}
-              >
-                <Icon className="h-4 w-4" aria-hidden="true" />
-                {short}
-              </button>
-            ))}
-          </nav>
         </header>
 
-        <main id="main" className="mx-auto max-w-[1320px] px-4 pb-20 pt-6 sm:px-6 lg:px-8">
-          {/* Trap picker (shared by every page) */}
-          {devices.length > 1 && tab !== 'map' && (
-            <div className="mb-5 flex flex-wrap items-center gap-3">
-              <span className="pill-label">Trap station</span>
-              <DevicePicker devices={devices} deviceId={deviceId} onSelect={selectDevice} />
+        <main id="main" className="mx-auto max-w-[1320px] px-4 pb-32 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+          {/* Trap picker for phones / tablets (the header holds it on desktop) */}
+          {devices.length > 0 && tab !== 'map' && (
+            <div className="mb-5 flex flex-wrap items-center gap-3 lg:hidden">
+              <TrapPicker devices={devices} deviceId={deviceId} onSelect={selectDevice} />
             </div>
           )}
 
@@ -223,7 +270,6 @@ export default function App() {
                 initial={{ opacity: 0, y: -8, height: 0 }}
                 animate={{ opacity: 1, y: 0, height: 'auto' }}
                 exit={{ opacity: 0, y: -8, height: 0 }}
-                transition={{ duration: 0.3, ease: EASE }}
                 className="mb-6 overflow-hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
               >
                 {error}
@@ -249,6 +295,10 @@ export default function App() {
                     telemetry={telemetry}
                     health={health}
                     onGoAdmin={() => goTab('admin')}
+                    layout={layout}
+                    live={live}
+                    onToggleLive={() => setLive((l) => !l)}
+                    onCustomize={() => setCustomizing(true)}
                   />
                 ) : tab === 'check' ? (
                   <PhoneCheckPage />
@@ -271,8 +321,8 @@ export default function App() {
           )}
         </main>
 
-        <footer className="border-t border-line bg-white">
-          <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-4 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <footer className="border-t border-line">
+          <div className="mx-auto flex max-w-[1320px] flex-col gap-3 px-4 py-6 pb-28 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8 lg:pb-6">
             <span className="flex items-center gap-2">
               <Sprout className="h-4 w-4 text-brand" aria-hidden="true" />
               AgriSense AI · decision support, not a diagnosis - scout the crop before treating.
@@ -280,6 +330,36 @@ export default function App() {
             {health && <StatusChips health={health} />}
           </div>
         </footer>
+
+        {/* ---------- Phone tab bar (thumb reach, safe-area aware) ---------- */}
+        <LayoutGroup id="tab-bar">
+          <nav className="glass pb-safe fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 rounded-[1.6rem] p-1.5 shadow-[var(--elev-4)] ring-1 ring-line lg:hidden" aria-label="Main">
+            {TABS.map(({ id, short, icon: Icon }) => (
+              <motion.button
+                key={id}
+                onClick={() => goTab(id)}
+                whileTap={{ scale: 0.92 }}
+                aria-current={tab === id ? 'page' : undefined}
+                className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-medium ${tab === id ? 'text-ink' : 'text-slate-500'}`}
+              >
+                {tab === id && <motion.span layoutId="tab-pill" className="absolute inset-0 rounded-2xl bg-slate-100" />}
+                <Icon className="relative h-5 w-5" aria-hidden="true" />
+                <span className="relative">{short}</span>
+              </motion.button>
+            ))}
+          </nav>
+        </LayoutGroup>
+
+        <CustomizeSheet
+          open={customizing}
+          onClose={() => setCustomizing(false)}
+          layout={layout}
+          setLayout={setLayout}
+          reset={resetLayout}
+          theme={theme}
+          setTheme={setTheme}
+        />
+        <CommandPalette open={palette} onClose={() => setPalette(false)} commands={commands} />
       </MotionConfig>
     </LanguageContext.Provider>
   );
@@ -290,44 +370,74 @@ export default function App() {
 function Brand() {
   return (
     <div className="flex shrink-0 items-center gap-2.5">
-      <div className="grid h-9 w-9 place-items-center rounded-xl bg-forest text-white">
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#f5b544] to-[#d97706] text-[#1a1206] shadow-[0_6px_18px_-6px_rgb(245_181_68/0.6)]">
         <Sprout className="h-5 w-5" aria-hidden="true" />
       </div>
       <div className="leading-tight">
         <div className="text-[15px] font-semibold tracking-tight text-ink">AgriSense</div>
-        <p className="hidden text-[11px] text-slate-500 sm:block">Predictive insect monitoring</p>
+        <p className="hidden text-[11px] text-slate-500 sm:block lg:hidden 2xl:block">Predictive insect monitoring</p>
       </div>
     </div>
   );
 }
 
+/** Text link with the reference's sliding underline. */
 function NavLink({ item, active, onClick }) {
   return (
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`relative rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'text-white' : 'text-slate-600 hover:text-ink'}`}
+      className={`relative whitespace-nowrap px-3 py-2.5 text-sm transition-colors duration-300 ${active ? 'font-medium text-ink' : 'text-slate-500 hover:text-ink'}`}
     >
-      {active && (
-        <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-ink" transition={{ type: 'spring', stiffness: 420, damping: 36 }} />
-      )}
-      <span className="relative">{item.label}</span>
+      <span className="xl:hidden">{item.short}</span>
+      <span className="hidden xl:inline">{item.label}</span>
+      {active && <motion.span layoutId="nav-underline" className="absolute inset-x-3.5 -bottom-0.5 h-0.5 rounded-full bg-ink" />}
     </button>
   );
 }
 
-function DevicePicker({ devices, deviceId, onSelect }) {
+function IconButton({ label, onClick, badge = null, className = '', children }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-600">
-      <Bug className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.9 }}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface text-ink shadow-[var(--elev-1)] ring-1 ring-line transition-colors hover:bg-slate-100 ${className}`}
+    >
+      {children}
+      {badge && (
+        <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-[#fff]" aria-hidden="true">
+          {badge}
+        </span>
+      )}
+    </motion.button>
+  );
+}
+
+/** The reference's account pill, as the trap selector. */
+function TrapPicker({ devices, deviceId, onSelect, className = '' }) {
+  const current = devices.find((d) => d.id === deviceId);
+  return (
+    <label className={`relative flex items-center gap-2 rounded-full bg-surface py-1 pl-1 pr-3 shadow-[var(--elev-1)] ring-1 ring-line ${className}`}>
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-soft text-brand" aria-hidden="true">
+        <Bug className="h-4 w-4" />
+      </span>
       <span className="sr-only">Trap station</span>
-      <select value={deviceId ?? ''} onChange={(e) => onSelect(e.target.value)} className="field min-w-0 px-3 py-2 text-sm">
+      <select
+        value={deviceId ?? ''}
+        onChange={(e) => (haptic(), onSelect(e.target.value))}
+        className="max-w-[220px] cursor-pointer appearance-none truncate bg-transparent pr-5 text-sm font-medium text-ink outline-none"
+      >
         {devices.map((d) => (
           <option key={d.id} value={d.id}>
             {d.name} ({d.battery_level}%)
           </option>
         ))}
       </select>
+      <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-slate-500" aria-hidden="true" />
+      {current && current.battery_level < LOW_BATTERY && <span className="sr-only">low battery</span>}
     </label>
   );
 }

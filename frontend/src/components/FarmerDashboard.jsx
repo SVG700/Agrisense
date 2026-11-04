@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowRight,
   BatteryFull,
   BatteryLow,
   BatteryMedium,
@@ -9,10 +8,8 @@ import {
   Bug,
   Camera,
   Clock,
-  Cpu,
   Droplets,
   History,
-  ScanSearch,
   ShieldAlert,
   StickyNote,
   Thermometer,
@@ -23,11 +20,13 @@ import TrapCanvas from './TrapCanvas.jsx';
 import AdvisoryCard from './AdvisoryCard.jsx';
 import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
-import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
 import ManualSprayCard from './ManualSprayCard.jsx';
 import Field3D from './Field3D.jsx';
-import { decisionReason, useT } from '../lib/i18n.jsx';
+import DayHeader from './DayHeader.jsx';
+import GlowCards from './GlowCards.jsx';
+import DailyTimeline from './DailyTimeline.jsx';
+import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
 import ImpactCard from './ImpactCard.jsx';
@@ -35,6 +34,7 @@ import ActionLogCard from './ActionLogCard.jsx';
 import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
 import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger } from '../lib/motion.jsx';
+import { SECTIONS } from '../lib/theme.js';
 import {
   DATA_SOURCES,
   LOW_BATTERY,
@@ -55,19 +55,40 @@ const HEADLINES = {
   Medium: 'Pest pressure is building',
   Low: 'Pest pressure is low',
 };
+const DEFAULT_LAYOUT = { order: SECTIONS.map((s) => s.id), hidden: [] };
 
-/** Farmer-facing dashboard: hero + status bar, today's numbers, detections, AI advice, spray. */
-export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, health, onGoAdmin }) {
+/**
+ * Farmer-facing dashboard: header + day strip, the three glow cards, the
+ * trap status row, then the sections in the viewer's chosen order (Customize).
+ */
+export default function FarmerDashboard({
+  device,
+  devices = [],
+  onSelectDevice,
+  telemetry,
+  health,
+  onGoAdmin,
+  layout = DEFAULT_LAYOUT,
+  live = true,
+  onToggleLive,
+  onCustomize,
+}) {
   const t = useT();
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
   const trapRef = useRef(null);
+  const adviceRef = useRef(null);
 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
+  const index = capture ? telemetry.findIndex((t) => t.id === capture.id) : -1;
+  const stepCapture = (dir) => {
+    const next = telemetry[index + dir];
+    if (next) setSelectedId(next.id === latest?.id ? null : next.id);
+  };
 
-  // Action log for this trap (shared by the log card, the spray button and the chart markers)
+  // Action log for this trap (shared by the log card, the spray button, the timeline and the chart markers)
   const [actions, setActions] = useState([]);
   const [actionsUnavailable, setActionsUnavailable] = useState(null);
   const loadActions = async () => {
@@ -91,6 +112,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
   const counts = countsKnown ? det.pest_counts ?? {} : {};
   const total = totalOf(counts);
   const risk = det?.ai_advisory?.risk_level ?? null;
+  const decision = det?.ai_advisory?.decision ?? null;
 
   // Trend vs the previous capture that actually has counts
   const counted = telemetry.filter((t) => hasCounts(t.detection));
@@ -114,61 +136,17 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
     : VISION_STATES[visionStatus(det)] ?? null;
   const source = DATA_SOURCES[capture?.data_source ?? 'unknown'] ?? DATA_SOURCES.unknown;
   const latestDecision = latest?.detection?.ai_advisory?.decision;
+  const headline = !capture
+    ? t('hero.waiting')
+    : decision?.decision === 'CHECK_TRAP'
+      ? t('hero.check')
+      : HEADLINES[risk]
+        ? t(`hero.${risk}`)
+        : t('hero.awaiting');
+  const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  return (
-    <div className="flex flex-col gap-8">
-      <AnimatePresence>
-        {device && device.battery_level < LOW_BATTERY && (
-          <motion.button
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3, ease: EASE }}
-            onClick={onGoAdmin}
-            className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm text-rose-800 transition hover:bg-rose-100"
-          >
-            <BatteryWarning className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span>
-              <b>{device.name}</b> is at {device.battery_level}% battery
-              {device.battery_source === 'manual' ? ' (manually set)' : ''} - captures may stop soon. Open hardware
-              control →
-            </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {isSimulated(capture) && (
-        <div
-          role="note"
-          data-testid="simulated-banner"
-          className="-mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
-        >
-          <Badge tone="warn">{t('simulatedData')}</Badge>
-          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">{t('demoDetector')}</Badge>}
-          <span>
-            {capture.detection?.vision_meta?.fallback
-              ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
-              : t('banner.simulated')}
-          </span>
-        </div>
-      )}
-
-      <Hero
-        device={device}
-        capture={capture}
-        latest={latest}
-        stale={stale}
-        risk={risk}
-        countsKnown={countsKnown}
-        total={total}
-        decision={det?.ai_advisory?.decision}
-        health={health}
-        vState={vState}
-        onViewTrap={() => trapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        onGoAdmin={onGoAdmin}
-      />
-
-      {/* ---------- Today at a glance: one box per number ---------- */}
+  const sections = {
+    glance: (
       <section aria-labelledby="glance-title" className="flex flex-col gap-4">
         <SectionHead id="glance-title" label={t('section.glance')}>
           {capture && (
@@ -199,7 +177,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
             icon={Bug}
             label={t('kpi.insects')}
             trend={trends.total}
-            trendColor="#15803d"
+            trendColor="#22c55e"
             value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : t('kpi.notCounted')}
             sub={
               delta !== null ? (
@@ -215,64 +193,134 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
             icon={Thermometer}
             label={t('kpi.temperature')}
             trend={trends.temperature}
-            trendColor="#ea580c"
+            trendColor="#f97316"
             value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
           />
           <Stat
             icon={Droplets}
             label={t('kpi.humidity')}
             trend={trends.humidity}
-            trendColor="#0284c7"
+            trendColor="#0ea5e9"
             value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
           />
           <Stat
             icon={ShieldAlert}
             label={t('kpi.risk')}
             trend={trends.risk}
-            trendColor="#e11d48"
+            trendColor="#f43f5e"
             value={<span className={RISK_STYLES[risk]?.text}>{risk ? t(`risk.${risk}`) : '—'}</span>}
           />
         </Stagger>
       </section>
-
-      {/* ---------- Detections + AI advisor + spray ---------- */}
+    ),
+    timeline: <DailyTimeline telemetry={telemetry} actions={actions} capture={capture} onSelectCapture={(id) => setSelectedId(id === latest?.id ? null : id)} />,
+    detections: (
       <section aria-labelledby="detections-title" className="flex flex-col gap-4">
         <SectionHead id="detections-title" label={t('section.detections')} />
-        <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.1}>
-          <Item className="flex min-w-0 flex-col gap-6 lg:col-span-3">
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
             <div ref={trapRef} className="scroll-mt-24">
               <TrapCanvas capture={capture} />
             </div>
             <PestBreakdown counts={counts} total={total} known={countsKnown} reason={vState?.help} live={!isHistoric} />
-          </Item>
-          <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
-            <AdvisoryCard advisory={det?.ai_advisory} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+            <div ref={adviceRef} className="scroll-mt-24">
+              <AdvisoryCard advisory={det?.ai_advisory} />
+            </div>
             <ManualSprayCard device={device} decision={latestDecision} onChanged={loadActions} />
             <WeatherCard deviceId={device?.id} decision={latestDecision} />
-          </Item>
-        </Stagger>
+          </div>
+        </div>
       </section>
-
-      {/* ---------- All traps ---------- */}
+    ),
+    field3d: <Field3D devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />,
+    traps: (
       <section aria-labelledby="traps-title" className="flex flex-col gap-4">
         <SectionHead id="traps-title" label={t('section.traps')} />
-        <Field3D devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
         <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
         <ImpactCard refreshKey={latest?.id} />
       </section>
-
+    ),
+    log: (
       <div className="grid gap-6 lg:grid-cols-2">
         <ActionLogCard deviceId={device?.id} decision={latestDecision} actions={actions} unavailable={actionsUnavailable} onChanged={loadActions} />
         <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
       </div>
+    ),
+    whatif: <WhatIfCard deviceId={device?.id} />,
+    climate: <MicroclimateChart telemetry={telemetry} actions={actions} />,
+  };
 
-      <Reveal>
-        <WhatIfCard deviceId={device?.id} />
-      </Reveal>
+  return (
+    <div className="flex flex-col gap-8">
+      <AnimatePresence>
+        {device && device.battery_level < LOW_BATTERY && (
+          <motion.button
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            onClick={onGoAdmin}
+            className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm text-rose-800 transition hover:bg-rose-100"
+          >
+            <BatteryWarning className="h-5 w-5 shrink-0" aria-hidden="true" />
+            <span>
+              <b>{device.name}</b> is at {device.battery_level}% battery
+              {device.battery_source === 'manual' ? ' (manually set)' : ''} - captures may stop soon. Open hardware
+              control →
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
-      <Reveal>
-        <MicroclimateChart telemetry={telemetry} actions={actions} />
-      </Reveal>
+      <DayHeader
+        headline={headline}
+        decision={decision}
+        device={device}
+        capture={capture}
+        index={index}
+        count={telemetry.length}
+        onStep={stepCapture}
+        onCustomize={onCustomize}
+        onAsk={() => scrollTo(adviceRef)}
+      />
+
+      {isSimulated(capture) && (
+        <div
+          role="note"
+          data-testid="simulated-banner"
+          className="-my-2 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+        >
+          <Badge tone="warn">{t('simulatedData')}</Badge>
+          {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">{t('demoDetector')}</Badge>}
+          <span>
+            {capture.detection?.vision_meta?.fallback
+              ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
+              : t('banner.simulated')}
+          </span>
+        </div>
+      )}
+
+      <GlowCards
+        capture={capture}
+        telemetry={telemetry}
+        delta={delta}
+        decision={decision}
+        live={live}
+        onToggleLive={onToggleLive}
+        onViewTrap={() => scrollTo(trapRef)}
+      />
+
+      <StatusBar device={device} capture={capture} health={health} vState={vState} />
+
+      {layout.order
+        .filter((id) => !layout.hidden.includes(id) && sections[id])
+        .map((id) => (
+          <Reveal key={id} y={16}>
+            {sections[id]}
+          </Reveal>
+        ))}
     </div>
   );
 }
@@ -307,114 +355,36 @@ function QualityBadge({ quality }) {
   );
 }
 
-/** Deep-forest hero: the headline built from the capture's real data + the trap's status bar. */
-function Hero({ device, capture, latest, stale, risk, countsKnown, total, decision, health, vState, onViewTrap, onGoAdmin }) {
-  const t = useT();
-  const headline = !capture
-    ? t('hero.waiting')
-    : decision?.decision === 'CHECK_TRAP'
-      ? t('hero.check')
-      : HEADLINES[risk]
-        ? t(`hero.${risk}`)
-        : t('hero.awaiting');
-  const dStyle = decisionStyle(decision?.decision);
-
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE }}
-      className="hero-field relative overflow-hidden rounded-[1.75rem] text-white"
-      aria-labelledby="hero-title"
-    >
-      <div className="relative grid gap-8 p-6 sm:p-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
-        <Stagger className="flex max-w-2xl flex-col gap-4" stagger={0.07} delay={0.05}>
-          <Item className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 font-medium text-white ring-1 ring-white/20 backdrop-blur">
-              <span className={`live-dot ${stale ? 'text-amber-300' : 'text-emerald-300'}`} aria-hidden="true" />
-              {device?.name ?? 'No trap selected'}
-            </span>
-            {latest && <span className="text-white/70">{t('hero.lastCapture', { ago: timeAgo(latest.timestamp) })}</span>}
-          </Item>
-          <Item as="h1" id="hero-title" className="text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-            {headline}
-          </Item>
-          <Item as="p" className="max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
-            {!capture
-              ? t('hero.noCapture')
-              : countsKnown
-                ? t.lang === 'en'
-                  ? `${total} insect${total === 1 ? '' : 's'} counted on the ${capture.id === latest?.id ? 'latest' : 'selected'} sticky-trap image. Review the detections and the advisory below.`
-                  : t('hero.counted', { n: total, which: t(capture.id === latest?.id ? 'hero.latest' : 'hero.selected') })
-                : t('hero.notCounted')}
-          </Item>
-          <Item className="mt-1 flex flex-wrap gap-3">
-            <button onClick={onViewTrap} className="btn btn-light" disabled={!capture}>
-              <ScanSearch className="h-4 w-4" aria-hidden="true" /> {t('hero.viewDetections')}
-            </button>
-            <button onClick={onGoAdmin} className="btn text-white ring-1 ring-white/30 hover:bg-white/10">
-              <Cpu className="h-4 w-4" aria-hidden="true" /> {t('hero.hardware')} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </Item>
-        </Stagger>
-
-        {/* Today's advice, front and centre */}
-        {dStyle && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: EASE, delay: 0.2 }}
-            className="rounded-2xl bg-white p-5 text-ink shadow-xl shadow-black/20"
-          >
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{t('decision')}</div>
-            <DecisionBadge decision={decision.decision} borderline={decision.borderline} size="lg" />
-            <p className="mt-3 text-sm leading-relaxed text-slate-700">{decisionReason(t.lang, decision)}</p>
-          </motion.div>
-        )}
-      </div>
-
-      <StatusBar device={device} capture={capture} health={health} vState={vState} />
-    </motion.section>
-  );
-}
-
 /** Battery, vision camera, trap type, last capture - the trap box at a glance. */
 function StatusBar({ device, capture, health, vState }) {
   const t = useT();
   const level = device?.battery_level;
   const BatteryIcon = level == null ? BatteryMedium : level < LOW_BATTERY ? BatteryLow : level < 60 ? BatteryMedium : BatteryFull;
-  const batteryTone = level == null ? 'text-white' : level < LOW_BATTERY ? 'text-rose-300' : level < 40 ? 'text-amber-300' : 'text-emerald-300';
+  const batteryTone = level == null ? 'text-slate-500' : level < LOW_BATTERY ? 'text-rose-700' : level < 40 ? 'text-amber-800' : 'text-emerald-700';
   const provider = health?.integrations?.yolo ? health.services?.vision?.provider ?? 'Model' : 'Demo detector';
   const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
 
   const items = [
-    {
-      icon: BatteryIcon,
-      tone: batteryTone,
-      label: t('status.battery'),
-      value: level == null ? '—' : `${level}%`,
-      sub: device?.battery_source === 'manual' ? 'manually set' : device?.status ?? '',
-    },
-    { icon: Camera, tone: 'text-emerald-300', label: t('status.vision'), value: providerName, sub: vState?.label ?? '' },
-    { icon: StickyNote, tone: 'text-amber-200', label: t('status.trap'), value: t('status.trapType'), sub: device?.name ?? '' },
-    {
-      icon: Clock,
-      tone: 'text-sky-200',
-      label: t('status.capture'),
-      value: capture ? timeAgo(capture.timestamp) : t('status.never'),
-      sub: capture ? new Date(capture.timestamp).toLocaleTimeString() : '',
-    },
+    { icon: BatteryIcon, tone: batteryTone, label: t('status.battery'), value: level == null ? '—' : `${level}%`, sub: device?.battery_source === 'manual' ? 'manually set' : device?.status ?? '' },
+    { icon: Camera, tone: 'text-emerald-700', label: t('status.vision'), value: providerName, sub: vState?.label ?? '' },
+    { icon: StickyNote, tone: 'text-amber-800', label: t('status.trap'), value: t('status.trapType'), sub: device?.name ?? '' },
+    { icon: Clock, tone: 'text-slate-600', label: t('status.capture'), value: capture ? timeAgo(capture.timestamp) : t('status.never'), sub: capture ? new Date(capture.timestamp).toLocaleTimeString() : '' },
   ];
 
   return (
-    <ul className="relative grid grid-cols-2 border-t border-white/10 bg-black/20 backdrop-blur-sm lg:grid-cols-4" aria-label="Trap status">
+    <ul className="card grid grid-cols-2 gap-0 p-0! lg:grid-cols-4" aria-label="Trap status">
       {items.map(({ icon: Icon, tone, label, value, sub }, i) => (
-        <li key={label} className={`flex items-center gap-3 px-5 py-4 sm:px-8 ${i % 2 ? 'border-l border-white/10' : ''} ${i >= 2 ? 'border-t border-white/10 lg:border-t-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}>
-          <Icon className={`h-5 w-5 shrink-0 ${tone}`} aria-hidden="true" />
+        <li
+          key={label}
+          className={`flex items-center gap-3 px-5 py-4 ${i % 2 ? 'border-l border-line' : ''} ${i >= 2 ? 'border-t border-line lg:border-t-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}
+        >
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 ${tone}`}>
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </span>
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-white/60">{label}</div>
-            <div className="truncate text-sm font-semibold text-white">{value}</div>
-            {sub && <div className="truncate text-[11px] text-white/60">{sub}</div>}
+            <div className="text-[11px] uppercase tracking-wider text-slate-500">{label}</div>
+            <div className="truncate text-sm font-semibold text-ink">{value}</div>
+            {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
           </div>
         </li>
       ))}
