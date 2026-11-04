@@ -30,8 +30,8 @@ const systemDark = () => (typeof window !== 'undefined' && window.matchMedia ? w
 /** Applies the chosen theme to <html data-theme> and follows the OS in "auto". */
 export function useTheme() {
   const [theme, setThemeState] = useState(() => {
-    const t = read(THEME_KEY, 'dark');
-    return THEMES.includes(t) ? t : 'dark';
+    const t = read(THEME_KEY, 'light');
+    return THEMES.includes(t) ? t : 'light';
   });
   const [resolved, setResolved] = useState(() => (theme === 'auto' ? (systemDark() ? 'dark' : 'light') : theme));
 

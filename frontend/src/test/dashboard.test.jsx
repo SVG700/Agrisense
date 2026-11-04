@@ -788,14 +788,62 @@ describe('Customize, quick actions, timeline, day strip', () => {
     const { useTheme } = await import('../lib/theme.js');
     function Probe() {
       const { theme, setTheme } = useTheme();
-      return <button onClick={() => setTheme('light')}>{theme}</button>;
+      return <button onClick={() => setTheme('dark')}>{theme}</button>;
     }
     localStorage.removeItem('agrisense.theme');
     render(<Probe />);
-    expect(document.documentElement.dataset.theme).toBe('dark'); // default
-    fireEvent.click(screen.getByRole('button', { name: 'dark' }));
-    expect(document.documentElement.dataset.theme).toBe('light');
-    expect(localStorage.getItem('agrisense.theme')).toBe('"light"');
+    expect(document.documentElement.dataset.theme).toBe('light'); // default
+    fireEvent.click(screen.getByRole('button', { name: 'light' }));
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(localStorage.getItem('agrisense.theme')).toBe('"dark"');
     localStorage.removeItem('agrisense.theme');
+  });
+});
+
+describe('Live Vision (Raspberry Pi OpenCV)', () => {
+  test('without a Pi stream it shows a labelled preview of the last capture', async () => {
+    const LiveVision = (await import('../components/LiveVision.jsx')).default;
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ frame: null, streaming: false, age_ms: null })));
+    render(<LiveVision open onClose={() => {}} device={DEVICE} capture={capture({ image_url: 'http://x/trap.svg' })} />);
+    expect(await screen.findByText(/Pi not streaming/)).toBeTruthy();
+    expect(screen.getByText(/not a live frame/)).toBeTruthy();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['1Raw', '2Grayscale', '3Threshold', '4Detections']);
+    fireEvent.click(screen.getByRole('tab', { name: /Threshold/ }));
+    expect(screen.getByRole('tab', { name: /Threshold/ }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  test('a streaming Pi frame shows its own stages, fps and pipeline', async () => {
+    const LiveVision = (await import('../components/LiveVision.jsx')).default;
+    const frame = {
+      image: 'data:image/jpeg;base64,AAAA',
+      stages: [{ name: 'Yellow mask', image: 'data:image/jpeg;base64,BBBB' }],
+      boxes: [{ x: 0.1, y: 0.1, width: 0.05, height: 0.05, label: 'whitefly', confidence: 0.9 }],
+      fps: 14,
+      width: 1280,
+      height: 960,
+      pipeline: ['HSV mask', 'contours'],
+    };
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ frame, streaming: true, age_ms: 400 })));
+    render(<LiveVision open onClose={() => {}} device={DEVICE} capture={capture()} />);
+    expect(await screen.findByText(/Streaming · 14 fps/)).toBeTruthy();
+    expect(screen.getByRole('tab', { name: /Yellow mask/ })).toBeTruthy();
+    expect(screen.getByText('1280×960')).toBeTruthy();
+    expect(screen.getByText('HSV mask')).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: /Yellow mask/ }));
+    expect(screen.getByRole('img', { name: /Yellow mask/ }).getAttribute('src')).toBe('data:image/jpeg;base64,BBBB');
+  });
+
+  test('the trap rail selects a trap and Add creates one', async () => {
+    const { TrapStage } = await import('../components/FieldHero.jsx');
+    const onSelect = vi.fn();
+    const onAdd = vi.fn(() => Promise.resolve());
+    const other = { ...DEVICE, id: '22222222-2222-4222-8222-222222222222', name: 'Trap 02' };
+    render(<TrapStage device={DEVICE} devices={[DEVICE, other]} capture={capture()} index={0} count={1} onStep={() => {}} onSelectDevice={onSelect} onAddTrap={onAdd} onOpenVision={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Trap 02' }));
+    expect(onSelect).toHaveBeenCalledWith(other.id);
+    fireEvent.click(screen.getByRole('button', { name: /Add/ }));
+    fireEvent.change(screen.getByLabelText('New trap name'), { target: { value: 'Polyhouse 4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add trap' }));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledWith('Polyhouse 4'));
   });
 });

@@ -81,6 +81,8 @@ export const api = {
   setControls: (deviceId, patch) => request(`/api/devices/${encodeURIComponent(deviceId)}/controls`, { method: 'PATCH', body: patch, admin: true }),
   sendCommand: (deviceId, command) =>
     request(`/api/devices/${encodeURIComponent(deviceId)}/commands`, { method: 'POST', body: { command }, admin: true }),
+  visionFrame: (deviceId) => request(`/api/devices/${encodeURIComponent(deviceId)}/vision/frame`),
+  createDevice: (name) => request('/api/devices', { method: 'POST', body: { name }, admin: true }),
   setBattery: (device_id, battery_level) =>
     request('/api/device/battery', { method: 'PATCH', body: { device_id, battery_level }, admin: true }),
   // Dashboard captures are always labelled as simulated readings

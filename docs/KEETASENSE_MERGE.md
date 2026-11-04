@@ -122,6 +122,22 @@ command, then `POST /api/devices/<id>/commands/ack` with `{command_id, ok, messa
 Until it does, the dashboard says "waiting for the Pi". State is kept in memory and resets when
 the backend restarts.
 
+**Live Vision (backend + dashboard ready, Pi side not built).** Pressing the trap photo (or
+"Live Vision") on the dashboard opens the Pi's OpenCV view. While streaming (after a
+`start_stream` command, until `stop_stream`), the Pi should send about 1-2 frames a second:
+
+```
+POST /api/devices/<id>/vision/frame        (X-Device-Key)
+{ "image_base64": "<jpeg>",                 # max 2 MB; ~960 px wide is plenty
+  "stages": [{ "name": "Yellow mask", "image_base64": "<jpeg>" }],   # up to 4 OpenCV steps
+  "boxes": [{ "x": 0.1, "y": 0.2, "width": 0.03, "height": 0.03, "label": "whitefly", "confidence": 0.9 }],
+  "fps": 12.5, "width": 1280, "height": 960,
+  "pipeline": ["Picamera2 capture", "HSV yellow-card mask", "contours"] }
+```
+
+Boxes are relative (0-1), like the vision model's. A frame older than 10 s counts as "not
+streaming", and the dashboard then shows a clearly labelled preview of the last capture instead.
+
 The edge client already has Picamera2 capture, a BME280 / DHT22 sensor, a durable offline queue and
 idempotent uploads with backoff. To use it as a field trap with these features:
 

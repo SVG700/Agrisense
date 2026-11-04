@@ -220,3 +220,30 @@ export function Sparkline({ values, color = '#34d399', height = 32, className = 
     </svg>
   );
 }
+
+/**
+ * Liquid + magnetic button behaviour: the ::before fill (CSS .liquid) pours in
+ * from the pointer, and the button leans toward the cursor on a spring.
+ * Spread the returned props on a motion element. Off for reduced motion.
+ */
+export function useLiquid(strength = 0.18) {
+  const reduce = useReducedMotion();
+  const x = useSpring(0, { stiffness: 300, damping: 20, mass: 0.5 });
+  const y = useSpring(0, { stiffness: 300, damping: 20, mass: 0.5 });
+  if (reduce) return { className: 'liquid' };
+  return {
+    className: 'liquid',
+    style: { x, y },
+    onPointerMove: (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      e.currentTarget.style.setProperty('--px', `${e.clientX - r.left}px`);
+      e.currentTarget.style.setProperty('--py', `${e.clientY - r.top}px`);
+      x.set((e.clientX - r.left - r.width / 2) * strength);
+      y.set((e.clientY - r.top - r.height / 2) * strength);
+    },
+    onPointerLeave: () => {
+      x.set(0);
+      y.set(0);
+    },
+  };
+}

@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  BatteryFull,
-  BatteryLow,
-  BatteryMedium,
   BatteryWarning,
   Bug,
-  Camera,
   Clock,
   Droplets,
   History,
   ShieldAlert,
-  StickyNote,
   Thermometer,
   TrendingDown,
   TrendingUp,
@@ -23,9 +18,11 @@ import Badge from './Badge.jsx';
 import TrapCards from './TrapCards.jsx';
 import ManualSprayCard from './ManualSprayCard.jsx';
 import Field3D from './Field3D.jsx';
-import DayHeader from './DayHeader.jsx';
-import GlowCards from './GlowCards.jsx';
 import DailyTimeline from './DailyTimeline.jsx';
+import LiveVision from './LiveVision.jsx';
+import { HeroCards, TrapStage, VISION_LAYOUT_ID } from './FieldHero.jsx';
+import { LayoutGroup } from 'framer-motion';
+import { buildEvents } from '../lib/events.js';
 import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -72,13 +69,15 @@ export default function FarmerDashboard({
   live = true,
   onToggleLive,
   onCustomize,
+  onAddTrap,
 }) {
   const t = useT();
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
   const trapRef = useRef(null);
-  const adviceRef = useRef(null);
+  const sectionRefs = useRef({});
+  const [vision, setVision] = useState(null); // {x, y} press point while Live Vision is open
 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
@@ -143,7 +142,9 @@ export default function FarmerDashboard({
       : HEADLINES[risk]
         ? t(`hero.${risk}`)
         : t('hero.awaiting');
-  const scrollTo = (ref) => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const events = buildEvents(telemetry, actions);
+  const seeSection = (id) => sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const selectCapture = (id) => setSelectedId(id === latest?.id ? null : id);
 
   const sections = {
     glance: (
@@ -213,7 +214,7 @@ export default function FarmerDashboard({
         </Stagger>
       </section>
     ),
-    timeline: <DailyTimeline telemetry={telemetry} actions={actions} capture={capture} onSelectCapture={(id) => setSelectedId(id === latest?.id ? null : id)} />,
+    timeline: <DailyTimeline telemetry={telemetry} actions={actions} capture={capture} onSelectCapture={selectCapture} />,
     detections: (
       <section aria-labelledby="detections-title" className="flex flex-col gap-4">
         <SectionHead id="detections-title" label={t('section.detections')} />
@@ -225,9 +226,7 @@ export default function FarmerDashboard({
             <PestBreakdown counts={counts} total={total} known={countsKnown} reason={vState?.help} live={!isHistoric} />
           </div>
           <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
-            <div ref={adviceRef} className="scroll-mt-24">
-              <AdvisoryCard advisory={det?.ai_advisory} />
-            </div>
+            <AdvisoryCard advisory={det?.ai_advisory} />
             <ManualSprayCard device={device} decision={latestDecision} onChanged={loadActions} />
             <WeatherCard deviceId={device?.id} decision={latestDecision} />
           </div>
@@ -274,18 +273,6 @@ export default function FarmerDashboard({
         )}
       </AnimatePresence>
 
-      <DayHeader
-        headline={headline}
-        decision={decision}
-        device={device}
-        capture={capture}
-        index={index}
-        count={telemetry.length}
-        onStep={stepCapture}
-        onCustomize={onCustomize}
-        onAsk={() => scrollTo(adviceRef)}
-      />
-
       {isSimulated(capture) && (
         <div
           role="note"
@@ -302,23 +289,33 @@ export default function FarmerDashboard({
         </div>
       )}
 
-      <GlowCards
-        capture={capture}
-        telemetry={telemetry}
-        delta={delta}
-        decision={decision}
-        live={live}
-        onToggleLive={onToggleLive}
-        onViewTrap={() => scrollTo(trapRef)}
-      />
-
-      <StatusBar device={device} capture={capture} health={health} vState={vState} />
+      <LayoutGroup id="vision">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)] lg:items-start [&>*]:min-w-0">
+          <TrapStage
+            device={device}
+            devices={devices}
+            capture={capture}
+            decision={decision}
+            index={index}
+            count={telemetry.length}
+            onStep={stepCapture}
+            onSelectDevice={onSelectDevice}
+            onAddTrap={onAddTrap}
+            onOpenVision={setVision}
+            visionOpen={Boolean(vision)}
+          />
+          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} />
+        </div>
+        <LiveVision open={Boolean(vision)} origin={vision} onClose={() => setVision(null)} device={device} capture={capture} layoutId={VISION_LAYOUT_ID} />
+      </LayoutGroup>
 
       {layout.order
         .filter((id) => !layout.hidden.includes(id) && sections[id])
         .map((id) => (
           <Reveal key={id} y={16}>
-            {sections[id]}
+            <div ref={(el) => (sectionRefs.current[id] = el)} className="scroll-mt-28">
+              {sections[id]}
+            </div>
           </Reveal>
         ))}
     </div>
@@ -352,43 +349,6 @@ function QualityBadge({ quality }) {
     <Badge tone="bad" title={`${quality.advice?.join(' ') ?? ''} ${detail}`} data-testid="quality-badge">
       Photo: {quality.issues.map((i) => ISSUE_LABELS[i] ?? i).join(', ')} - retake
     </Badge>
-  );
-}
-
-/** Battery, vision camera, trap type, last capture - the trap box at a glance. */
-function StatusBar({ device, capture, health, vState }) {
-  const t = useT();
-  const level = device?.battery_level;
-  const BatteryIcon = level == null ? BatteryMedium : level < LOW_BATTERY ? BatteryLow : level < 60 ? BatteryMedium : BatteryFull;
-  const batteryTone = level == null ? 'text-slate-500' : level < LOW_BATTERY ? 'text-rose-700' : level < 40 ? 'text-amber-800' : 'text-emerald-700';
-  const provider = health?.integrations?.yolo ? health.services?.vision?.provider ?? 'Model' : 'Demo detector';
-  const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
-
-  const items = [
-    { icon: BatteryIcon, tone: batteryTone, label: t('status.battery'), value: level == null ? '—' : `${level}%`, sub: device?.battery_source === 'manual' ? 'manually set' : device?.status ?? '' },
-    { icon: Camera, tone: 'text-emerald-700', label: t('status.vision'), value: providerName, sub: vState?.label ?? '' },
-    { icon: StickyNote, tone: 'text-amber-800', label: t('status.trap'), value: t('status.trapType'), sub: device?.name ?? '' },
-    { icon: Clock, tone: 'text-slate-600', label: t('status.capture'), value: capture ? timeAgo(capture.timestamp) : t('status.never'), sub: capture ? new Date(capture.timestamp).toLocaleTimeString() : '' },
-  ];
-
-  return (
-    <ul className="card grid grid-cols-2 gap-0 p-0! lg:grid-cols-4" aria-label="Trap status">
-      {items.map(({ icon: Icon, tone, label, value, sub }, i) => (
-        <li
-          key={label}
-          className={`flex items-center gap-3 px-5 py-4 ${i % 2 ? 'border-l border-line' : ''} ${i >= 2 ? 'border-t border-line lg:border-t-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}
-        >
-          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 ${tone}`}>
-            <Icon className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-slate-500">{label}</div>
-            <div className="truncate text-sm font-semibold text-ink">{value}</div>
-            {sub && <div className="truncate text-[11px] text-slate-500">{sub}</div>}
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 }
 

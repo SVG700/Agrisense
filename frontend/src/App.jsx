@@ -1,9 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import { Bell, Bug, Camera, ChevronDown, Command, Cpu, LayoutDashboard, Map as MapIcon, Moon, RefreshCw, Sprout, Sun, WifiOff } from 'lucide-react';
+import { Bell, Bug, Camera, ChevronDown, Cpu, LayoutDashboard, Map as MapIcon, Moon, RefreshCw, Search, Sprout, Sun, WifiOff } from 'lucide-react';
 import { api } from './api.js';
 import { LOW_BATTERY } from './lib/pests.js';
-import { pageTransition } from './lib/motion.jsx';
+import { pageTransition, useLiquid } from './lib/motion.jsx';
 import { LanguageContext, LanguageToggle } from './lib/i18n.jsx';
 import { haptic, useLayout, useTheme } from './lib/theme.js';
 import { BackToTop, InteractionEffects, ScrollProgress } from './components/InteractionEffects.jsx';
@@ -14,6 +14,7 @@ import { DashboardSkeleton } from './components/Skeletons.jsx';
 import { StatusChips } from './components/SystemStatus.jsx';
 import CustomizeSheet from './components/CustomizeSheet.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
+import Backdrop from './components/Backdrop.jsx';
 
 // The map page (and everything kepler.gl pulls in) is a separate chunk, loaded on first visit
 const PestMapPage = lazy(() => import('./map/PestMapPage.jsx'));
@@ -196,38 +197,48 @@ export default function App() {
         {/* Background refresh indicator */}
         <div className="fixed inset-x-0 top-0 z-50 h-0.5">{manualRefresh && <div className="progress-indeterminate" />}</div>
 
-        {/* ---------- Top bar (glass; lifts once content scrolls under it) ---------- */}
+        <Backdrop />
+        <div className="lg:px-6 lg:pt-6">
+        <div className="app-window mx-auto max-w-[1440px] overflow-clip lg:rounded-[44px]">
+        {/* ---------- Top bar (reference: logo · links · search · dark pill · bell · avatar) ---------- */}
         <header
-          className={`glass sticky top-0 z-40 border-b transition-[box-shadow,border-color] duration-500 ${
-            scrolled ? 'border-line shadow-[var(--elev-2)]' : 'border-transparent'
-          }`}
+          className={`sticky top-0 z-40 transition-[background-color,box-shadow] duration-500 ${scrolled ? 'glass shadow-[var(--elev-2)]' : ''}`}
         >
-          <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-8">
+          <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-3 px-4 sm:px-6 lg:h-[84px] lg:px-10">
             <Brand />
 
             <LayoutGroup id="top-nav">
-              <nav className="ml-6 hidden items-center gap-1 lg:flex" aria-label="Main">
+              <nav className="ml-4 hidden items-center gap-0.5 lg:flex xl:ml-8" aria-label="Main">
                 {TABS.map((t) => (
                   <NavLink key={t.id} item={t} active={tab === t.id} onClick={() => goTab(t.id)} />
                 ))}
               </nav>
             </LayoutGroup>
 
-            <div className="ml-auto flex min-w-0 items-center gap-1.5 text-xs sm:gap-2">
-              {translated && <LanguageToggle />}
+            <div className="ml-auto flex min-w-0 items-center gap-2 text-xs">
+              <SearchPill onOpen={() => setPalette(true)} />
               <span
                 role="status"
-                className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 font-medium ring-1 ${
-                  error ? 'bg-rose-50 text-rose-700 ring-rose-200' : !live ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-brand-soft text-brand ring-emerald-200'
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1.5 font-medium ${
+                  error ? 'bg-rose-50 text-rose-700' : !live ? 'bg-amber-50 text-amber-800' : 'text-slate-600'
                 }`}
+                title={lastSync ? `Last update ${lastSync.toLocaleTimeString()}` : undefined}
               >
                 {error ? <WifiOff className="h-3.5 w-3.5" aria-hidden="true" /> : <span className={live ? 'live-dot text-emerald-500' : 'h-2 w-2 rounded-full bg-amber-500'} aria-hidden="true" />}
-                {error ? 'Offline' : !live ? 'Paused' : lastSync ? <span>Live<span className="hidden md:inline"> · {lastSync.toLocaleTimeString()}</span></span> : 'Connecting…'}
+                <span className={error || !live ? '' : 'hidden xl:inline'}>{error ? 'Offline' : !live ? 'Paused' : lastSync ? 'Live' : 'Connecting…'}</span>
               </span>
-              <IconButton label="Quick actions (Ctrl+K)" onClick={() => setPalette(true)} className="hidden! sm:grid!">
-                <Command className="h-4 w-4" aria-hidden="true" />
+              {translated && <LanguageToggle />}
+              <LiquidPill onClick={() => (goTab('farmer'), setCustomizing(true))} className="hidden sm:inline-flex">
+                Customize
+              </LiquidPill>
+              <IconButton
+                label={lowBattery.length ? `${lowBattery.length} trap${lowBattery.length > 1 ? 's' : ''} low on battery` : 'No alerts'}
+                onClick={() => goTab('admin')}
+                badge={lowBattery.length || null}
+              >
+                <Bell className="h-4 w-4" aria-hidden="true" />
               </IconButton>
-              <IconButton label={`Switch to ${nextTheme} theme`} onClick={() => (haptic(), setTheme(nextTheme))}>
+              <IconButton label={`Switch to ${nextTheme} theme`} onClick={() => (haptic(), setTheme(nextTheme))} className="bg-gradient-to-br! from-[#f6d867] to-[#c9a227] text-[#2b231c]! ring-[#fff]/70!">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.span
                     key={resolved}
@@ -240,25 +251,17 @@ export default function App() {
                   </motion.span>
                 </AnimatePresence>
               </IconButton>
-              <IconButton
-                label={lowBattery.length ? `${lowBattery.length} trap${lowBattery.length > 1 ? 's' : ''} low on battery` : 'No alerts'}
-                onClick={() => goTab('admin')}
-                badge={lowBattery.length || null}
-              >
-                <Bell className="h-4 w-4" aria-hidden="true" />
-              </IconButton>
-              <IconButton label="Refresh now" onClick={onManualRefresh} className="hidden! sm:grid!">
+              <IconButton label="Refresh now" onClick={onManualRefresh} className="hidden! 2xl:grid!">
                 <RefreshCw className={`h-4 w-4 ${manualRefresh ? 'animate-spin' : ''}`} aria-hidden="true" />
               </IconButton>
-              {devices.length > 0 && tab !== 'map' && <TrapPicker devices={devices} deviceId={deviceId} onSelect={selectDevice} className="hidden lg:flex" />}
             </div>
           </div>
         </header>
 
-        <main id="main" className="mx-auto max-w-[1320px] px-4 pb-32 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
-          {/* Trap picker for phones / tablets (the header holds it on desktop) */}
-          {devices.length > 0 && tab !== 'map' && (
-            <div className="mb-5 flex flex-wrap items-center gap-3 lg:hidden">
+        <main id="main" className="mx-auto max-w-[1320px] px-4 pb-32 pt-4 sm:px-6 lg:px-10 lg:pb-16 lg:pt-2">
+          {/* Trap picker on pages without the trap rail */}
+          {devices.length > 0 && (tab === 'check' || tab === 'admin') && (
+            <div className="mb-5 flex flex-wrap items-center gap-3">
               <TrapPicker devices={devices} deviceId={deviceId} onSelect={selectDevice} />
             </div>
           )}
@@ -299,6 +302,11 @@ export default function App() {
                     live={live}
                     onToggleLive={() => setLive((l) => !l)}
                     onCustomize={() => setCustomizing(true)}
+                    onAddTrap={async (name) => {
+                      const created = await api.createDevice(name);
+                      await refresh();
+                      if (created?.id) selectDevice(created.id);
+                    }}
                   />
                 ) : tab === 'check' ? (
                   <PhoneCheckPage />
@@ -330,6 +338,8 @@ export default function App() {
             {health && <StatusChips health={health} />}
           </div>
         </footer>
+        </div>
+        </div>
 
         {/* ---------- Phone tab bar (thumb reach, safe-area aware) ---------- */}
         <LayoutGroup id="tab-bar">
@@ -360,6 +370,7 @@ export default function App() {
           setTheme={setTheme}
         />
         <CommandPalette open={palette} onClose={() => setPalette(false)} commands={commands} />
+
       </MotionConfig>
     </LanguageContext.Provider>
   );
@@ -369,15 +380,45 @@ export default function App() {
 
 function Brand() {
   return (
-    <div className="flex shrink-0 items-center gap-2.5">
-      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#f5b544] to-[#d97706] text-[#1a1206] shadow-[0_6px_18px_-6px_rgb(245_181_68/0.6)]">
-        <Sprout className="h-5 w-5" aria-hidden="true" />
-      </div>
-      <div className="leading-tight">
-        <div className="text-[15px] font-semibold tracking-tight text-ink">AgriSense</div>
-        <p className="hidden text-[11px] text-slate-500 sm:block lg:hidden 2xl:block">Predictive insect monitoring</p>
-      </div>
+    <div className="flex shrink-0 items-center gap-2">
+      <svg width="28" height="22" viewBox="0 0 28 22" aria-hidden="true">
+        <path d="M3 4 H17 L22 9 H8 Z" fill="#f2c230" />
+        <path d="M6 13 H20 L25 18 H11 Z" fill="#e0a915" />
+      </svg>
+      <span className="text-[22px] font-semibold tracking-tight text-ink">agrisense</span>
     </div>
+  );
+}
+
+/** Reference search field: opens Quick actions (pages, traps, actions). */
+function SearchPill({ onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="hidden h-10 w-[min(20vw,280px)] items-center gap-2 rounded-full bg-surface/90 px-4 text-sm text-slate-500 shadow-[var(--elev-1)] ring-1 ring-line transition-[box-shadow] hover:shadow-[var(--elev-2)] md:flex"
+      aria-label="Search (Ctrl+K)"
+    >
+      <Search className="h-4 w-4" aria-hidden="true" />
+      <span className="flex-1 text-left">Search</span>
+      <kbd className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">Ctrl K</kbd>
+    </button>
+  );
+}
+
+/** Reference dark pill ("Upgrade"), with a liquid fill from the pointer. */
+function LiquidPill({ onClick, className = '', children }) {
+  const liquid = useLiquid(0.15);
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileTap={{ scale: 0.95 }}
+      {...liquid}
+      className={`${liquid.className} h-10 shrink-0 items-center whitespace-nowrap rounded-full bg-cocoa px-5 text-sm font-medium text-[#fff] shadow-[var(--elev-2)] [--liquid:#5a4636] [:root[data-theme=dark]_&]:text-[#2b231c] [:root[data-theme=dark]_&]:[--liquid:#ffffff] ${className}`}
+    >
+      {children}
+    </motion.button>
   );
 }
 
@@ -387,11 +428,11 @@ function NavLink({ item, active, onClick }) {
     <button
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`relative whitespace-nowrap px-3 py-2.5 text-sm transition-colors duration-300 ${active ? 'font-medium text-ink' : 'text-slate-500 hover:text-ink'}`}
+      className={`relative whitespace-nowrap px-3 py-2.5 text-[15px] transition-colors duration-300 ${active ? 'font-medium text-ink' : 'text-slate-500 hover:text-ink'}`}
     >
       <span className="xl:hidden">{item.short}</span>
       <span className="hidden xl:inline">{item.label}</span>
-      {active && <motion.span layoutId="nav-underline" className="absolute inset-x-3.5 -bottom-0.5 h-0.5 rounded-full bg-ink" />}
+      {active && <motion.span layoutId="nav-underline" className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-ink" transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 0.6 }} />}
     </button>
   );
 }
