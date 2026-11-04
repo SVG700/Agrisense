@@ -45,7 +45,7 @@ export default function CommandPalette({ open, onClose, commands }) {
             role="dialog"
             aria-modal="true"
             aria-label="Quick actions"
-            className="glass w-full max-w-xl overflow-hidden rounded-3xl shadow-[var(--elev-4)] ring-1 ring-line"
+            className="glass silver relative w-full max-w-xl overflow-hidden rounded-3xl shadow-[var(--elev-4)] ring-1 ring-line"
             initial={{ opacity: 0, scale: 0.96, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: -4 }}

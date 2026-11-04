@@ -325,7 +325,7 @@ function Card({ className = '', children, ...rest }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={SPRING}
       whileHover={{ y: -3 }}
-      className={`rounded-[26px] bg-surface/95 p-5 shadow-[var(--elev-2)] ring-1 ring-line transition-shadow duration-500 hover:shadow-[var(--elev-3)] ${className}`}
+      className={`silver relative rounded-[26px] bg-surface/95 p-5 shadow-[var(--elev-2)] ring-1 ring-line transition-shadow duration-500 hover:shadow-[var(--elev-3)] ${className}`}
       {...rest}
     >
       {children}

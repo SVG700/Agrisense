@@ -5,9 +5,10 @@
 export default function Backdrop() {
   return (
     <div className="backdrop" aria-hidden="true">
+      <span className="moon" />
       <span className="mist" style={{ width: '60vw', height: '30vh', left: '-10vw', top: '18vh' }} />
       <span className="mist" style={{ width: '50vw', height: '26vh', right: '-12vw', top: '34vh', animationDelay: '-12s' }} />
-      <svg viewBox="0 0 1440 700" preserveAspectRatio="xMidYMax slice">
+      <svg className="scenery" viewBox="0 0 1440 700" preserveAspectRatio="xMidYMax slice">
         <defs>
           <linearGradient id="bd-far" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#b9bfbd" />
@@ -44,6 +45,22 @@ export default function Backdrop() {
             return <line key={i} x1={x} y1={y} x2={x + ((i % 5) - 2) * 3} y2={y - 10 - (i % 4) * 4} />;
           })}
         </g>
+      </svg>
+      {/* silver rim light along the far ridge (dark theme only) */}
+      <svg className="silver-line absolute inset-x-0 bottom-0 h-[78%] w-full" viewBox="0 0 1440 700" preserveAspectRatio="xMidYMax slice">
+        <defs>
+          <linearGradient id="bd-silver" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#dfe5ef" stopOpacity="0" />
+            <stop offset="0.35" stopColor="#eef2f8" stopOpacity="0.55" />
+            <stop offset="0.6" stopColor="#c7ced9" stopOpacity="0.3" />
+            <stop offset="1" stopColor="#dfe5ef" stopOpacity="0" />
+          </linearGradient>
+          <filter id="bd-glow">
+            <feGaussianBlur stdDeviation="2.5" />
+          </filter>
+        </defs>
+        <path d="M0 330 L160 230 L300 290 L460 170 L620 280 L760 210 L920 300 L1080 190 L1260 270 L1440 220" fill="none" stroke="url(#bd-silver)" strokeWidth="3" filter="url(#bd-glow)" />
+        <path d="M0 330 L160 230 L300 290 L460 170 L620 280 L760 210 L920 300 L1080 190 L1260 270 L1440 220" fill="none" stroke="url(#bd-silver)" strokeWidth="0.8" />
       </svg>
     </div>
   );

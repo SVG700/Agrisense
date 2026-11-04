@@ -3,7 +3,7 @@
  * Both live in localStorage and are wrapped in try/catch: in private mode the
  * choice simply isn't remembered.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const THEME_KEY = 'agrisense.theme';
 const LAYOUT_KEY = 'agrisense.layout';
@@ -25,6 +25,7 @@ const write = (key, value) => {
   }
 };
 
+let fadeTimer = null;
 const systemDark = () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true);
 
 /** Applies the chosen theme to <html data-theme> and follows the OS in "auto". */
@@ -35,11 +36,20 @@ export function useTheme() {
   });
   const [resolved, setResolved] = useState(() => (theme === 'auto' ? (systemDark() ? 'dark' : 'light') : theme));
 
+  const first = useRef(true);
   useEffect(() => {
     const apply = () => {
       const r = theme === 'auto' ? (systemDark() ? 'dark' : 'light') : theme;
       setResolved(r);
-      document.documentElement.dataset.theme = r;
+      const html = document.documentElement;
+      // Fade colours on a real switch (not on first paint); the class lives ~0.5 s only
+      if (!first.current && html.dataset.theme !== r && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        html.classList.add('theme-fade');
+        clearTimeout(fadeTimer);
+        fadeTimer = setTimeout(() => html.classList.remove('theme-fade'), 520);
+      }
+      first.current = false;
+      html.dataset.theme = r;
     };
     apply();
     if (theme !== 'auto' || !window.matchMedia) return undefined;

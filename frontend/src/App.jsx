@@ -199,10 +199,10 @@ export default function App() {
 
         <Backdrop />
         <div className="lg:px-6 lg:pt-6">
-        <div className="app-window mx-auto max-w-[1440px] overflow-clip lg:rounded-[44px]">
+        <div className="app-window silver silver-live mx-auto max-w-[1440px] overflow-clip lg:rounded-[44px]">
         {/* ---------- Top bar (reference: logo · links · search · dark pill · bell · avatar) ---------- */}
         <header
-          className={`sticky top-0 z-40 transition-[background-color,box-shadow] duration-500 ${scrolled ? 'glass shadow-[var(--elev-2)]' : ''}`}
+          className={`silver-rule sticky top-0 z-40 transition-[background-color,box-shadow] duration-500 ${scrolled ? 'is-scrolled glass shadow-[var(--elev-2)]' : ''}`}
         >
           <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-3 px-4 sm:px-6 lg:h-[84px] lg:px-10">
             <Brand />
@@ -343,7 +343,7 @@ export default function App() {
 
         {/* ---------- Phone tab bar (thumb reach, safe-area aware) ---------- */}
         <LayoutGroup id="tab-bar">
-          <nav className="glass pb-safe fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 rounded-[1.6rem] p-1.5 shadow-[var(--elev-4)] ring-1 ring-line lg:hidden" aria-label="Main">
+          <nav className="glass silver pb-safe fixed inset-x-3 bottom-3 z-40 grid grid-cols-4 rounded-[1.6rem] p-1.5 shadow-[var(--elev-4)] ring-1 ring-line lg:hidden" aria-label="Main">
             {TABS.map(({ id, short, icon: Icon }) => (
               <motion.button
                 key={id}

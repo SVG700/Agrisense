@@ -557,13 +557,13 @@ input[type="range"].battery {
 :root[data-theme="dark"] .backdrop {
   background: linear-gradient(180deg, #0d0f11 0%, #121514 50%, #17140f 100%);
 }
-.backdrop svg {
+.backdrop svg.scenery {
   position: absolute;
   inset: auto 0 0 0;
   width: 100%;
   height: 78%;
 }
-:root[data-theme="dark"] .backdrop svg {
+:root[data-theme="dark"] .backdrop svg.scenery {
   opacity: 0.28;
 }
 .mist {
@@ -584,6 +584,7 @@ input[type="range"].battery {
 
 /* The app sits in one large rounded "window" (desktop) */
 .app-window {
+  position: relative;
   background: rgb(255 255 255 / 0.42);
   backdrop-filter: blur(22px) saturate(1.3);
   -webkit-backdrop-filter: blur(22px) saturate(1.3);
@@ -734,6 +735,138 @@ input[type="range"].battery {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+/* ---------- Silver lining (premium edges, strongest in the dark theme) --- */
+
+/* Angle of the light travelling round an edge (registered so it can animate) */
+@property --silver-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 140deg;
+}
+
+:root {
+  /* Light theme: a quiet pearl edge only */
+  --silver-o: 0.55;
+  --silver-hi: rgb(255 255 255 / 0.95);
+  --silver-mid: rgb(196 198 204 / 0.35);
+  --silver-lo: rgb(255 255 255 / 0.15);
+}
+:root[data-theme="dark"] {
+  /* Dark theme: brushed silver with a soft moving highlight */
+  --silver-o: 1;
+  --silver-hi: rgb(236 239 245 / 0.72);
+  --silver-mid: rgb(160 166 178 / 0.22);
+  --silver-lo: rgb(255 255 255 / 0.04);
+}
+
+/* A 1px gradient edge drawn on top of the surface; never takes clicks or space */
+.card::after,
+.silver::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--silver-angle),
+    var(--silver-lo) 0deg,
+    var(--silver-hi) 40deg,
+    var(--silver-mid) 90deg,
+    var(--silver-lo) 170deg,
+    var(--silver-lo) 200deg,
+    var(--silver-mid) 260deg,
+    var(--silver-hi) 300deg,
+    var(--silver-lo) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: calc(var(--silver-o) * 0.75);
+  transition: opacity 600ms var(--spring);
+  /* the highlight only travels while you hover (no constant repainting) */
+  animation: silver-sweep 9s linear infinite paused;
+}
+@media (hover: hover) {
+  .card:hover::after,
+  .silver:hover::after {
+    opacity: var(--silver-o);
+    animation-play-state: running;
+  }
+}
+/* Large, always-visible frames keep a very slow sweep */
+.silver-live::after {
+  animation-duration: 22s;
+  animation-play-state: running;
+}
+@keyframes silver-sweep {
+  to {
+    --silver-angle: 500deg;
+  }
+}
+
+/* Silver hairline under the header once content scrolls beneath it */
+.silver-rule {
+  position: relative;
+}
+.silver-rule::before {
+  content: "";
+  position: absolute;
+  inset: auto 6% 0 6%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--silver-hi), var(--silver-mid) 60%, transparent);
+  opacity: 0;
+  transition: opacity 600ms var(--spring);
+}
+.silver-rule.is-scrolled::before {
+  opacity: calc(var(--silver-o) * 0.8);
+}
+
+/* Moonlit sheen + silver horizon in the dark backdrop (hidden in light) */
+.backdrop .moon {
+  position: absolute;
+  left: 50%;
+  top: -18vh;
+  width: 90vw;
+  height: 60vh;
+  translate: -50% 0;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgb(210 218 232 / 0.16), rgb(210 218 232 / 0.05) 55%, transparent);
+  filter: blur(10px);
+  opacity: 0;
+  transition: opacity 800ms var(--spring);
+  pointer-events: none;
+}
+.backdrop .silver-line {
+  opacity: 0;
+  transition: opacity 800ms var(--spring);
+}
+:root[data-theme="dark"] .backdrop .moon {
+  opacity: 1;
+}
+:root[data-theme="dark"] .backdrop .silver-line {
+  opacity: 0.9;
+}
+
+/* Smooth theme change: colours fade instead of snapping (added for ~0.5 s only) */
+.theme-fade,
+.theme-fade *,
+.theme-fade *::before,
+.theme-fade *::after {
+  transition:
+    background-color 480ms var(--spring),
+    border-color 480ms var(--spring),
+    color 480ms var(--spring),
+    fill 480ms var(--spring),
+    stroke 480ms var(--spring),
+    box-shadow 480ms var(--spring),
+    opacity 480ms var(--spring) !important;
+}
+
 /* ---------- Accessibility: honour reduced-motion ----------------------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -751,7 +884,9 @@ input[type="range"].battery {
   .scan-sweep {
     display: none;
   }
-  .mist {
+  .mist,
+  .card::after,
+  .silver::after {
     animation: none;
   }
 }

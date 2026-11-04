@@ -177,7 +177,7 @@ export default function LiveVision({ open, onClose, device, capture, origin, lay
                 <motion.div
                   layoutId={layoutId}
                   transition={SPRING}
-                  className="relative aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-[#16130f] shadow-[0_40px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-[#fff]/10"
+                  className="silver silver-live relative aspect-[4/3] w-full overflow-hidden rounded-[28px] bg-[#16130f] shadow-[0_40px_80px_-30px_rgb(0_0_0/0.9)] ring-1 ring-[#fff]/10"
                 >
                   {image ? (
                     <img
@@ -206,7 +206,7 @@ export default function LiveVision({ open, onClose, device, capture, origin, lay
                 animate={{ opacity: 1, x: 0, transition: { ...SPRING, delay: 0.32 } }}
                 className="flex flex-col gap-4"
               >
-                <section className="rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
+                <section className="silver relative rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <Gauge className="h-4 w-4 text-[#f6d867]" aria-hidden="true" /> Stream
                   </h3>
@@ -218,7 +218,7 @@ export default function LiveVision({ open, onClose, device, capture, origin, lay
                   </dl>
                 </section>
 
-                <section className="rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
+                <section className="silver relative rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <Layers className="h-4 w-4 text-[#f6d867]" aria-hidden="true" /> OpenCV pipeline
                   </h3>
@@ -238,7 +238,7 @@ export default function LiveVision({ open, onClose, device, capture, origin, lay
                   {!frame && <p className="mt-3 text-[11px] leading-snug text-[#f4efe8]/50">Planned Pi pipeline. The Pi will send its real steps with each frame.</p>}
                 </section>
 
-                <section className="rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
+                <section className="silver relative rounded-[24px] bg-[#fff]/[0.05] p-5 ring-1 ring-[#fff]/10">
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                     <Cpu className="h-4 w-4 text-[#f6d867]" aria-hidden="true" /> Raspberry Pi
                   </h3>

@@ -56,7 +56,7 @@ export default function CustomizeSheet({ open, onClose, layout, setLayout, reset
             role="dialog"
             aria-modal="true"
             aria-labelledby="customize-title"
-            className="glass fixed inset-x-0 bottom-0 z-[71] flex max-h-[85vh] flex-col rounded-t-[1.75rem] shadow-[var(--elev-4)] ring-1 ring-line outline-none sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-4 sm:max-h-none sm:w-[400px] sm:rounded-[1.75rem]"
+            className="glass silver fixed inset-x-0 bottom-0 z-[71] flex max-h-[85vh] flex-col rounded-t-[1.75rem] shadow-[var(--elev-4)] ring-1 ring-line outline-none sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-4 sm:max-h-none sm:w-[400px] sm:rounded-[1.75rem]"
             initial={{ y: '100%', opacity: 0.6 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0.6 }}
