@@ -17,7 +17,6 @@ import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
 import TrapCards from './TrapCards.jsx';
 import ManualSprayCard from './ManualSprayCard.jsx';
-import Field3D from './Field3D.jsx';
 import DailyTimeline from './DailyTimeline.jsx';
 import LiveVision from './LiveVision.jsx';
 import { HeroCards, TrapStage, VISION_LAYOUT_ID } from './FieldHero.jsx';
@@ -238,7 +237,6 @@ export default function FarmerDashboard({
         </div>
       </section>
     ),
-    field3d: <Field3D devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />,
     traps: (
       <section aria-labelledby="traps-title" className="flex flex-col gap-4">
         <SectionHead id="traps-title" label={t('section.traps')} />

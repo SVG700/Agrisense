@@ -712,24 +712,9 @@ describe('Trap box controls', () => {
   });
 });
 
-describe('3D farm view', () => {
-  test('without WebGL it lists every trap with its decision, and a click selects the trap', async () => {
-    const Field3D = (await import('../components/Field3D.jsx')).default;
-    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ decision: 'SPRAY', avg_pests: 47, no_predators: true, thresholds: { action_threshold_per_day: 25 } })));
-    const onSelect = vi.fn();
-    render(<Field3D devices={[DEVICE]} activeId={DEVICE.id} onSelect={onSelect} />);
-    expect(screen.getByText(/3D view needs WebGL/)).toBeTruthy(); // jsdom has no WebGL
-    expect(await screen.findByText('47 pests/day')).toBeTruthy();
-    expect(screen.getByText('SPRAY')).toBeTruthy();
-    expect(screen.getByText(/action level \(25\/day\)/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Trap 01' }));
-    expect(onSelect).toHaveBeenCalledWith(DEVICE.id);
-  });
-});
-
 describe('Customize, quick actions, timeline, day strip', () => {
   test('a hidden section is not rendered, and the order is followed', () => {
-    const layout = { order: ['log', 'glance', 'timeline', 'detections', 'field3d', 'traps', 'whatif', 'climate'], hidden: ['glance'] };
+    const layout = { order: ['log', 'glance', 'timeline', 'detections', 'traps', 'whatif', 'climate'], hidden: ['glance'] };
     render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} layout={layout} />);
     expect(screen.queryByText('Today at a glance')).toBeNull();
     const log = screen.getByText('Recent Captures');

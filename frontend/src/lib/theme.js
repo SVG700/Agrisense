@@ -60,7 +60,6 @@ export const SECTIONS = [
   { id: 'glance', label: 'Today at a glance' },
   { id: 'timeline', label: 'Daily timeline' },
   { id: 'detections', label: 'Live detections & AI advisor' },
-  { id: 'field3d', label: '3D farm view' },
   { id: 'traps', label: 'All traps & impact' },
   { id: 'log', label: 'Action log & recent captures' },
   { id: 'whatif', label: 'What-if simulator' },
@@ -94,14 +93,3 @@ export function haptic(ms = 8) {
   }
 }
 
-/** The theme currently on <html> (for canvas/WebGL code that can't use CSS variables). */
-export function useResolvedTheme() {
-  const get = () => (typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
-  const [t, setT] = useState(get);
-  useEffect(() => {
-    const obs = new MutationObserver(() => setT(get()));
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => obs.disconnect();
-  }, []);
-  return t;
-}
