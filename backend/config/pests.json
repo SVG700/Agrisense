@@ -217,5 +217,31 @@
     "max_weekly_loss_pct": 15,
     "horizon_days": 7,
     "_horizon_days": "The window the projection covers (until the next check)."
+  },
+  "lifecycle": {
+    "_about": "PLACEHOLDER whitefly lifecycle model - to confirm with the IIHR mentor. Degree-day bands above degree_days.base_temp_c, from the day eggs were laid.",
+    "stages": {
+      "hatch": 90,
+      "second_instar": 125,
+      "third_instar": 165,
+      "adult": 300
+    },
+    "_stages": "Cumulative degree-days: eggs hatch at hatch; crawlers / 1st instar (unprotected, most vulnerable) until second_instar; parasitoids prefer third_instar onwards; adults at adult.",
+    "humid_rh": 70,
+    "humid_factor": 1.1,
+    "dry_rh": 40,
+    "dry_factor": 0.85,
+    "_humid": "Development speeds up a little in moist air and slows in dry air.",
+    "spike_rise_pts": 15,
+    "spike_high_rh": 80,
+    "spike_low_rh": 65,
+    "_spike": "A humidity spike = RH rising by spike_rise_pts within 6 h, or crossing spike_high_rh from below spike_low_rh within 12 h.",
+    "spike_lead_hours": 24,
+    "spike_lag_hours": 12,
+    "_spike_window": "A spike this close to the predicted hatch is taken as the hatching cue.",
+    "crawler_fallback_hours": 48,
+    "preferred_start_hour": 6,
+    "preferred_end_hour": 8,
+    "_preferred": "Local hours preferred for treatment: cool, calm, whiteflies and pollinators less active."
   }
 }

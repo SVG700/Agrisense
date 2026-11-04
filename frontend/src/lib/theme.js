@@ -67,6 +67,7 @@ export function useTheme() {
 
 /** Dashboard sections the viewer can reorder and hide (Customize). */
 export const SECTIONS = [
+  { id: 'timing', label: 'Treatment timing (lifecycle)' },
   { id: 'economics', label: 'Economic impact (₹)' },
   { id: 'glance', label: 'Today at a glance' },
   { id: 'timeline', label: 'Daily timeline' },

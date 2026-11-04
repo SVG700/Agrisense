@@ -27,7 +27,7 @@ const vision = createVision({ config, logger });
 const advisor = createAdvisor({ config, logger });
 const weather = createWeather({ config, logger });
 const telegram = createTelegram({ config, store, weather, logger });
-const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, logger }) : null;
+const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, weather, logger }) : null;
 const app = createApp({ config, store, vision, advisor, weather, telegram, telegramBot, logger });
 telegram.startScheduler();
 // Photo bot: long-polls Telegram for trap photos (no public URL needed)

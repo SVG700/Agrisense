@@ -38,7 +38,7 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
   const weather = createWeather({ config, logger, http: weatherHttp ?? { get: async () => { throw new Error('offline'); } } });
   const telegram = createTelegram({ config, store, weather, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } });
   // The photo bot is created but not started (tests drive it with bot.handle)
-  const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } }) : null;
+  const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, weather, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } }) : null;
   const app = createApp({ config, store, vision, advisor, weather, telegram, telegramBot, voice, logger });
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');

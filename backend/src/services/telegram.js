@@ -14,6 +14,8 @@
 import axios from 'axios';
 import { trapDecision } from '../routes/map.js';
 import { economicsSettings, evaluateEconomics } from './economics.js';
+import { predictLifecycle } from './lifecycle.js';
+import { dailySeries } from './decision.js';
 
 const inr = (n) => `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`;
 
@@ -53,6 +55,7 @@ export const TEXT = {
     became: (trap, now) => `${trap}: advice is now ${now}`,
     open: 'Open dashboard',
     test: 'AgriSense is connected. Trap alerts and a daily summary will arrive here.',
+    reminder: (trap, text) => `⏰ <b>Reminder - ${trap}</b>\nIn about an hour: ${text}`,
     moneySaved: (v) => `💰 Chemical spray avoided: <b>${v} saved today</b> (estimate)`,
     moneyAtRisk: (v, days, spray) => `💸 If ignored: about <b>${v}</b> of crop at risk over ${days} days - spraying costs ${spray} (estimate)`,
     sprayTitle: 'Manual spray started',
@@ -78,6 +81,7 @@ export const TEXT = {
     became: (trap, now) => `${trap}: ಈಗಿನ ಸಲಹೆ ${now}`,
     open: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ತೆರೆಯಿರಿ',
     test: 'ಅಗ್ರಿಸೆನ್ಸ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ. ಬಲೆ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ದೈನಂದಿನ ಸಾರಾಂಶ ಇಲ್ಲಿ ಬರುತ್ತವೆ.',
+    reminder: (trap, text) => `⏰ <b>ಜ್ಞಾಪನೆ - ${trap}</b>\nಸುಮಾರು ಒಂದು ಗಂಟೆಯಲ್ಲಿ: ${text}`,
     moneySaved: (v) => `💰 ರಾಸಾಯನಿಕ ಸಿಂಪಡಣೆ ತಪ್ಪಿತು: <b>ಇಂದು ${v} ಉಳಿತಾಯ</b> (ಅಂದಾಜು)`,
     moneyAtRisk: (v, days, spray) => `💸 ನಿರ್ಲಕ್ಷಿಸಿದರೆ: ${days} ದಿನಗಳಲ್ಲಿ ಸುಮಾರು <b>${v}</b> ಬೆಳೆ ನಷ್ಟದ ಅಪಾಯ - ಸಿಂಪಡಣೆಯ ವೆಚ್ಚ ${spray} (ಅಂದಾಜು)`,
     sprayTitle: 'ಕೈಯಾರೆ ಸಿಂಪಡಣೆ ಪ್ರಾರಂಭವಾಗಿದೆ',
@@ -149,7 +153,7 @@ export function summaryText({ traps, weather, languages, date, fmtWindow, dashbo
   return blocks.join('\n\n────────────\n\n');
 }
 
-export function alertText({ name, previous, decision, languages, dashboardUrl }) {
+export function alertText({ name, previous, decision, languages, dashboardUrl, timing = null }) {
   const blocks = languages.map((lang) => {
     const t = TEXT[lang];
     const now = `${ICON[decision.decision] ?? ''} ${label(lang, decision.decision)}`;
@@ -160,6 +164,8 @@ export function alertText({ name, previous, decision, languages, dashboardUrl })
     else if (decision.avg_pests != null) lines.push(trapLine(lang, name, decision));
     const money = moneyLine(lang, decision);
     if (money) lines.push(money);
+    // Targeted timing from the lifecycle forecast (English sentence; shown once)
+    if (timing && lang === languages[0]) lines.push(`⏱ ${esc(timing)}`);
     return lines.join('\n');
   });
   if (dashboardUrl) blocks.push(`🔗 <a href="${esc(dashboardUrl)}">${TEXT[languages[0]].open}</a>`);
@@ -174,6 +180,8 @@ export function createTelegram({ config, store, weather, http = axios, logger })
   const configured = Boolean(tg.token && tg.chatIds.length);
   const languages = tg.language === 'both' ? ['en', 'kn'] : [tg.language];
   const lastAlert = new Map(); // `${deviceId}|${decision}` -> ms
+  const reminders = []; // {id, at, remind_at, device, text, timer}
+  const MAX_REMINDERS = 50;
   let lastSummaryDay = null;
   let lastResult = null;
 
@@ -251,12 +259,46 @@ export function createTelegram({ config, store, weather, http = axios, logger })
       const key = `${device.id}|${decision.decision}`;
       if (Date.now() - (lastAlert.get(key) ?? 0) < ALERT_REPEAT_MS) return null;
       lastAlert.set(key, Date.now());
-      return send(alertText({ name: device.name, previous, decision, languages, dashboardUrl: tg.dashboardUrl }));
+      // The "when" for the action, from the lifecycle forecast (best effort, never blocks the alert)
+      let timing = null;
+      try {
+        const point = { lat: config.weather.defaultLat, lon: config.weather.defaultLon };
+        const forecast = await weather?.forecast?.(point);
+        if (forecast) {
+          const rows = await store.listTelemetry({ deviceId: device.id, limit: 120, sign: false });
+          timing = predictLifecycle(forecast, { decision, days: dailySeries(rows) }).headline;
+        }
+      } catch {
+        /* alert goes out without timing */
+      }
+      return send(alertText({ name: device.name, previous, decision, languages, dashboardUrl: tg.dashboardUrl, timing }));
     },
 
     /** Farmer pressed "Manual spray": tell the group straight away (not throttled). */
     notifySpray({ device, decision, note }) {
       return send(sprayText({ name: device.name, decision, note, languages, dashboardUrl: tg.dashboardUrl }));
+    },
+
+    /**
+     * Telegram reminder one hour before a treatment time. In memory (lost on restart),
+     * at most 50 queued; returns {ok, remind_at} or {ok:false, code}.
+     */
+    remind({ at, deviceName, text }) {
+      if (!configured) return { ok: false, code: 'not_configured' };
+      const when = Date.parse(at) - 3_600_000;
+      const now = Date.now();
+      if (!Number.isFinite(when) || when > now + 14 * 86_400_000) return { ok: false, code: 'invalid_time' };
+      for (let i = reminders.length - 1; i >= 0; i--) if (reminders[i].fired) reminders.splice(i, 1);
+      if (reminders.length >= MAX_REMINDERS) return { ok: false, code: 'too_many' };
+      const remindAt = Math.max(now + 5_000, when);
+      const item = { at, remind_at: new Date(remindAt).toISOString(), device: deviceName, fired: false };
+      item.timer = setTimeout(() => {
+        item.fired = true;
+        send(languages.map((l) => TEXT[l].reminder(esc(deviceName), esc(text))).join('\n\n')).catch(() => {});
+      }, remindAt - now);
+      item.timer.unref?.();
+      reminders.push(item);
+      return { ok: true, remind_at: item.remind_at };
     },
 
     /** Chats that have messaged the bot recently - to find TELEGRAM_CHAT_ID. Works with only the token set. */

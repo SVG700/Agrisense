@@ -5,6 +5,7 @@
  *   POST /api/admin/telegram/test      send a short "connected" message
  *   POST /api/admin/telegram/summary   send the trap summary now
  *   GET  /api/admin/telegram/chats     chats that messaged the bot (to find TELEGRAM_CHAT_ID)
+ *   POST /api/admin/telegram/remind    {device_id, at, text} Telegram reminder 1 h before a treatment time
  *   GET  /api/admin/telegram/bot       photo bot status (listening?, checks, access)
  *   POST /api/admin/telegram/bot       {enabled: true|false} start / stop the photo bot
  */
@@ -13,7 +14,7 @@ import { requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { HttpError } from '../utils/validate.js';
 
-export function telegramRouter({ config, telegram, telegramBot }) {
+export function telegramRouter({ config, store, telegram, telegramBot }) {
   const router = Router();
   const adminLimit = rateLimit({ name: 'admin', windowMs: config.rateLimit.windowMs, max: config.rateLimit.adminMax });
   router.use('/admin/telegram', adminLimit, requireAdmin(config));
@@ -30,6 +31,18 @@ export function telegramRouter({ config, telegram, telegramBot }) {
   router.get('/admin/telegram/preview', async (req, res) => res.json({ text: await telegram.buildSummary() }));
   router.post('/admin/telegram/test', async (req, res) => result(res, await telegram.sendTest()));
   router.post('/admin/telegram/summary', async (req, res) => result(res, await telegram.sendSummary()));
+  router.post('/admin/telegram/remind', async (req, res) => {
+    const { device_id: deviceId, at, text } = req.body ?? {};
+    const device = typeof deviceId === 'string' ? await store.getDevice(deviceId).catch(() => null) : null;
+    if (!device) throw new HttpError(404, 'Unknown trap', { code: 'unknown_device' });
+    if (typeof text !== 'string' || !text.trim() || text.length > 400) throw new HttpError(422, '"text" must be 1-400 characters', { code: 'invalid_text' });
+    const r = telegram.remind({ at, deviceName: device.name, text: text.trim() });
+    if (!r.ok) {
+      if (r.code === 'not_configured') throw new HttpError(409, 'Telegram is not set up - add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to backend/.env', { code: 'telegram_not_configured' });
+      throw new HttpError(422, r.code === 'too_many' ? 'Too many reminders queued' : '"at" must be a time within the next 14 days', { code: r.code });
+    }
+    res.status(201).json(r);
+  });
   router.get('/admin/telegram/bot', (req, res) => res.json(telegramBot?.describe() ?? { enabled: false, state: 'off' }));
   router.post('/admin/telegram/bot', (req, res) => {
     if (!telegramBot) throw new HttpError(409, 'Telegram is not set up - add TELEGRAM_BOT_TOKEN to backend/.env', { code: 'telegram_not_configured' });
