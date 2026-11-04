@@ -23,6 +23,8 @@ import { LOW_BATTERY, RISK_STYLES, timeAgo, totalOf } from '../lib/pests.js';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TelegramCard from './TelegramCard.jsx';
+import HardwareControls from './HardwareControls.jsx';
+import { SystemStatusCard } from './SystemStatus.jsx';
 
 let logSeq = 0;
 
@@ -35,31 +37,38 @@ const explain = (err) =>
       : err.message;
 
 /** Admin & hardware control: battery override + in-browser edge capture simulator. */
-export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired, onDevicePatched, onIngested }) {
+export default function AdminPanel({ devices, activeDeviceId, health, adminAuthRequired, onDevicePatched, onIngested }) {
   const [log, setLog] = useState([]);
   const pushLog = (msg, level = 'info') =>
     setLog((l) => [{ id: ++logSeq, at: new Date(), msg, level }, ...l].slice(0, 40));
 
+  const active = devices.find((d) => d.id === activeDeviceId) ?? null;
   return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-3">
+        <span className="pill-label w-fit">Admin & hardware</span>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Control the trap box</h1>
+        <p className="max-w-2xl text-sm text-slate-600 sm:text-base">
+          Switch the fan and trap light, send commands to the Raspberry Pi, set battery levels, test captures and manage
+          Telegram alerts. Changes need the admin key.
+        </p>
+      </header>
     <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08}>
       <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
         <Item>
           <AdminKeyBox required={adminAuthRequired} />
         </Item>
         <Item>
-          <DemoControl onChanged={onIngested} log={pushLog} />
-        </Item>
-        <Item>
-          <TelegramCard log={pushLog} />
+          <HardwareControls device={active} log={pushLog} />
         </Item>
         <Item as="section" className="card">
           <h2 className="card-title mb-1">
             <span className="icon-chip h-8! w-8! rounded-lg!">
               <Cpu className="h-4 w-4" />
             </span>
-            Hardware Simulator
+            Battery
           </h2>
-          <p className="mb-5 text-sm text-slate-400">
+          <p className="mb-5 text-sm text-slate-500">
             Manually override each trap's battery level (no battery sensor is wired yet). Values are saved as{' '}
             <i>manual</i> with a timestamp; dropping below {LOW_BATTERY}% raises live alerts across the dashboard.
           </p>
@@ -74,9 +83,19 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
         <Item>
           <CaptureSimulator deviceId={activeDeviceId} onIngested={onIngested} log={pushLog} />
         </Item>
+        <Item>
+          <TelegramCard log={pushLog} />
+        </Item>
+        <Item>
+          <DemoControl onChanged={onIngested} log={pushLog} />
+        </Item>
       </div>
 
-      <Item as="section" className="card flex flex-col lg:col-span-2">
+      <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+      <Item>
+        <SystemStatusCard health={health} />
+      </Item>
+      <Item as="section" className="card flex flex-col lg:sticky lg:top-24">
         <h2 className="card-title mb-3">
           <span className="icon-chip h-8! w-8! rounded-lg!">
             <Terminal className="h-4 w-4" />
@@ -84,18 +103,18 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
           Event Log
           <span className="ml-auto text-[11px] font-normal text-slate-500">{log.length} events</span>
         </h2>
-        <ul className="flex max-h-[640px] flex-col gap-1 overflow-y-auto rounded-xl bg-slate-950/60 p-3 font-mono text-xs ring-1 ring-slate-800">
+        <ul className="flex max-h-[640px] flex-col gap-1 overflow-y-auto rounded-xl bg-canvas p-3 font-mono text-xs ring-1 ring-slate-200">
           {log.length === 0 && <li className="text-slate-500">Actions you take here will be logged.</li>}
           <AnimatePresence initial={false}>
             {log.map((e) => (
               <motion.li
                 key={e.id}
                 layout
-                initial={{ opacity: 0, y: -8, backgroundColor: 'rgba(16,185,129,0.12)' }}
-                animate={{ opacity: 1, y: 0, backgroundColor: 'rgba(16,185,129,0)' }}
+                initial={{ opacity: 0, y: -8, backgroundColor: 'rgba(21,128,61,0.10)' }}
+                animate={{ opacity: 1, y: 0, backgroundColor: 'rgba(21,128,61,0)' }}
                 transition={{ duration: 0.45, ease: EASE }}
                 className={`rounded-md px-1.5 py-0.5 ${
-                  e.level === 'error' ? 'text-rose-300' : e.level === 'warn' ? 'text-amber-300' : 'text-slate-300'
+                  e.level === 'error' ? 'text-rose-700' : e.level === 'warn' ? 'text-amber-800' : 'text-slate-700'
                 }`}
               >
                 <span className="text-slate-500">{e.at.toLocaleTimeString()}</span> {e.msg}
@@ -104,7 +123,9 @@ export default function AdminPanel({ devices, activeDeviceId, adminAuthRequired,
           </AnimatePresence>
         </ul>
       </Item>
+      </div>
     </Stagger>
+    </div>
   );
 }
 
@@ -146,7 +167,7 @@ function DemoControl({ onChanged, log }) {
           Simulated data
         </Badge>
       </h2>
-      <p className="mb-4 text-sm text-slate-400">
+      <p className="mb-4 text-sm text-slate-500">
         Loads four <b>DEMO</b> traps with 14 days of simulated whitefly and predator captures (demo detector + rule engine,
         no paid API calls). They are built to show every decision: SPRAY, RELEASE BIOCONTROL, a BORDERLINE WAIT and CHECK
         TRAP. Reset any time to start the story again from today.
@@ -164,8 +185,8 @@ function DemoControl({ onChanged, log }) {
       {result && (
         <ul className="mt-4 flex flex-col gap-2 text-sm">
           {result.traps.map((t) => (
-            <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-900/50 px-3 py-2">
-              <span className="text-slate-200">{t.name}</span>
+            <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2">
+              <span className="text-slate-800">{t.name}</span>
               <DecisionBadge decision={t.decision} borderline={t.borderline} size="sm" />
             </li>
           ))}
@@ -181,7 +202,7 @@ function AdminKeyBox({ required }) {
   const [saved, setSaved] = useState(Boolean(getAdminKey()));
   if (!required && !saved) {
     return (
-      <p className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-200">
+      <p className="rounded-2xl border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-xs text-amber-800">
         Demo mode: admin actions are not protected by a key on this backend.
       </p>
     );
@@ -195,7 +216,7 @@ function AdminKeyBox({ required }) {
         setSaved(Boolean(value.trim()));
       }}
     >
-      <label htmlFor="admin-key" className="text-sm text-slate-300">
+      <label htmlFor="admin-key" className="text-sm text-slate-700">
         Admin key
       </label>
       <input
@@ -220,16 +241,16 @@ const BATTERY_SOURCE = {
 };
 
 function batteryVisual(level) {
-  if (level < LOW_BATTERY) return { Icon: BatteryWarning, color: '#f43f5e', text: 'text-rose-400' };
-  if (level < 40) return { Icon: BatteryLow, color: '#f59e0b', text: 'text-amber-400' };
-  if (level < 75) return { Icon: BatteryMedium, color: '#a3e635', text: 'text-lime-400' };
-  return { Icon: BatteryFull, color: '#10b981', text: 'text-emerald-400' };
+  if (level < LOW_BATTERY) return { Icon: BatteryWarning, color: '#f43f5e', text: 'text-rose-700' };
+  if (level < 40) return { Icon: BatteryLow, color: '#f59e0b', text: 'text-amber-800' };
+  if (level < 75) return { Icon: BatteryMedium, color: '#a3e635', text: 'text-lime-700' };
+  return { Icon: BatteryFull, color: '#10b981', text: 'text-emerald-700' };
 }
 
 const STATUS_BADGE = {
-  online: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40',
-  low_battery: 'bg-rose-500/15 text-rose-300 ring-rose-500/40',
-  offline: 'bg-slate-700/50 text-slate-400 ring-slate-600',
+  online: 'bg-emerald-500/15 text-emerald-700 ring-emerald-500/40',
+  low_battery: 'bg-rose-500/15 text-rose-700 ring-rose-500/40',
+  offline: 'bg-slate-200 text-slate-500 ring-slate-300',
 };
 
 function BatteryControl({ device, onPatched, log }) {
@@ -275,7 +296,7 @@ function BatteryControl({ device, onPatched, log }) {
       className={`rounded-2xl border p-4 transition-all duration-500 ${
         low
           ? 'border-rose-500/60 bg-rose-500/5 shadow-[0_0_28px_-6px_rgba(244,63,94,0.55)]'
-          : 'border-slate-700/70 bg-slate-950/40 hover:border-emerald-500/30'
+          : 'border-slate-200 bg-slate-50 hover:border-emerald-500/30'
       }`}
     >
       <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -296,11 +317,11 @@ function BatteryControl({ device, onPatched, log }) {
             {device.status?.replace('_', ' ')}
           </span>
         </span>
-        {saving && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+        {saving && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
       </div>
 
       {/* Animated level gauge */}
-      <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-slate-800/80" aria-hidden="true">
+      <div className="mb-4 h-2.5 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
         <motion.div
           className="h-full rounded-full"
           style={{ background: `linear-gradient(90deg, ${color}99, ${color})`, boxShadow: `0 0 14px ${color}66` }}
@@ -331,7 +352,7 @@ function BatteryControl({ device, onPatched, log }) {
             onChange={(e) => commit(e.target.value)}
             className="w-14 bg-transparent px-2 py-1 text-right tabular-nums focus:outline-none"
           />
-          <span className="text-sm text-slate-400">%</span>
+          <span className="text-sm text-slate-500">%</span>
         </div>
       </div>
 
@@ -355,7 +376,7 @@ function BatteryControl({ device, onPatched, log }) {
             animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
             exit={{ opacity: 0, height: 0, marginTop: 0 }}
             transition={{ duration: 0.3, ease: EASE }}
-            className="flex items-center gap-2 overflow-hidden text-sm font-medium text-rose-300"
+            className="flex items-center gap-2 overflow-hidden text-sm font-medium text-rose-700"
           >
             <BatteryWarning className="h-4 w-4" />
             Critical: battery below {LOW_BATTERY}% - schedule a swap or switch to solar.
@@ -432,7 +453,7 @@ function CaptureSimulator({ deviceId, onIngested, log }) {
         </span>
         Edge Capture Simulator
       </h2>
-      <p className="mb-5 text-sm text-slate-400">
+      <p className="mb-5 text-sm text-slate-500">
         Sends a <b>simulated</b> capture (synthetic trap image + the readings below) through the full pipeline (vision →
         advisory → database) for the selected device. It is stored and shown as simulated data.
       </p>
@@ -455,7 +476,7 @@ function CaptureSimulator({ deviceId, onIngested, log }) {
         <button
           onClick={() => setStreaming((s) => !s)}
           disabled={!deviceId}
-          className={`btn ${streaming ? 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/50 hover:bg-rose-500/25' : 'btn-ghost'}`}
+          className={`btn ${streaming ? 'bg-rose-500/15 text-rose-700 ring-1 ring-rose-500/50 hover:bg-rose-500/25' : 'btn-ghost'}`}
         >
           {streaming ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           {streaming ? 'Stop stream' : 'Auto-stream (6s)'}
@@ -466,13 +487,13 @@ function CaptureSimulator({ deviceId, onIngested, log }) {
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -6 }}
-              className="flex items-center gap-1.5 text-xs text-emerald-300"
+              className="flex items-center gap-1.5 text-xs text-emerald-700"
             >
               <Radio className="h-3.5 w-3.5 animate-pulse" /> streaming
             </motion.span>
           )}
         </AnimatePresence>
-        {busy && <span className="text-xs text-slate-400">Running vision + advisory…</span>}
+        {busy && <span className="text-xs text-slate-500">Running vision + advisory…</span>}
         <AnimatePresence mode="popLayout">
           {last && (
             <motion.span
@@ -481,8 +502,8 @@ function CaptureSimulator({ deviceId, onIngested, log }) {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.3, ease: EASE }}
-              className={`ml-auto rounded-full px-3 py-1 text-xs ring-1 ring-white/5 ${RISK_STYLES[last.ai_advisory.risk_level]?.bg ?? 'bg-slate-800'} ${
-                RISK_STYLES[last.ai_advisory.risk_level]?.text ?? 'text-slate-300'
+              className={`ml-auto rounded-full px-3 py-1 text-xs ring-1 ring-black/5 ${RISK_STYLES[last.ai_advisory.risk_level]?.bg ?? 'bg-slate-100'} ${
+                RISK_STYLES[last.ai_advisory.risk_level]?.text ?? 'text-slate-700'
               }`}
             >
               Last: {totalOf(last.pest_counts)} insects · {last.ai_advisory.risk_level ?? 'no advisory'}
@@ -496,13 +517,13 @@ function CaptureSimulator({ deviceId, onIngested, log }) {
 
 function Slider({ label, unit, min, max, step, value, onChange }) {
   return (
-    <label className="flex flex-col gap-2 rounded-xl bg-slate-950/40 p-3 text-sm ring-1 ring-slate-800 transition-colors duration-200 hover:ring-emerald-500/30">
-      <span className="flex justify-between text-slate-400">
+    <label className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200 transition-colors duration-200 hover:ring-emerald-500/30">
+      <span className="flex justify-between text-slate-500">
         {label}
         <motion.span
           key={value}
           initial={{ scale: 1.25, color: '#6ee7b7' }}
-          animate={{ scale: 1, color: '#f1f5f9' }}
+          animate={{ scale: 1, color: '#0f172a' }}
           transition={{ duration: 0.35, ease: EASE }}
           className="inline-block tabular-nums"
         >

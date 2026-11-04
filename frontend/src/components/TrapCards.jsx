@@ -62,12 +62,12 @@ function TrapCard({ device, result, active, onSelect, index }) {
       }`}
     >
       {/* traffic-light edge */}
-      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ background: style?.color ?? '#334155' }} />
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ background: style?.color ?? '#cbd5e1' }} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="font-semibold leading-snug break-words text-white">{device.name}</div>
+          <div className="font-semibold leading-snug break-words text-slate-900">{device.name}</div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
-            <BatteryMedium className="h-3.5 w-3.5" /> {device.battery_level}%{active && <span className="text-emerald-300">· {t('trap.viewing')}</span>}
+            <BatteryMedium className="h-3.5 w-3.5" /> {device.battery_level}%{active && <span className="text-emerald-700">· {t('trap.viewing')}</span>}
           </div>
         </div>
         {loading ? (
@@ -79,7 +79,7 @@ function TrapCard({ device, result, active, onSelect, index }) {
         )}
       </div>
       {result?.decision && !result.check_trap && (
-        <div className="flex flex-wrap gap-x-3 text-xs text-slate-400">
+        <div className="flex flex-wrap gap-x-3 text-xs text-slate-500">
           <span className="inline-flex items-center gap-1">
             <Bug className="h-3.5 w-3.5" /> {t('trap.pestsPerDay', { n: result.avg_pests })}
           </span>
@@ -90,7 +90,7 @@ function TrapCard({ device, result, active, onSelect, index }) {
           </span>
         </div>
       )}
-      {result?.reason && <p className="line-clamp-2 text-xs leading-snug text-slate-400">{decisionReason(t.lang, result)}</p>}
+      {result?.reason && <p className="line-clamp-2 text-xs leading-snug text-slate-500">{decisionReason(t.lang, result)}</p>}
     </motion.button>
   );
 }

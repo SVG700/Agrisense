@@ -88,7 +88,7 @@ export default function WhatIfCard({ deviceId }) {
             </span>
             {t('title.whatIf')}
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-500">
             Change the numbers and see how the advice changes. The answers come from the same decision engine that decides for
             the traps.
           </p>
@@ -118,23 +118,23 @@ export default function WhatIfCard({ deviceId }) {
               <button
                 key={sc.id}
                 onClick={() => setS((x) => sc.apply(x))}
-                className="rounded-full px-3 py-1.5 text-xs text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800"
+                className="rounded-full px-3 py-1.5 text-xs text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-100"
               >
                 {sc.label}
               </button>
             ))}
           </div>
 
-          <div className="rounded-xl bg-slate-900/60 p-3 ring-1 ring-slate-800" aria-live="polite" data-testid="what-if-result">
+          <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200" aria-live="polite" data-testid="what-if-result">
             {error ? (
-              <p className="text-sm text-rose-300">{error}</p>
+              <p className="text-sm text-rose-700">{error}</p>
             ) : result ? (
               <>
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="text-xs uppercase tracking-widest text-slate-400">Then the advice is</span>
+                  <span className="text-xs uppercase tracking-widest text-slate-500">Then the advice is</span>
                   <DecisionBadge decision={result.decision} borderline={result.borderline} />
                 </div>
-                <p className="text-sm text-slate-300">{result.reason}</p>
+                <p className="text-sm text-slate-700">{result.reason}</p>
                 <p className="mt-1 text-[11px] text-slate-500">
                   {result.no_predators ? 'No predators' : `${result.pests_per_predator} pests per predator`} · count range{' '}
                   {result.range?.pests?.[0]}-{result.range?.pests?.[1]} pests/day (±{Math.round((result.range?.uncertainty ?? 0) * 100)}%) ·
@@ -142,7 +142,7 @@ export default function WhatIfCard({ deviceId }) {
                 </p>
               </>
             ) : (
-              <div className="h-10 animate-pulse rounded bg-slate-800/60" />
+              <div className="h-10 animate-pulse rounded bg-slate-100" />
             )}
           </div>
         </div>
@@ -156,9 +156,9 @@ export default function WhatIfCard({ deviceId }) {
 function Slider({ label, value, min = 0, max, step, onChange, suffix = '', format }) {
   return (
     <label className="flex flex-col gap-1.5 text-sm">
-      <span className="flex justify-between text-slate-300">
+      <span className="flex justify-between text-slate-700">
         {label}
-        <b className="tabular-nums text-white">{format ? format(value) : `${round1(value)}${suffix}`}</b>
+        <b className="tabular-nums text-slate-900">{format ? format(value) : `${round1(value)}${suffix}`}</b>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={onChange} className="accent-emerald-400" aria-label={label} />
     </label>
@@ -194,7 +194,7 @@ function DecisionMap({ regions, point, base }) {
   }, [regions, iw, ih, pad.l, pad.t]);
 
   if (regions === false) return <p className="self-center text-xs text-slate-500">The decision map is unavailable right now.</p>;
-  if (!regions) return <div className="h-56 animate-pulse rounded-xl bg-slate-800/50" />;
+  if (!regions) return <div className="h-56 animate-pulse rounded-xl bg-slate-100" />;
   const maxP = regions.pests.at(-1);
   const maxR = regions.predators.at(-1);
   const sx = (p) => pad.l + (Math.min(p, maxP) / maxP) * iw;
@@ -208,31 +208,31 @@ function DecisionMap({ regions, point, base }) {
           <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h + 0.6} fill={DECISION_STYLES[r.d]?.color} fillOpacity="0.28" shapeRendering="crispEdges" />
         ))}
         {/* action threshold and spray-ratio line */}
-        <line x1={sx(t.action_threshold_per_day)} x2={sx(t.action_threshold_per_day)} y1={pad.t} y2={pad.t + ih} stroke="#e2e8f0" strokeDasharray="3 3" opacity="0.6" />
-        <line x1={sx(t.action_threshold_per_day)} y1={sy(t.action_threshold_per_day / t.spray_ratio)} x2={sx(maxP)} y2={sy(maxP / t.spray_ratio)} stroke="#e2e8f0" strokeDasharray="3 3" opacity="0.6" />
+        <line x1={sx(t.action_threshold_per_day)} x2={sx(t.action_threshold_per_day)} y1={pad.t} y2={pad.t + ih} stroke="#334155" strokeDasharray="3 3" opacity="0.6" />
+        <line x1={sx(t.action_threshold_per_day)} y1={sy(t.action_threshold_per_day / t.spray_ratio)} x2={sx(maxP)} y2={sy(maxP / t.spray_ratio)} stroke="#334155" strokeDasharray="3 3" opacity="0.6" />
         {/* axes */}
         <line x1={pad.l} y1={pad.t + ih} x2={pad.l + iw} y2={pad.t + ih} stroke="#64748b" />
         <line x1={pad.l} y1={pad.t} x2={pad.l} y2={pad.t + ih} stroke="#64748b" />
         {[0, 50, 100, 150].filter((v) => v <= maxP).map((v) => (
-          <text key={v} x={sx(v)} y={H - 10} fontSize="9" fill="#94a3b8" textAnchor="middle">
+          <text key={v} x={sx(v)} y={H - 10} fontSize="9" fill="#64748b" textAnchor="middle">
             {v}
           </text>
         ))}
         {[0, 10, 20, 30].filter((v) => v <= maxR).map((v) => (
-          <text key={v} x={pad.l - 5} y={sy(v) + 3} fontSize="9" fill="#94a3b8" textAnchor="end">
+          <text key={v} x={pad.l - 5} y={sy(v) + 3} fontSize="9" fill="#64748b" textAnchor="end">
             {v}
           </text>
         ))}
-        <text x={pad.l + iw / 2} y={H - 1} fontSize="9" fill="#cbd5e1" textAnchor="middle">
+        <text x={pad.l + iw / 2} y={H - 1} fontSize="9" fill="#475569" textAnchor="middle">
           pests per day →
         </text>
-        <text x={10} y={pad.t + ih / 2} fontSize="9" fill="#cbd5e1" textAnchor="middle" transform={`rotate(-90 10 ${pad.t + ih / 2})`}>
+        <text x={10} y={pad.t + ih / 2} fontSize="9" fill="#475569" textAnchor="middle" transform={`rotate(-90 10 ${pad.t + ih / 2})`}>
           predators per day →
         </text>
-        {base && <circle cx={sx(base.pests)} cy={sy(base.predators)} r="5" fill="none" stroke="#e2e8f0" strokeWidth="1.5" />}
+        {base && <circle cx={sx(base.pests)} cy={sy(base.predators)} r="5" fill="none" stroke="#334155" strokeWidth="1.5" />}
         <circle cx={sx(point.pests)} cy={sy(point.predators)} r="5.5" fill="#fff" stroke="#0f172a" strokeWidth="2" data-testid="what-if-point" />
       </svg>
-      <figcaption className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+      <figcaption className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500">
         {['SPRAY', 'BIOCONTROL', 'WAIT'].map((d) => (
           <span key={d} className="inline-flex items-center gap-1">
             <span style={{ color: DECISION_STYLES[d].color }}>{DECISION_STYLES[d].shape}</span>

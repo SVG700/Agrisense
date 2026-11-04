@@ -9,9 +9,9 @@ import { useT } from '../lib/i18n.jsx';
 
 /** The three things a farmer can report after reading the advice (colours match the chart markers). */
 export const ACTION_TYPES = {
-  sprayed: { label: 'Sprayed', icon: SprayCan, color: '#f43f5e', tone: 'text-rose-300 ring-rose-500/40 hover:bg-rose-500/10' },
-  released: { label: 'Released predators', icon: Users, color: '#f59e0b', tone: 'text-amber-300 ring-amber-500/40 hover:bg-amber-500/10' },
-  not_yet: { label: 'Not yet', icon: Hourglass, color: '#94a3b8', tone: 'text-slate-300 ring-slate-500/40 hover:bg-slate-500/10' },
+  sprayed: { label: 'Sprayed', icon: SprayCan, color: '#f43f5e', tone: 'text-rose-700 ring-rose-500/40 hover:bg-rose-500/10' },
+  released: { label: 'Released predators', icon: Users, color: '#f59e0b', tone: 'text-amber-800 ring-amber-500/40 hover:bg-amber-500/10' },
+  not_yet: { label: 'Not yet', icon: Hourglass, color: '#94a3b8', tone: 'text-slate-700 ring-slate-500/40 hover:bg-slate-500/10' },
 };
 
 /**
@@ -61,14 +61,14 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
           </span>
           {t('actions.title')}
         </h2>
-        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+        <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           {t('actions.subtitle')}
           {decision?.decision && <DecisionBadge decision={decision.decision} size="sm" />}
         </p>
       </div>
 
       {unavailable ? (
-        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">{unavailable}</p>
+        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-500/30">{unavailable}</p>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-2">
@@ -98,7 +98,7 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
       )}
 
       {error && (
-        <p role="alert" className="text-xs text-rose-300">
+        <p role="alert" className="text-xs text-rose-700">
           {error}
         </p>
       )}
@@ -117,12 +117,12 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3, ease: EASE }}
-                  className="flex items-start gap-2 rounded-lg bg-slate-900/50 px-2.5 py-2 text-xs ring-1 ring-slate-800"
+                  className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2 text-xs ring-1 ring-slate-200"
                 >
                   <Icon className="mt-0.5 h-4 w-4 shrink-0" style={{ color: type.color }} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <b className="text-slate-100">{t(`actions.${a.action}`)}</b>
+                      <b className="text-slate-900">{t(`actions.${a.action}`)}</b>
                       {a.decision && (
                         <span className="flex items-center gap-1 text-slate-500">
                           {t('actions.adviceWas')} <DecisionBadge decision={a.decision} size="sm" />
@@ -130,10 +130,10 @@ export default function ActionLogCard({ deviceId, decision, actions, unavailable
                       )}
                       <span className="text-slate-500">· {timeAgo(a.acted_at)}</span>
                     </div>
-                    {a.note && <div className="mt-0.5 truncate text-slate-400">{a.note}</div>}
+                    {a.note && <div className="mt-0.5 truncate text-slate-500">{a.note}</div>}
                   </div>
                   {i === 0 && (
-                    <button onClick={() => undo(a.id)} disabled={busy !== null} className="text-slate-500 hover:text-slate-200" title="Undo this entry" aria-label="Undo last action">
+                    <button onClick={() => undo(a.id)} disabled={busy !== null} className="text-slate-500 hover:text-slate-800" title="Undo this entry" aria-label="Undo last action">
                       <Undo2 className="h-3.5 w-3.5" />
                     </button>
                   )}

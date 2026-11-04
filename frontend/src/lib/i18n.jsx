@@ -46,6 +46,29 @@ const DICT = {
     'kpi.temperature': 'Temperature',
     'kpi.humidity': 'Humidity',
     'kpi.risk': 'Risk level',
+    'title.advisory': 'AI Advisor',
+    'status.battery': 'Battery',
+    'status.vision': 'Vision camera',
+    'status.trap': 'Trap',
+    'status.trapType': 'Yellow sticky card',
+    'status.capture': 'Last capture',
+    'status.never': 'No capture yet',
+    'section.glance': 'Today at a glance',
+    'section.traps': 'All traps',
+    'section.detections': 'Live detections',
+    'species.title': 'Species breakdown',
+    'species.live': 'Updates with every new capture',
+    'species.none': 'No insects detected in this capture.',
+    'spray.title': 'Manual spray',
+    'spray.help': 'Spraying now? Log it and alert your Telegram group in one tap.',
+    'spray.button': 'Start manual spray',
+    'spray.note': 'Note (optional)',
+    'spray.ask': 'Log a spray on {trap} and send a Telegram alert?',
+    'spray.warn': 'Current advice is {advice} - spraying is not recommended right now.',
+    'spray.confirm': 'Yes, spray and alert',
+    'spray.cancel': 'Cancel',
+    'spray.sent': 'Spray logged and sent to Telegram.',
+    'spray.notSent': 'Spray logged, but the Telegram message failed ({code}).',
     'kpi.notCounted': 'Not counted',
     'risk.Low': 'Low',
     'risk.Medium': 'Medium',
@@ -64,7 +87,6 @@ const DICT = {
     'trap.noData': 'No data yet',
     'trap.unavailable': 'Unavailable',
     // card titles
-    'title.advisory': 'Agronomic Advisory',
     'title.whatIf': 'What if…?',
     'title.impact': 'Estimated impact',
     // weather
@@ -165,6 +187,29 @@ const DICT = {
     'kpi.temperature': 'ತಾಪಮಾನ',
     'kpi.humidity': 'ತೇವಾಂಶ',
     'kpi.risk': 'ಅಪಾಯದ ಮಟ್ಟ',
+    'title.advisory': 'ಎಐ ಸಲಹೆಗಾರ',
+    'status.battery': 'ಬ್ಯಾಟರಿ',
+    'status.vision': 'ದೃಷ್ಟಿ ಕ್ಯಾಮೆರಾ',
+    'status.trap': 'ಬಲೆ',
+    'status.trapType': 'ಹಳದಿ ಅಂಟು ಕಾರ್ಡ್',
+    'status.capture': 'ಕೊನೆಯ ಚಿತ್ರ',
+    'status.never': 'ಇನ್ನೂ ಚಿತ್ರವಿಲ್ಲ',
+    'section.glance': 'ಇಂದಿನ ಸಾರಾಂಶ',
+    'section.traps': 'ಎಲ್ಲಾ ಬಲೆಗಳು',
+    'section.detections': 'ನೇರ ಪತ್ತೆಗಳು',
+    'species.title': 'ಪ್ರಭೇದಗಳ ವಿಂಗಡಣೆ',
+    'species.live': 'ಪ್ರತಿ ಹೊಸ ಚಿತ್ರದೊಂದಿಗೆ ನವೀಕರಿಸುತ್ತದೆ',
+    'species.none': 'ಈ ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ಕೀಟಗಳು ಕಂಡುಬಂದಿಲ್ಲ.',
+    'spray.title': 'ಕೈಯಾರೆ ಸಿಂಪಡಣೆ',
+    'spray.help': 'ಈಗ ಸಿಂಪಡಿಸುತ್ತಿದ್ದೀರಾ? ಒಂದೇ ಸ್ಪರ್ಶದಲ್ಲಿ ದಾಖಲಿಸಿ ಮತ್ತು ಟೆಲಿಗ್ರಾಮ್ ಗುಂಪಿಗೆ ತಿಳಿಸಿ.',
+    'spray.button': 'ಕೈಯಾರೆ ಸಿಂಪಡಣೆ ಪ್ರಾರಂಭಿಸಿ',
+    'spray.note': 'ಟಿಪ್ಪಣಿ (ಐಚ್ಛಿಕ)',
+    'spray.ask': '{trap} ನಲ್ಲಿ ಸಿಂಪಡಣೆ ದಾಖಲಿಸಿ ಟೆಲಿಗ್ರಾಮ್ ಎಚ್ಚರಿಕೆ ಕಳುಹಿಸಬೇಕೆ?',
+    'spray.warn': 'ಈಗಿನ ಸಲಹೆ {advice} - ಈಗ ಸಿಂಪಡಣೆ ಶಿಫಾರಸು ಮಾಡಲಾಗಿಲ್ಲ.',
+    'spray.confirm': 'ಹೌದು, ಸಿಂಪಡಿಸಿ ಮತ್ತು ತಿಳಿಸಿ',
+    'spray.cancel': 'ರದ್ದುಮಾಡಿ',
+    'spray.sent': 'ಸಿಂಪಡಣೆ ದಾಖಲಾಗಿದೆ ಮತ್ತು ಟೆಲಿಗ್ರಾಮ್‌ಗೆ ಕಳುಹಿಸಲಾಗಿದೆ.',
+    'spray.notSent': 'ಸಿಂಪಡಣೆ ದಾಖಲಾಗಿದೆ, ಆದರೆ ಟೆಲಿಗ್ರಾಮ್ ಸಂದೇಶ ವಿಫಲವಾಗಿದೆ ({code}).',
     'kpi.notCounted': 'ಎಣಿಸಿಲ್ಲ',
     'risk.Low': 'ಕಡಿಮೆ',
     'risk.Medium': 'ಮಧ್ಯಮ',
@@ -180,7 +225,6 @@ const DICT = {
     'trap.viewing': 'ನೋಡುತ್ತಿರುವುದು',
     'trap.noData': 'ಇನ್ನೂ ದತ್ತಾಂಶವಿಲ್ಲ',
     'trap.unavailable': 'ಲಭ್ಯವಿಲ್ಲ',
-    'title.advisory': 'ಕೃಷಿ ಸಲಹೆ',
     'title.whatIf': 'ಹೀಗಾದರೆ…?',
     'title.impact': 'ಅಂದಾಜು ಪರಿಣಾಮ',
     'weather.title': 'ಈಗ ಸಿಂಪಡಿಸಬಹುದೇ?',
@@ -296,14 +340,14 @@ export function decisionReason(lang, d) {
 export function LanguageToggle({ className = '' }) {
   const { lang, setLang } = useLanguage();
   return (
-    <div className={`inline-flex rounded-full bg-slate-900/70 p-0.5 text-xs ring-1 ring-slate-700 ${className}`} role="group" aria-label="Language">
+    <div className={`inline-flex rounded-full bg-white p-0.5 text-xs ring-1 ring-slate-200 ${className}`} role="group" aria-label="Language">
       {Object.entries(LANGS).map(([id, name]) => (
         <button
           key={id}
           onClick={() => setLang(id)}
           aria-pressed={lang === id}
           lang={id}
-          className={`rounded-full px-2.5 py-1 font-semibold transition ${lang === id ? 'bg-emerald-400 text-slate-950' : 'text-slate-300 hover:text-white'}`}
+          className={`rounded-full px-2.5 py-1 font-semibold transition ${lang === id ? 'bg-emerald-700 text-white' : 'text-slate-700 hover:text-slate-900'}`}
         >
           {id === 'en' ? 'EN' : name}
         </button>

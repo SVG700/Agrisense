@@ -74,12 +74,12 @@ export default function PhoneCheckPage() {
             </span>
             {t('check.title')}
           </h2>
-          <p className="mt-1 text-sm text-slate-400">{t('check.intro')}</p>
+          <p className="mt-1 text-sm text-slate-500">{t('check.intro')}</p>
         </div>
 
         {/* 1. Photo */}
         <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{t('check.step1')}</div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{t('check.step1')}</div>
           <input
             ref={inputRef}
             type="file"
@@ -91,10 +91,10 @@ export default function PhoneCheckPage() {
             onChange={(e) => choose(e.target.files?.[0])}
           />
           {photo ? (
-            <div className="relative overflow-hidden rounded-xl ring-1 ring-slate-700">
-              <img src={result?.annotated_image ?? photo} alt="Sticky trap photo" className="max-h-[420px] w-full object-contain bg-slate-950" />
+            <div className="relative overflow-hidden rounded-xl ring-1 ring-slate-200">
+              <img src={result?.annotated_image ?? photo} alt="Sticky trap photo" className="max-h-[420px] w-full object-contain bg-white" />
               {!busy && (
-                <label htmlFor="trap-photo" className="btn btn-ghost absolute right-2 top-2 cursor-pointer bg-slate-900/80! text-xs">
+                <label htmlFor="trap-photo" className="btn btn-ghost absolute right-2 top-2 cursor-pointer bg-slate-50! text-xs">
                   <ImagePlus className="h-4 w-4" /> {t('check.change')}
                 </label>
               )}
@@ -102,27 +102,27 @@ export default function PhoneCheckPage() {
           ) : (
             <label
               htmlFor="trap-photo"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-600 px-4 py-10 text-center transition hover:border-emerald-400/60 hover:bg-emerald-500/5"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-10 text-center transition hover:border-emerald-400/60 hover:bg-emerald-500/5"
             >
-              <Camera className="h-10 w-10 text-emerald-300" />
-              <span className="font-semibold text-white">{t('check.take')}</span>
-              <span className="text-xs text-slate-400">{t('check.takeHint')}</span>
+              <Camera className="h-10 w-10 text-emerald-700" />
+              <span className="font-semibold text-slate-900">{t('check.take')}</span>
+              <span className="text-xs text-slate-500">{t('check.takeHint')}</span>
             </label>
           )}
         </div>
 
         {/* 2. Days hung */}
         <div>
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">{t('check.step2')}</div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{t('check.step2')}</div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-xl ring-1 ring-slate-700">
-              <button className="grid h-11 w-11 place-items-center text-slate-300 disabled:opacity-40" aria-label={t('check.lessDay')} onClick={() => setDays((d) => Math.max(1, d - 1))} disabled={days <= 1}>
+            <div className="flex items-center rounded-xl ring-1 ring-slate-200">
+              <button className="grid h-11 w-11 place-items-center text-slate-700 disabled:opacity-40" aria-label={t('check.lessDay')} onClick={() => setDays((d) => Math.max(1, d - 1))} disabled={days <= 1}>
                 <Minus className="h-4 w-4" />
               </button>
-              <span className="w-16 text-center text-lg font-bold tabular-nums text-white" aria-live="polite" data-testid="days-value">
+              <span className="w-16 text-center text-lg font-bold tabular-nums text-slate-900" aria-live="polite" data-testid="days-value">
                 {t(days === 1 ? 'check.day' : 'check.days', { n: days })}
               </span>
-              <button className="grid h-11 w-11 place-items-center text-slate-300 disabled:opacity-40" aria-label={t('check.moreDay')} onClick={() => setDays((d) => Math.min(30, d + 1))} disabled={days >= 30}>
+              <button className="grid h-11 w-11 place-items-center text-slate-700 disabled:opacity-40" aria-label={t('check.moreDay')} onClick={() => setDays((d) => Math.min(30, d + 1))} disabled={days >= 30}>
                 <Plus className="h-4 w-4" />
               </button>
             </div>
@@ -130,7 +130,7 @@ export default function PhoneCheckPage() {
               <button
                 key={d}
                 onClick={() => setDays(d)}
-                className={`rounded-full px-3 py-1.5 text-sm ring-1 transition ${d === days ? 'bg-emerald-500/20 text-emerald-200 ring-emerald-500/50' : 'text-slate-300 ring-slate-700 hover:bg-slate-800'}`}
+                className={`rounded-full px-3 py-1.5 text-sm ring-1 transition ${d === days ? 'bg-emerald-500/20 text-emerald-700 ring-emerald-500/50' : 'text-slate-700 ring-slate-200 hover:bg-slate-100'}`}
               >
                 {d}
               </button>
@@ -151,7 +151,7 @@ export default function PhoneCheckPage() {
         </div>
 
         {error && (
-          <p role="alert" className="flex gap-2 rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-200 ring-1 ring-rose-500/30">
+          <p role="alert" className="flex gap-2 rounded-xl bg-rose-500/10 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-500/30">
             <TriangleAlert className="h-4 w-4 shrink-0" /> {error}
           </p>
         )}
@@ -160,8 +160,8 @@ export default function PhoneCheckPage() {
       <AnimatePresence>{result && <CheckResult key="result" result={result} />}</AnimatePresence>
 
       {!result && (
-        <section className="card text-sm text-slate-400">
-          <div className="mb-2 font-semibold text-slate-200">{t('check.tipsTitle')}</div>
+        <section className="card text-sm text-slate-500">
+          <div className="mb-2 font-semibold text-slate-800">{t('check.tipsTitle')}</div>
           <ul className="list-disc space-y-1 pl-5">
             {TIPS.map((key) => (
               <li key={key}>{t(key)}</li>
@@ -195,17 +195,17 @@ function CheckResult({ result }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease: EASE }}
-      className={`card flex scroll-mt-4 flex-col gap-4 ring-1 ${style?.panel ?? 'ring-slate-700'}`}
+      className={`card flex scroll-mt-4 flex-col gap-4 ring-1 ${style?.panel ?? 'ring-slate-200'}`}
       data-testid="check-result"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-widest text-slate-400">{t('check.whatToDo')}</span>
+        <span className="text-xs uppercase tracking-widest text-slate-500">{t('check.whatToDo')}</span>
         <DecisionBadge decision={d?.decision} borderline={d?.borderline} size="lg" />
       </div>
-      {d?.reason && <p className="text-sm leading-relaxed text-slate-200">{decisionReason(t.lang, d)}</p>}
+      {d?.reason && <p className="text-sm leading-relaxed text-slate-800">{decisionReason(t.lang, d)}</p>}
 
       {(fallback || result.vision?.status === 'simulated') && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-100 ring-1 ring-amber-500/30">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-500/30">
           <Badge tone="warn">{t('simulatedData')}</Badge>
           <Badge tone="warn">{t('demoDetector')}</Badge>
           {fallback?.message ?? 'These counts come from the demo detector.'}
@@ -237,14 +237,14 @@ function CheckResult({ result }) {
       </div>
 
       {adv?.recommendation && (
-        <div className="rounded-xl bg-slate-900/60 p-3 ring-1 ring-slate-800">
-          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <ShieldCheck className="h-3.5 w-3.5" /> {t('check.advice')}{' '}
             <span className="font-normal normal-case tracking-normal text-slate-500">
               ({adv.source === 'gemini' ? 'Gemini' : adv.source === 'claude' ? 'Claude' : 'rule engine'}) {t('check.englishNote')}
             </span>
           </div>
-          <ol className="ml-5 list-decimal space-y-1 text-sm text-slate-200">
+          <ol className="ml-5 list-decimal space-y-1 text-sm text-slate-800">
             {(adv.mitigation_strategy?.length ? adv.mitigation_strategy : [adv.recommendation]).map((s, i) => (
               <li key={i}>{s}</li>
             ))}
@@ -259,9 +259,9 @@ function CheckResult({ result }) {
 
 function Stat({ label, value, sub }) {
   return (
-    <div className="rounded-xl bg-slate-900/60 p-3 ring-1 ring-slate-800">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400">{label}</div>
-      <div className="text-xl font-bold tabular-nums text-white">{value}</div>
+    <div className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xl font-bold tabular-nums text-slate-900">{value}</div>
       {sub && <div className="text-[11px] text-slate-500">{sub}</div>}
     </div>
   );

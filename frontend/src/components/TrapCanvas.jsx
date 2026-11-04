@@ -91,7 +91,7 @@ export default function TrapCanvas({ capture }) {
               {vState.label}
             </Badge>
           )}
-          <span className="text-xs text-slate-400" data-testid="box-count">
+          <span className="text-xs text-slate-500" data-testid="box-count">
             {visible.length} / {boxes.length} shown
           </span>
         </div>
@@ -108,7 +108,7 @@ export default function TrapCanvas({ capture }) {
               onClick={() => toggle(label)}
               aria-pressed={!off}
               className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 transition-all duration-200 hover:-translate-y-px active:scale-95 ${
-                off ? 'text-slate-500 ring-slate-700 hover:text-slate-300' : 'bg-slate-800/80 text-slate-100 ring-slate-600 hover:ring-emerald-500/50'
+                off ? 'text-slate-500 ring-slate-200 hover:text-slate-700' : 'bg-slate-100 text-slate-900 ring-slate-300 hover:ring-emerald-500/50'
               }`}
             >
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: off ? '#475569' : meta.color }} />
@@ -116,7 +116,7 @@ export default function TrapCanvas({ capture }) {
             </button>
           );
         })}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+        <label className="ml-auto flex items-center gap-2 text-xs text-slate-500">
           Min confidence
           <input
             type="range"
@@ -127,13 +127,13 @@ export default function TrapCanvas({ capture }) {
             onChange={(e) => setMinConf(Number(e.target.value))}
             className="w-24 accent-emerald-500"
           />
-          <span className="w-8 tabular-nums text-slate-200">{Math.round(minConf * 100)}%</span>
+          <span className="w-8 tabular-nums text-slate-800">{Math.round(minConf * 100)}%</span>
         </label>
       </div>
 
       {/* Image + overlay */}
       <div
-        className="frame-corners relative w-full overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-emerald-900/50 transition-[aspect-ratio] duration-500"
+        className="frame-corners relative w-full overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-emerald-200 transition-[aspect-ratio] duration-500"
         style={{ aspectRatio: aspect }}
         onMouseLeave={() => setHovered(null)}
         data-testid="trap-frame"
@@ -147,7 +147,7 @@ export default function TrapCanvas({ capture }) {
         ) : (
           <>
             {!loaded && (
-              <div className="skeleton absolute inset-0 grid place-items-center rounded-none! text-slate-400">
+              <div className="skeleton absolute inset-0 grid place-items-center rounded-none! text-slate-500">
                 <span className="relative z-10 flex items-center gap-2 text-xs">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading trap image…
                 </span>
@@ -201,13 +201,13 @@ export default function TrapCanvas({ capture }) {
             )}
             {loaded && active && <Tooltip box={active} pinned={pinned === active.id} />}
             {loaded && ['failed', 'not_configured'].includes(status) && (
-              <div className="overlay-in absolute inset-x-0 bottom-0 bg-slate-950/85 px-3 py-2 text-xs text-amber-200 backdrop-blur">
+              <div className="overlay-in absolute inset-x-0 bottom-0 bg-white/95 px-3 py-2 text-xs text-amber-800 backdrop-blur">
                 {vState.help}
                 {det?.vision_meta?.error?.code ? ` (${det.vision_meta.error.code})` : ''}
               </div>
             )}
             {loaded && status === 'ok' && boxes.length === 0 && (
-              <div className="overlay-in absolute inset-x-0 bottom-0 bg-slate-950/85 px-3 py-2 text-xs text-slate-200 backdrop-blur">
+              <div className="overlay-in absolute inset-x-0 bottom-0 bg-white/95 px-3 py-2 text-xs text-slate-800 backdrop-blur">
                 The model found no insects on this trap.
               </div>
             )}
@@ -235,7 +235,7 @@ function Tooltip({ box, pinned }) {
   return (
     <div
       role="tooltip"
-      className="tooltip-in pointer-events-none absolute z-10 mx-2 min-w-36 rounded-xl border border-emerald-500/25 bg-slate-950/95 px-3 py-2 text-xs shadow-xl shadow-black/40 backdrop-blur"
+      className="tooltip-in pointer-events-none absolute z-10 mx-2 min-w-36 rounded-xl border border-emerald-500/25 bg-white/95 px-3 py-2 text-xs shadow-xl shadow-black/40 backdrop-blur"
       style={style}
     >
       <div className="mb-1 flex items-center gap-1.5 font-semibold" style={{ color: meta.color }}>
@@ -243,11 +243,11 @@ function Tooltip({ box, pinned }) {
         {meta.name}
         {pinned && <span className="ml-auto text-[10px] text-slate-500">pinned</span>}
       </div>
-      <div className="flex justify-between gap-4 text-slate-300">
+      <div className="flex justify-between gap-4 text-slate-700">
         <span>Confidence</span>
         <span className="font-mono">{(box.confidence * 100).toFixed(1)}%</span>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-800">
+      <div className="mt-1 h-1.5 overflow-hidden rounded bg-slate-100">
         <div className="h-full rounded" style={{ width: `${box.confidence * 100}%`, background: meta.color }} />
       </div>
     </div>

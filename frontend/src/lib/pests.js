@@ -18,9 +18,9 @@ export const pestMeta = (label) =>
   PESTS[label] ?? { name: String(label).replace(/_/g, ' '), color: '#facc15' };
 
 export const RISK_STYLES = {
-  Low: { text: 'text-emerald-300', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', dot: 'bg-emerald-400' },
-  Medium: { text: 'text-amber-300', bg: 'bg-amber-500/15', ring: 'ring-amber-500/40', dot: 'bg-amber-400' },
-  High: { text: 'text-rose-300', bg: 'bg-rose-500/15', ring: 'ring-rose-500/50', dot: 'bg-rose-400' },
+  Low: { text: 'text-emerald-700', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/40', dot: 'bg-emerald-400' },
+  Medium: { text: 'text-amber-800', bg: 'bg-amber-500/15', ring: 'ring-amber-500/40', dot: 'bg-amber-400' },
+  High: { text: 'text-rose-700', bg: 'bg-rose-500/15', ring: 'ring-rose-500/50', dot: 'bg-rose-400' },
 };
 
 export const totalOf = (counts) => Object.values(counts ?? {}).reduce((a, b) => a + Number(b || 0), 0);
@@ -63,10 +63,10 @@ export const fmtReading = (n, digits, unit) =>
   n === null || n === undefined || Number.isNaN(n) ? '—' : `${Number(n).toFixed(digits)}${unit}`;
 
 export const TONES = {
-  good: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/40',
-  warn: 'bg-amber-500/15 text-amber-300 ring-amber-500/40',
-  bad: 'bg-rose-500/15 text-rose-300 ring-rose-500/40',
-  muted: 'bg-slate-700/40 text-slate-300 ring-slate-600',
+  good: 'bg-emerald-500/15 text-emerald-700 ring-emerald-500/40',
+  warn: 'bg-amber-500/15 text-amber-800 ring-amber-500/40',
+  bad: 'bg-rose-500/15 text-rose-700 ring-rose-500/40',
+  muted: 'bg-slate-200 text-slate-700 ring-slate-300',
 };
 
 export function timeAgo(iso) {

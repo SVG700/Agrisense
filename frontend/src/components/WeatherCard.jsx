@@ -62,7 +62,7 @@ export default function WeatherCard({ deviceId, decision }) {
     return (
       <section className="card flex flex-col gap-2" data-testid="weather-card">
         {title}
-        <p className="text-sm text-slate-400">{data?.reason ?? 'Weather is unavailable right now.'} Pest decisions are not affected.</p>
+        <p className="text-sm text-slate-500">{data?.reason ?? 'Weather is unavailable right now.'} Pest decisions are not affected.</p>
       </section>
     );
   }
@@ -70,7 +70,7 @@ export default function WeatherCard({ deviceId, decision }) {
     return (
       <section className="card flex flex-col gap-3" data-testid="weather-card">
         {title}
-        <div className="h-16 animate-pulse rounded-xl bg-slate-800/60" />
+        <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
       </section>
     );
   }
@@ -101,14 +101,14 @@ export default function WeatherCard({ deviceId, decision }) {
           s.can_spray_now ? 'bg-emerald-500/10 ring-emerald-500/30' : 'bg-rose-500/10 ring-rose-500/30'
         }`}
       >
-        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${s.can_spray_now ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+        <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${s.can_spray_now ? 'bg-emerald-500/20 text-emerald-700' : 'bg-rose-500/20 text-rose-700'}`}>
           {s.can_spray_now ? <Check className="h-6 w-6" /> : <X className="h-6 w-6" />}
         </span>
         <div className="min-w-0">
-          <div className={`text-xl font-extrabold ${s.can_spray_now ? 'text-emerald-300' : 'text-rose-300'}`} data-testid="spray-verdict">
+          <div className={`text-xl font-extrabold ${s.can_spray_now ? 'text-emerald-700' : 'text-rose-700'}`} data-testid="spray-verdict">
             {s.can_spray_now ? t('weather.yes') : t('weather.no')}
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-slate-500">
             {s.next_window
               ? s.can_spray_now
                 ? t('weather.until', { t: fmtTime(s.next_window.end) })
@@ -119,7 +119,7 @@ export default function WeatherCard({ deviceId, decision }) {
       </motion.div>
 
       {sprayAdvised && (
-        <p className="rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-300 ring-1 ring-slate-800" data-testid="spray-timing">
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 ring-1 ring-slate-200" data-testid="spray-timing">
           {s.can_spray_now
             ? t('weather.adviseNow')
             : s.next_window
@@ -133,15 +133,15 @@ export default function WeatherCard({ deviceId, decision }) {
           const Icon = CHECK_ICON[ch.id] ?? Check;
           return (
             <li key={ch.id} className="flex items-start gap-2">
-              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ch.ok ? 'text-emerald-300' : 'text-rose-300'}`} />
-              <span className={ch.ok ? 'text-slate-300' : 'text-rose-200'}>
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ch.ok ? 'text-emerald-700' : 'text-rose-700'}`} />
+              <span className={ch.ok ? 'text-slate-700' : 'text-rose-700'}>
                 {t.lang === 'en' ? ch.label : t(`weather.${ch.id}${ch.ok ? 'Ok' : 'No'}`, { w: Math.round(c.wind_kmh ?? 0) })}
               </span>
             </li>
           );
         })}
         {s.cautions.map((msg) => (
-          <li key={msg} className="flex items-start gap-2 text-amber-200">
+          <li key={msg} className="flex items-start gap-2 text-amber-800">
             <Thermometer className="mt-0.5 h-4 w-4 shrink-0" /> {msg}
           </li>
         ))}
@@ -154,9 +154,9 @@ export default function WeatherCard({ deviceId, decision }) {
       </div>
 
       {dd?.days_per_generation && (
-        <div className="rounded-xl bg-slate-900/60 p-3 text-sm ring-1 ring-slate-800" data-testid="degree-days">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Next whitefly generation</div>
-          <p className="text-slate-200">
+        <div className="rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200" data-testid="degree-days">
+          <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Next whitefly generation</div>
+          <p className="text-slate-800">
             At about <b>{dd.per_day} degree-days/day</b>, one generation (≈{dd.generation_degree_days} DD above {dd.base_temp_c} °C) takes{' '}
             <b>~{dd.days_per_generation} days</b>: eggs laid today become adults around{' '}
             <b>{new Date(`${dd.next_adults_around}T00:00:00`).toLocaleDateString([], { day: 'numeric', month: 'short' })}</b>.
@@ -178,9 +178,9 @@ export default function WeatherCard({ deviceId, decision }) {
 
 function Mini({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-lg bg-slate-900/50 p-2 ring-1 ring-slate-800">
-      <Icon className="mx-auto mb-0.5 h-3.5 w-3.5 text-slate-400" />
-      <div className="font-semibold text-slate-100">{value}</div>
+    <div className="rounded-lg bg-slate-50 p-2 ring-1 ring-slate-200">
+      <Icon className="mx-auto mb-0.5 h-3.5 w-3.5 text-slate-500" />
+      <div className="font-semibold text-slate-900">{value}</div>
       <div className="text-[10px] text-slate-500">{label}</div>
     </div>
   );

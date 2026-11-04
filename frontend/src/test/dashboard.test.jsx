@@ -29,8 +29,8 @@ const capture = (over = {}) => ({
   ...over,
 });
 
-/** Calls a test made itself (the Admin panel's Telegram card also fetches its status in the background). */
-const ownCalls = (m) => m.mock.calls.filter(([u]) => !String(u).includes('/api/admin/telegram'));
+/** Calls a test made itself (the Admin panel's Telegram card and trap-box controls also poll in the background). */
+const ownCalls = (m) => m.mock.calls.filter(([u]) => !String(u).includes('/api/admin/telegram') && !String(u).endsWith('/controls'));
 
 const jsonResponse = (body, status = 200) =>
   Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(body) });
@@ -640,5 +640,74 @@ describe('Trap cards with a slow database', () => {
     }
     await waitFor(() => expect(screen.getByTestId('trap-card').querySelector('[data-decision="WAIT"]')).toBeTruthy());
     expect(calls).toBe(1);
+  });
+});
+
+describe('Manual spray', () => {
+  test('asks first, warns when the advice is not SPRAY, logs with notify and reports the Telegram result', async () => {
+    const ManualSprayCard = (await import('../components/ManualSprayCard.jsx')).default;
+    const fetchMock = vi.fn(() => jsonResponse({ id: 1, action: 'sprayed', telegram: { ok: true, code: null } }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    const onChanged = vi.fn();
+    render(<ManualSprayCard device={DEVICE} decision={{ decision: 'WAIT' }} onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole('button', { name: /Start manual spray/ }));
+    expect(fetchMock).not.toHaveBeenCalled(); // confirmation first
+    expect(screen.getByText(/spraying is not recommended/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'rows 1-4' } });
+    fireEvent.click(screen.getByRole('button', { name: /Yes, spray and alert/ }));
+    expect(await screen.findByText('Spray logged and sent to Telegram.')).toBeTruthy();
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toMatchObject({ device_id: DEVICE.id, action: 'sprayed', note: 'rows 1-4', notify: true });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  test('a failed Telegram send still shows the spray as logged', async () => {
+    const ManualSprayCard = (await import('../components/ManualSprayCard.jsx')).default;
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ id: 2, action: 'sprayed', telegram: { ok: false, code: 'telegram_unreachable' } }, 201)));
+    render(<ManualSprayCard device={DEVICE} decision={{ decision: 'SPRAY' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Start manual spray/ }));
+    expect(screen.queryByText(/not recommended/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Yes, spray and alert/ }));
+    expect(await screen.findByText(/Spray logged, but the Telegram message failed \(telegram_unreachable\)/)).toBeTruthy();
+  });
+});
+
+describe('Trap box controls', () => {
+  const controls = (over = {}) => ({
+    device_id: DEVICE.id,
+    switches: { fan: { on: false, applied: null }, trap_light: { on: true, applied: null }, ...over },
+    commands: [],
+    pi: { online: false, last_seen: null },
+  });
+
+  test('fan switch sends a PATCH and shows "waiting for the Pi" until confirmed', async () => {
+    const HardwareControls = (await import('../components/HardwareControls.jsx')).default;
+    const fetchMock = vi.fn((url, opts) =>
+      opts?.method === 'PATCH' ? jsonResponse(controls({ fan: { on: true, applied: false } })) : jsonResponse(controls())
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    render(<HardwareControls device={DEVICE} />);
+    const fan = await screen.findByRole('switch', { name: 'Fan' });
+    expect(fan.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(fan);
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Fan' }).getAttribute('aria-checked')).toBe('true'));
+    const patch = fetchMock.mock.calls.find(([, o]) => o?.method === 'PATCH');
+    expect(patch[0]).toContain(`/api/devices/${DEVICE.id}/controls`);
+    expect(JSON.parse(patch[1].body)).toEqual({ fan: true });
+    expect(screen.getByText('Waiting for the Pi')).toBeTruthy();
+    expect(screen.getByText(/Raspberry Pi offline/)).toBeTruthy();
+  });
+
+  test('reboot needs a second click to confirm', async () => {
+    const HardwareControls = (await import('../components/HardwareControls.jsx')).default;
+    const fetchMock = vi.fn(() => jsonResponse(controls()));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<HardwareControls device={DEVICE} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Reboot Pi/ }));
+    expect(fetchMock.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /Confirm reboot/ }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => o?.method === 'POST' && u.endsWith('/commands'))).toBe(true));
+    const post = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST');
+    expect(JSON.parse(post[1].body)).toEqual({ command: 'reboot' });
   });
 });

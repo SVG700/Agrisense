@@ -25,7 +25,7 @@ export default function DecisionBadge({ decision, borderline = false, size = 'md
       </span>
       {label}
       {borderline && (
-        <span aria-hidden="true" className="ml-0.5 rounded-sm bg-black/25 px-1 text-[0.8em] font-semibold text-amber-200">
+        <span aria-hidden="true" className="ml-0.5 rounded-sm bg-amber-100 px-1 text-[0.8em] font-semibold text-amber-900">
           {t('borderline')}
         </span>
       )}

@@ -2,14 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowRight,
+  BatteryFull,
+  BatteryLow,
+  BatteryMedium,
   BatteryWarning,
   Bug,
+  Camera,
   Clock,
   Cpu,
   Droplets,
   History,
   ScanSearch,
   ShieldAlert,
+  StickyNote,
   Thermometer,
   TrendingDown,
   TrendingUp,
@@ -20,14 +25,15 @@ import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TrapCards from './TrapCards.jsx';
-import { useT } from '../lib/i18n.jsx';
+import ManualSprayCard from './ManualSprayCard.jsx';
+import { decisionReason, useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
 import ImpactCard from './ImpactCard.jsx';
 import ActionLogCard from './ActionLogCard.jsx';
 import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
-import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger, WordReveal, useTilt } from '../lib/motion.jsx';
+import { AnimatedNumber, EASE, Item, Reveal, Sparkline, Stagger } from '../lib/motion.jsx';
 import {
   DATA_SOURCES,
   LOW_BATTERY,
@@ -49,8 +55,8 @@ const HEADLINES = {
   Low: 'Pest pressure is low',
 };
 
-/** Farmer-facing analytics view. */
-export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, onGoAdmin }) {
+/** Farmer-facing dashboard: hero + status bar, today's numbers, detections, AI advice, spray. */
+export default function FarmerDashboard({ device, devices = [], onSelectDevice, telemetry, health, onGoAdmin }) {
   const t = useT();
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
@@ -60,7 +66,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
   const latest = telemetry.at(-1) ?? null;
   const capture = telemetry.find((t) => t.id === selectedId) ?? latest;
 
-  // Action log for this trap (shared by the log card and the chart markers)
+  // Action log for this trap (shared by the log card, the spray button and the chart markers)
   const [actions, setActions] = useState([]);
   const [actionsUnavailable, setActionsUnavailable] = useState(null);
   const loadActions = async () => {
@@ -90,7 +96,7 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
   const prevCounted = counted.length >= 2 && capture?.id === counted.at(-1)?.id ? counted.at(-2) : null;
   const delta = prevCounted ? total - totalOf(prevCounted.detection.pest_counts) : null;
 
-  // Real history for the KPI sparklines (most recent 20 points)
+  // Real history for the KPI sparklines
   const RISK_SCORE = { Low: 1, Medium: 2, High: 3 };
   const trends = {
     total: counted.map((t) => totalOf(t.detection.pest_counts)),
@@ -106,9 +112,10 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
     ? { label: 'Photo rejected', tone: 'bad', help: det.vision_meta.error.message }
     : VISION_STATES[visionStatus(det)] ?? null;
   const source = DATA_SOURCES[capture?.data_source ?? 'unknown'] ?? DATA_SOURCES.unknown;
+  const latestDecision = latest?.detection?.ai_advisory?.decision;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <AnimatePresence>
         {device && device.battery_level < LOW_BATTERY && (
           <motion.button
@@ -117,9 +124,9 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.3, ease: EASE }}
             onClick={onGoAdmin}
-            className="group flex items-center gap-3 rounded-2xl border border-rose-500/50 bg-rose-500/10 px-4 py-3 text-left text-sm text-rose-200 transition hover:bg-rose-500/15"
+            className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-left text-sm text-rose-800 transition hover:bg-rose-100"
           >
-            <BatteryWarning className="h-5 w-5 shrink-0 animate-pulse" />
+            <BatteryWarning className="h-5 w-5 shrink-0" aria-hidden="true" />
             <span>
               <b>{device.name}</b> is at {device.battery_level}% battery
               {device.battery_source === 'manual' ? ' (manually set)' : ''} - captures may stop soon. Open hardware
@@ -133,11 +140,11 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
         <div
           role="note"
           data-testid="simulated-banner"
-          className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100"
+          className="-mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
         >
           <Badge tone="warn">{t('simulatedData')}</Badge>
           {capture.detection?.vision_meta?.status === 'simulated' && <Badge tone="warn">{t('demoDetector')}</Badge>}
-          <span className="text-amber-100/80">
+          <span>
             {capture.detection?.vision_meta?.fallback
               ? `The real detection model was unavailable (${capture.detection.vision_meta.fallback.error?.code ?? capture.detection.vision_meta.fallback.reason}), so these counts were simulated by the demo detector, not read from this photo.`
               : t('banner.simulated')}
@@ -153,99 +160,109 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
         risk={risk}
         countsKnown={countsKnown}
         total={total}
+        decision={det?.ai_advisory?.decision}
+        health={health}
+        vState={vState}
         onViewTrap={() => trapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
         onGoAdmin={onGoAdmin}
-        decision={det?.ai_advisory?.decision}
       />
 
-      <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
-
-      <ImpactCard refreshKey={latest?.id} />
-
-      {/* Provenance strip: what the numbers below are */}
-      {capture && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="flex flex-wrap items-center gap-2 text-xs text-slate-400"
-        >
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {isHistoric ? 'Viewing historical capture' : 'Latest capture'} · {new Date(capture.timestamp).toLocaleString()} (
-            {timeAgo(capture.timestamp)})
-          </span>
-          {isHistoric && (
-            <button onClick={() => setSelectedId(null)} className="text-emerald-300 underline-offset-2 hover:underline">
-              back to latest
-            </button>
-          )}
-          {stale && !isHistoric && <Badge tone="bad">Stale - no capture for {timeAgo(latest.timestamp).replace(' ago', '')}</Badge>}
-          {vState && (
-            <Badge tone={vState.tone} title={vState.help}>
-              Detections: {vState.label}
-            </Badge>
-          )}
-          <Badge tone={source.tone}>Readings: {source.label}</Badge>
-          {quality && <QualityBadge quality={quality} />}
-        </motion.div>
-      )}
-
-      {/* KPI row */}
-      <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4" stagger={0.07} delay={0.1}>
-        <Stat
-          icon={Bug}
-          label={t('kpi.insects')}
-          trend={trends.total}
-          trendColor="#a3e635"
-          value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : t('kpi.notCounted')}
-          sub={
-            delta !== null ? (
-              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${delta > 0 ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
-                {delta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {delta > 0 ? '+' : ''}
-                {delta} vs previous
+      {/* ---------- Today at a glance: one box per number ---------- */}
+      <section aria-labelledby="glance-title" className="flex flex-col gap-4">
+        <SectionHead id="glance-title" label={t('section.glance')}>
+          {capture && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                {isHistoric ? 'Viewing historical capture' : 'Latest capture'} · {new Date(capture.timestamp).toLocaleString()} ({timeAgo(capture.timestamp)})
               </span>
-            ) : null
-          }
-        />
-        <Stat
-          icon={Thermometer}
-          label={t('kpi.temperature')}
-          trend={trends.temperature}
-          trendColor="#fb923c"
-          value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
-        />
-        <Stat
-          icon={Droplets}
-          label={t('kpi.humidity')}
-          trend={trends.humidity}
-          trendColor="#38bdf8"
-          value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
-        />
-        <Stat icon={ShieldAlert} label={t('kpi.risk')} trend={trends.risk} trendColor="#f87171" value={<span className={RISK_STYLES[risk]?.text}>{risk ? t(`risk.${risk}`) : '—'}</span>} />
-      </Stagger>
+              {isHistoric && (
+                <button onClick={() => setSelectedId(null)} className="font-medium text-brand underline-offset-2 hover:underline">
+                  back to latest
+                </button>
+              )}
+              {stale && !isHistoric && <Badge tone="bad">Stale - no capture for {timeAgo(latest.timestamp).replace(' ago', '')}</Badge>}
+              {vState && (
+                <Badge tone={vState.tone} title={vState.help}>
+                  Detections: {vState.label}
+                </Badge>
+              )}
+              <Badge tone={source.tone}>Readings: {source.label}</Badge>
+              {quality && <QualityBadge quality={quality} />}
+            </div>
+          )}
+        </SectionHead>
 
-      <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.2}>
-        <Item className="flex min-w-0 flex-col gap-6 lg:col-span-3">
-          <div ref={trapRef} className="scroll-mt-6">
-            <TrapCanvas capture={capture} />
-          </div>
-          <PestBreakdown counts={counts} total={total} known={countsKnown} reason={vState?.help} />
-        </Item>
-        <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
-          <AdvisoryCard advisory={det?.ai_advisory} />
-          <WeatherCard deviceId={device?.id} decision={latest?.detection?.ai_advisory?.decision} />
-          <ActionLogCard
-            deviceId={device?.id}
-            decision={latest?.detection?.ai_advisory?.decision}
-            actions={actions}
-            unavailable={actionsUnavailable}
-            onChanged={loadActions}
+        <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-4" stagger={0.06} delay={0.05}>
+          <Stat
+            icon={Bug}
+            label={t('kpi.insects')}
+            trend={trends.total}
+            trendColor="#15803d"
+            value={!capture ? '—' : countsKnown ? <AnimatedNumber value={total} /> : t('kpi.notCounted')}
+            sub={
+              delta !== null ? (
+                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${delta > 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  {delta > 0 ? <TrendingUp className="h-3 w-3" aria-hidden="true" /> : <TrendingDown className="h-3 w-3" aria-hidden="true" />}
+                  {delta > 0 ? '+' : ''}
+                  {delta} vs previous
+                </span>
+              ) : null
+            }
           />
-          <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
-        </Item>
-      </Stagger>
+          <Stat
+            icon={Thermometer}
+            label={t('kpi.temperature')}
+            trend={trends.temperature}
+            trendColor="#ea580c"
+            value={capture && capture.temperature !== null ? <AnimatedNumber value={capture.temperature} decimals={1} suffix="°C" /> : '—'}
+          />
+          <Stat
+            icon={Droplets}
+            label={t('kpi.humidity')}
+            trend={trends.humidity}
+            trendColor="#0284c7"
+            value={capture && capture.humidity !== null ? <AnimatedNumber value={capture.humidity} decimals={0} suffix="%" /> : fmtReading(null)}
+          />
+          <Stat
+            icon={ShieldAlert}
+            label={t('kpi.risk')}
+            trend={trends.risk}
+            trendColor="#e11d48"
+            value={<span className={RISK_STYLES[risk]?.text}>{risk ? t(`risk.${risk}`) : '—'}</span>}
+          />
+        </Stagger>
+      </section>
+
+      {/* ---------- Detections + AI advisor + spray ---------- */}
+      <section aria-labelledby="detections-title" className="flex flex-col gap-4">
+        <SectionHead id="detections-title" label={t('section.detections')} />
+        <Stagger className="grid gap-6 lg:grid-cols-5" stagger={0.08} delay={0.1}>
+          <Item className="flex min-w-0 flex-col gap-6 lg:col-span-3">
+            <div ref={trapRef} className="scroll-mt-24">
+              <TrapCanvas capture={capture} />
+            </div>
+            <PestBreakdown counts={counts} total={total} known={countsKnown} reason={vState?.help} live={!isHistoric} />
+          </Item>
+          <Item className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+            <AdvisoryCard advisory={det?.ai_advisory} />
+            <ManualSprayCard device={device} decision={latestDecision} onChanged={loadActions} />
+            <WeatherCard deviceId={device?.id} decision={latestDecision} />
+          </Item>
+        </Stagger>
+      </section>
+
+      {/* ---------- All traps ---------- */}
+      <section aria-labelledby="traps-title" className="flex flex-col gap-4">
+        <SectionHead id="traps-title" label={t('section.traps')} />
+        <TrapCards devices={devices} activeId={device?.id} onSelect={onSelectDevice} refreshKey={latest?.id} />
+        <ImpactCard refreshKey={latest?.id} />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ActionLogCard deviceId={device?.id} decision={latestDecision} actions={actions} unavailable={actionsUnavailable} onChanged={loadActions} />
+        <CaptureHistory telemetry={telemetry} selectedId={capture?.id} latestId={latest?.id} onSelect={setSelectedId} />
+      </div>
 
       <Reveal>
         <WhatIfCard deviceId={device?.id} />
@@ -259,6 +276,17 @@ export default function FarmerDashboard({ device, devices = [], onSelectDevice, 
 }
 
 /* -------------------------------------------------------------------------- */
+
+function SectionHead({ id, label, children }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 id={id} className="pill-label">
+        {label}
+      </h2>
+      {children}
+    </div>
+  );
+}
 
 const ISSUE_LABELS = { blurry: 'blurry', dark: 'too dark', bright: 'overexposed', glare: 'glare' };
 
@@ -277,8 +305,8 @@ function QualityBadge({ quality }) {
   );
 }
 
-/** Summary banner built only from the selected capture's real data. */
-function Hero({ device, capture, latest, stale, risk, countsKnown, total, onViewTrap, onGoAdmin, decision }) {
+/** Deep-forest hero: the headline built from the capture's real data + the trap's status bar. */
+function Hero({ device, capture, latest, stale, risk, countsKnown, total, decision, health, vState, onViewTrap, onGoAdmin }) {
   const t = useT();
   const headline = !capture
     ? t('hero.waiting')
@@ -287,35 +315,29 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
       : HEADLINES[risk]
         ? t(`hero.${risk}`)
         : t('hero.awaiting');
-  const style = RISK_STYLES[risk];
-  const boxes = (capture?.detection?.bounding_boxes ?? []).slice(0, 40);
+  const dStyle = decisionStyle(decision?.decision);
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 18 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, ease: EASE }}
-      className="card aurora-border relative overflow-hidden p-6! sm:p-8!"
+      transition={{ duration: 0.5, ease: EASE }}
+      className="hero-field relative overflow-hidden rounded-[1.75rem] text-white"
+      aria-labelledby="hero-title"
     >
-      {/* soft brand wash */}
-      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-500/15 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-lime-500/10 blur-3xl" />
-
-      <div className="relative flex flex-col items-start gap-8 md:flex-row md:items-center md:justify-between">
-        <Stagger className="flex max-w-xl flex-col gap-3" stagger={0.08} delay={0.1}>
+      <div className="relative grid gap-8 p-6 sm:p-10 lg:grid-cols-[1.4fr_1fr] lg:items-end">
+        <Stagger className="flex max-w-2xl flex-col gap-4" stagger={0.07} delay={0.05}>
           <Item className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-              <span className={`live-dot ${stale ? 'text-amber-400' : 'text-emerald-400'}`} />
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 font-medium text-white ring-1 ring-white/20 backdrop-blur">
+              <span className={`live-dot ${stale ? 'text-amber-300' : 'text-emerald-300'}`} aria-hidden="true" />
               {device?.name ?? 'No trap selected'}
             </span>
-            {latest && <span className="text-slate-500">{t('hero.lastCapture', { ago: timeAgo(latest.timestamp) })}</span>}
-            {decision?.decision && <DecisionBadge decision={decision.decision} borderline={decision.borderline} />}
+            {latest && <span className="text-white/70">{t('hero.lastCapture', { ago: timeAgo(latest.timestamp) })}</span>}
           </Item>
-          <Item as="h2" className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl">
-            <WordReveal text={headline} wordClassName="text-shine" delay={0.15} />
-            {style && <span className={`ml-2 inline-block h-3 w-3 translate-y-[-0.35em] rounded-full ${style.dot}`} />}
+          <Item as="h1" id="hero-title" className="text-3xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
+            {headline}
           </Item>
-          <Item as="p" className="text-sm leading-relaxed text-slate-400 sm:text-base">
+          <Item as="p" className="max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
             {!capture
               ? t('hero.noCapture')
               : countsKnown
@@ -324,143 +346,151 @@ function Hero({ device, capture, latest, stale, risk, countsKnown, total, onView
                   : t('hero.counted', { n: total, which: t(capture.id === latest?.id ? 'hero.latest' : 'hero.selected') })
                 : t('hero.notCounted')}
           </Item>
-          <Item className="mt-2 flex flex-wrap gap-3">
-            <button onClick={onViewTrap} className="btn btn-primary" disabled={!capture}>
-              <ScanSearch className="h-4 w-4" /> {t('hero.viewDetections')}
+          <Item className="mt-1 flex flex-wrap gap-3">
+            <button onClick={onViewTrap} className="btn btn-light" disabled={!capture}>
+              <ScanSearch className="h-4 w-4" aria-hidden="true" /> {t('hero.viewDetections')}
             </button>
-            <button onClick={onGoAdmin} className="btn btn-ghost">
-              <Cpu className="h-4 w-4" /> {t('hero.hardware')} <ArrowRight className="h-3.5 w-3.5" />
+            <button onClick={onGoAdmin} className="btn text-white ring-1 ring-white/30 hover:bg-white/10">
+              <Cpu className="h-4 w-4" aria-hidden="true" /> {t('hero.hardware')} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </Item>
         </Stagger>
 
-        <TrapRadar boxes={boxes} />
+        {/* Today's advice, front and centre */}
+        {dStyle && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.2 }}
+            className="rounded-2xl bg-white p-5 text-ink shadow-xl shadow-black/20"
+          >
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{t('decision')}</div>
+            <DecisionBadge decision={decision.decision} borderline={decision.borderline} size="lg" />
+            <p className="mt-3 text-sm leading-relaxed text-slate-700">{decisionReason(t.lang, decision)}</p>
+          </motion.div>
+        )}
       </div>
+
+      <StatusBar device={device} capture={capture} health={health} vState={vState} />
     </motion.section>
   );
 }
 
-/** Decorative radar whose blips are the real detection centres of the capture. */
-function TrapRadar({ boxes }) {
+/** Battery, vision camera, trap type, last capture - the trap box at a glance. */
+function StatusBar({ device, capture, health, vState }) {
+  const t = useT();
+  const level = device?.battery_level;
+  const BatteryIcon = level == null ? BatteryMedium : level < LOW_BATTERY ? BatteryLow : level < 60 ? BatteryMedium : BatteryFull;
+  const batteryTone = level == null ? 'text-white' : level < LOW_BATTERY ? 'text-rose-300' : level < 40 ? 'text-amber-300' : 'text-emerald-300';
+  const provider = health?.integrations?.yolo ? health.services?.vision?.provider ?? 'Model' : 'Demo detector';
+  const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+  const items = [
+    {
+      icon: BatteryIcon,
+      tone: batteryTone,
+      label: t('status.battery'),
+      value: level == null ? '—' : `${level}%`,
+      sub: device?.battery_source === 'manual' ? 'manually set' : device?.status ?? '',
+    },
+    { icon: Camera, tone: 'text-emerald-300', label: t('status.vision'), value: providerName, sub: vState?.label ?? '' },
+    { icon: StickyNote, tone: 'text-amber-200', label: t('status.trap'), value: t('status.trapType'), sub: device?.name ?? '' },
+    {
+      icon: Clock,
+      tone: 'text-sky-200',
+      label: t('status.capture'),
+      value: capture ? timeAgo(capture.timestamp) : t('status.never'),
+      sub: capture ? new Date(capture.timestamp).toLocaleTimeString() : '',
+    },
+  ];
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.7, ease: EASE, delay: 0.2 }}
-      className="relative hidden h-44 w-44 shrink-0 md:block lg:h-52 lg:w-52"
-      aria-hidden="true"
-    >
-      <svg viewBox="0 0 200 200" className="float-slow h-full w-full">
-        <defs>
-          <radialGradient id="radar-bg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgb(16 185 129 / 0.18)" />
-            <stop offset="100%" stopColor="rgb(16 185 129 / 0)" />
-          </radialGradient>
-          <linearGradient id="radar-sweep" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="rgb(52 211 153 / 0)" />
-            <stop offset="100%" stopColor="rgb(52 211 153 / 0.45)" />
-          </linearGradient>
-          <clipPath id="radar-clip">
-            <circle cx="100" cy="100" r="92" />
-          </clipPath>
-        </defs>
-        <circle cx="100" cy="100" r="92" fill="url(#radar-bg)" stroke="rgb(52 211 153 / 0.35)" />
-        {[66, 40, 14].map((r) => (
-          <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="rgb(52 211 153 / 0.18)" strokeDasharray="2 4" />
-        ))}
-        <line x1="8" y1="100" x2="192" y2="100" stroke="rgb(52 211 153 / 0.12)" />
-        <line x1="100" y1="8" x2="100" y2="192" stroke="rgb(52 211 153 / 0.12)" />
-        <g clipPath="url(#radar-clip)">
-          <g className="radar-sweep">
-            <path d="M100 100 L192 100 A92 92 0 0 0 165 35 Z" fill="url(#radar-sweep)" />
-          </g>
-          {boxes.map((b, i) => {
-            const cx = 8 + (b.x + b.width / 2) * 184;
-            const cy = 8 + (b.y + b.height / 2) * 184;
-            return (
-              <circle
-                key={i}
-                cx={cx}
-                cy={cy}
-                r="2.6"
-                fill={pestMeta(b.label).color}
-                style={{ animation: `bbox-in 400ms cubic-bezier(.22,1,.36,1) ${300 + i * 25}ms both`, transformBox: 'fill-box', transformOrigin: 'center' }}
-              />
-            );
-          })}
-        </g>
-      </svg>
-    </motion.div>
+    <ul className="relative grid grid-cols-2 border-t border-white/10 bg-black/20 backdrop-blur-sm lg:grid-cols-4" aria-label="Trap status">
+      {items.map(({ icon: Icon, tone, label, value, sub }, i) => (
+        <li key={label} className={`flex items-center gap-3 px-5 py-4 sm:px-8 ${i % 2 ? 'border-l border-white/10' : ''} ${i >= 2 ? 'border-t border-white/10 lg:border-t-0' : ''} ${i === 2 ? 'lg:border-l' : ''}`}>
+          <Icon className={`h-5 w-5 shrink-0 ${tone}`} aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wider text-white/60">{label}</div>
+            <div className="truncate text-sm font-semibold text-white">{value}</div>
+            {sub && <div className="truncate text-[11px] text-white/60">{sub}</div>}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function Stat({ icon: Icon, label, value, sub, trend = [], trendColor }) {
-  const tilt = useTilt(5);
   return (
-    <Item className="card card-hover flex flex-col gap-3 p-4! sm:p-5!" {...tilt}>
+    <Item className="card card-hover flex flex-col gap-2 p-5!">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400">{label}</span>
+        <span className="text-sm font-medium text-slate-600">{label}</span>
         <span className="icon-chip h-8! w-8! rounded-lg!">
-          <Icon className="h-4 w-4" />
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
-      <div
-        className={`font-semibold tabular-nums tracking-tight text-white ${
-          typeof value === 'string' && value.length > 3 ? 'text-lg sm:text-xl' : 'text-2xl sm:text-3xl'
-        }`}
-      >
+      <div className={`font-semibold tabular-nums tracking-tight text-ink ${typeof value === 'string' && value.length > 3 ? 'text-xl' : 'text-4xl'}`}>
         {value}
       </div>
       {sub && <div className="text-xs">{sub}</div>}
-      {/* Trend of this metric over recent captures (real data) */}
-      <Sparkline values={trend} color={trendColor} height={28} className="-mx-1 mt-auto opacity-90" />
+      <Sparkline values={trend} color={trendColor} height={28} className="-mx-1 mt-auto" />
     </Item>
   );
 }
 
-function PestBreakdown({ counts, total, known, reason }) {
+/** Share of each species on the shown capture; re-animates whenever a new capture arrives. */
+function PestBreakdown({ counts, total, known, reason, live }) {
+  const t = useT();
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   return (
-    <section className="card card-hover">
-      <h2 className="card-title mb-5">
-        <span className="icon-chip h-8! w-8! rounded-lg!">
-          <Bug className="h-4 w-4" />
-        </span>
-        Species Breakdown
-      </h2>
+    <section className="card card-hover" aria-labelledby="species-title">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="species-title" className="card-title">
+          <span className="icon-chip h-8! w-8! rounded-lg!">
+            <Bug className="h-4 w-4" aria-hidden="true" />
+          </span>
+          {t('species.title')}
+        </h2>
+        {live && known && (
+          <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+            <span className="live-dot text-emerald-500" aria-hidden="true" />
+            {t('species.live')}
+          </span>
+        )}
+      </div>
       {!known ? (
         <p className="text-sm text-slate-500">{reason ?? 'No detections yet.'}</p>
       ) : entries.length === 0 || total === 0 ? (
-        <p className="text-sm text-slate-500">No insects detected in this capture.</p>
+        <p className="text-sm text-slate-500">{t('species.none')}</p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-4" aria-live="polite">
           {entries.map(([label, n], i) => {
             const meta = pestMeta(label);
             const pct = total ? (n / total) * 100 : 0;
             return (
-              <div key={label} className="group">
+              <li key={label}>
                 <div className="mb-1.5 flex justify-between text-sm">
-                  <span className="flex items-center gap-2 text-slate-200">
-                    <span className="h-2.5 w-2.5 rounded-full ring-2 ring-white/5" style={{ background: meta.color }} />
+                  <span className="flex items-center gap-2 font-medium text-slate-800">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: meta.color }} aria-hidden="true" />
                     {meta.name}
                   </span>
-                  <span className="tabular-nums text-slate-400">
+                  <span className="tabular-nums text-slate-600">
                     <AnimatedNumber value={n} /> <span className="text-xs">({pct.toFixed(0)}%)</span>
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-800/80">
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="presentation">
                   <motion.div
                     className="h-full rounded-full"
-                    style={{ background: `linear-gradient(90deg, ${meta.color}aa, ${meta.color})`, boxShadow: `0 0 12px ${meta.color}55` }}
+                    style={{ background: meta.color }}
                     initial={{ width: 0 }}
                     animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.7, ease: EASE, delay: 0.1 + i * 0.06 }}
+                    transition={{ duration: 0.6, ease: EASE, delay: 0.05 + i * 0.05 }}
                   />
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </section>
   );
@@ -472,7 +502,7 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
     <section className="card card-hover">
       <h2 className="card-title mb-3">
         <span className="icon-chip h-8! w-8! rounded-lg!">
-          <History className="h-4 w-4" />
+          <History className="h-4 w-4" aria-hidden="true" />
         </span>
         Recent Captures
       </h2>
@@ -496,8 +526,9 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
                 >
                   <button
                     onClick={() => onSelect(t.id === latestId ? null : t.id)}
-                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-all duration-200 ${
-                      selected ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40' : 'hover:translate-x-0.5 hover:bg-slate-800/60'
+                    aria-pressed={selected}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors duration-200 ${
+                      selected ? 'bg-brand-soft ring-1 ring-emerald-200' : 'hover:bg-slate-50'
                     }`}
                   >
                     {dec ? (
@@ -505,11 +536,11 @@ function CaptureHistory({ telemetry, selectedId, latestId, onSelect }) {
                         {dec.shape}
                       </span>
                     ) : (
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-500'}`} />
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-400'}`} />
                     )}
-                    <span className="tabular-nums text-slate-300">{new Date(t.timestamp).toLocaleTimeString()}</span>
-                    {vs === 'simulated' && <span className="text-[10px] uppercase tracking-wide text-amber-300/80">sim</span>}
-                    <span className="ml-auto truncate tabular-nums text-slate-400">
+                    <span className="tabular-nums text-slate-700">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                    {vs === 'simulated' && <span className="text-[10px] uppercase tracking-wide text-amber-800">sim</span>}
+                    <span className="ml-auto truncate tabular-nums text-slate-600">
                       {hasCounts(t.detection) ? `${totalOf(t.detection.pest_counts)} bugs` : VISION_STATES[vs]?.label} ·{' '}
                       {fmtReading(t.temperature, 0, '°C')} · {fmtReading(t.humidity, 0, '%')}
                     </span>

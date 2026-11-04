@@ -48,7 +48,7 @@ export default function TelegramCard({ log }) {
             </span>
             Telegram alerts
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-500">
             A daily trap summary{status?.summary_time ? ` at ${status.summary_time} (${status.timezone})` : ''} and an instant alert when a
             trap turns SPRAY, RELEASE BIOCONTROL or CHECK TRAP - in English and ಕನ್ನಡ.
           </p>
@@ -57,7 +57,7 @@ export default function TelegramCard({ log }) {
       </div>
 
       {!ready && (
-        <ol className="list-decimal space-y-1 rounded-lg bg-slate-900/60 p-3 pl-7 text-xs text-slate-300 ring-1 ring-slate-800">
+        <ol className="list-decimal space-y-1 rounded-lg bg-slate-50 p-3 pl-7 text-xs text-slate-700 ring-1 ring-slate-200">
           <li>
             In Telegram, open <b>@BotFather</b>, send <code>/newbot</code>, copy the token into <code>TELEGRAM_BOT_TOKEN</code> in backend/.env.
           </li>
@@ -88,13 +88,13 @@ export default function TelegramCard({ log }) {
       </div>
 
       {chats && (
-        <div className="text-xs text-slate-300">
+        <div className="text-xs text-slate-700">
           {chats.length ? (
             <ul className="space-y-1">
-              {bot && <li className="text-slate-400">Bot: @{bot.username} - copy your number below into TELEGRAM_CHAT_ID:</li>}
+              {bot && <li className="text-slate-500">Bot: @{bot.username} - copy your number below into TELEGRAM_CHAT_ID:</li>}
               {chats.map((c) => (
                 <li key={c.id}>
-                  <code className="rounded bg-slate-800 px-1.5 py-0.5 text-emerald-200">{c.id}</code> {c.name} ({c.type})
+                  <code className="rounded bg-slate-100 px-1.5 py-0.5 text-emerald-700">{c.id}</code> {c.name} ({c.type})
                 </li>
               ))}
             </ul>
@@ -102,7 +102,7 @@ export default function TelegramCard({ log }) {
             <p data-testid="telegram-no-chats">
               No messages found for{' '}
               {bot ? (
-                <a href={`https://t.me/${bot.username}`} target="_blank" rel="noreferrer" className="font-semibold text-emerald-300 underline">
+                <a href={`https://t.me/${bot.username}`} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 underline">
                   @{bot.username}
                 </a>
               ) : (
@@ -116,7 +116,7 @@ export default function TelegramCard({ log }) {
       )}
 
       {status?.last && (
-        <p className={`text-xs ${status.last.ok ? 'text-slate-500' : 'text-rose-300'}`}>
+        <p className={`text-xs ${status.last.ok ? 'text-slate-500' : 'text-rose-700'}`}>
           Last send: {status.last.ok ? `OK (${status.last.messages} message${status.last.messages === 1 ? '' : 's'})` : `failed - ${status.last.description ?? status.last.code}`} ·{' '}
           {new Date(status.last.at).toLocaleTimeString()}
         </p>
@@ -124,7 +124,7 @@ export default function TelegramCard({ log }) {
 
       {preview && (
         <div
-          className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-xl bg-slate-950/70 p-3 text-xs leading-relaxed text-slate-200 ring-1 ring-slate-800"
+          className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-xl bg-white/95 p-3 text-xs leading-relaxed text-slate-800 ring-1 ring-slate-200"
           data-testid="telegram-preview"
           // Server-built Telegram HTML (escaped names; only <b>, <i>, <a>): shown as plain text here
         >

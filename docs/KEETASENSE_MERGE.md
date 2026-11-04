@@ -115,6 +115,13 @@ All optional. Nothing is required for the demo.
 
 ## 6. #14 - Raspberry Pi gaps (not built)
 
+**Trap-box controls (backend ready, Pi side not built).** The Admin page switches the fan and trap
+light and sends Pi commands (`capture_now`, `restart_camera`, `reboot`). The Pi should poll
+`GET /api/devices/<id>/commands/pending` (device key) every ~30 s, apply the switches, run each
+command, then `POST /api/devices/<id>/commands/ack` with `{command_id, ok, message, switches}`.
+Until it does, the dashboard says "waiting for the Pi". State is kept in memory and resets when
+the backend restarts.
+
 The edge client already has Picamera2 capture, a BME280 / DHT22 sensor, a durable offline queue and
 idempotent uploads with backoff. To use it as a field trap with these features:
 
