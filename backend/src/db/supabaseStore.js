@@ -82,11 +82,11 @@ export function createSupabaseStore({ config, client, logger }) {
       );
     },
 
-    async listObservations({ since }) {
-      return run(
-        'listObservations',
-        supabase.from('trap_daily_observations').select('*').gte('date', since).order('date', { ascending: true }).limit(20000)
-      );
+    /** Optionally for one trap only (uses the unique (device_id, date) index). */
+    async listObservations({ since, deviceId }) {
+      let q = supabase.from('trap_daily_observations').select('*').gte('date', since);
+      if (deviceId) q = q.eq('device_id', deviceId);
+      return run('listObservations', q.order('date', { ascending: true }).limit(20000));
     },
 
     /** Removes simulated map traps (their observations cascade). */

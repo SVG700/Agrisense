@@ -9,6 +9,7 @@ import { createAdvisor } from './services/advisor.js';
 import { createWeather } from './services/weather.js';
 import { createTelegram } from './services/telegram.js';
 import { createApp } from './app.js';
+import { warmDecisions } from './routes/map.js';
 
 const logger = createLogger();
 const { config, errors, warnings } = loadConfig();
@@ -27,6 +28,8 @@ const weather = createWeather({ config, logger });
 const telegram = createTelegram({ config, store, weather, logger });
 const app = createApp({ config, store, vision, advisor, weather, telegram, logger });
 telegram.startScheduler();
+// Fill the decision cache in the background so the first dashboard load is fast
+warmDecisions({ store, logger });
 
 const server = app.listen(config.port, () => {
   logger.info('server_started', {

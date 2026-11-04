@@ -13,21 +13,25 @@ import { decisionReason, useT } from '../lib/i18n.jsx';
  */
 export default function TrapCards({ devices, activeId, onSelect, refreshKey }) {
   const [decisions, setDecisions] = useState({});
+  // The dashboard polls every few seconds and hands us a new array each time; only
+  // reload when the set of traps (or the latest capture) actually changes - otherwise
+  // a slow database would restart the requests forever and the cards never fill in.
+  const ids = devices.map((d) => d.id).join(',');
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all(
-      devices.map((d) =>
-        api
-          .decision(d.id)
-          .then((r) => [d.id, r])
-          .catch((err) => [d.id, { error: err.message }])
-      )
-    ).then((pairs) => !cancelled && setDecisions(Object.fromEntries(pairs)));
+    // Each card fills in as soon as its own answer arrives; old answers stay visible meanwhile
+    for (const id of ids ? ids.split(',') : []) {
+      api
+        .decision(id)
+        .then((r) => r)
+        .catch((err) => ({ error: err.message }))
+        .then((r) => !cancelled && setDecisions((prev) => ({ ...prev, [id]: r })));
+    }
     return () => {
       cancelled = true;
     };
-  }, [devices, refreshKey]);
+  }, [ids, refreshKey]);
 
   if (!devices.length) return null;
 

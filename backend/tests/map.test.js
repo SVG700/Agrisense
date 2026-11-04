@@ -295,3 +295,26 @@ describe('what-if simulator', () => {
     }
   });
 });
+
+describe('decision cache', () => {
+  test('repeat requests are cached; a new capture refreshes that trap at once', async () => {
+    const app = await startApp({});
+    try {
+      await app.request('POST', '/api/telemetry', { body: { temperature: 25, image_url: mockTrapUrl('c1', 0.05) } });
+      let reads = 0;
+      const original = app.store.listTelemetry.bind(app.store);
+      app.store.listTelemetry = (...a) => (reads++, original(...a));
+      const first = await app.request('GET', `/api/decision?device_id=${DEVICE}`);
+      await app.request('GET', `/api/decision?device_id=${DEVICE}`);
+      assert.equal(reads, 1); // second answer came from the cache
+      assert.equal(first.body.decision, 'WAIT');
+
+      // A dense card arrives -> the next decision is recomputed, not stale
+      await app.request('POST', '/api/telemetry', { body: { temperature: 25, image_url: mockTrapUrl('c2', 1.6) } });
+      const after = await app.request('GET', `/api/decision?device_id=${DEVICE}`);
+      assert.notEqual(after.body.avg_pests, first.body.avg_pests);
+    } finally {
+      await app.close();
+    }
+  });
+});

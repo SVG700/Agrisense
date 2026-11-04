@@ -76,8 +76,8 @@ export function createMemoryStore() {
       return rows.map((r) => ({ id: observations.get(`${r.device_id}|${r.date}`).id }));
     },
 
-    async listObservations({ since }) {
-      return [...observations.values()].filter((o) => o.date >= since).sort((a, b) => a.date.localeCompare(b.date)).map(clone);
+    async listObservations({ since, deviceId }) {
+      return [...observations.values()].filter((o) => o.date >= since && (!deviceId || o.device_id === deviceId)).sort((a, b) => a.date.localeCompare(b.date)).map(clone);
     },
 
     async deleteSimulatedDevices() {

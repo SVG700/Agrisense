@@ -155,18 +155,82 @@ export async function trapDayRows({ store, logger }, days, { requireCoords = tru
  * last N days, with CHECK TRAP from the latest capture. Used by /decision and the
  * action log (to record the advice shown when the farmer acted).
  */
+// Short per-trap cache: the dashboard asks for every trap's decision on each load, and a
+// remote database can take seconds per query. Cleared for a trap the moment it gets a new
+// capture (and for all traps on a demo reset), so advice is never stale after new data.
+// Safe to keep for minutes: every event that changes a decision (new capture, demo reset,
+// map seed) clears it immediately; only the 48 h CHECK TRAP clock can lag by up to this long.
+const DECISION_TTL_MS = 5 * 60_000;
+const DECISION_WINDOW_DAYS = 30; // plenty for a 3-day average + the 48 h CHECK TRAP rule
+// One cache per data store, so separate app instances (e.g. tests) never share answers
+const caches = new WeakMap(); // store -> Map(deviceId -> {at, value})
+const cacheFor = (store) => {
+  if (!caches.has(store)) caches.set(store, new Map());
+  return caches.get(store);
+};
+
+/** Drop one trap's cached decision (new capture), or all of them (no deviceId). */
+export function invalidateDecision(store, deviceId) {
+  const cache = cacheFor(store);
+  if (!deviceId) return cache.clear();
+  cache.delete(deviceId);
+  // Network-wide results depend on every trap
+  for (const key of cache.keys()) if (String(key).startsWith('impact:')) cache.delete(key);
+}
+
+/** Network-wide impact estimate, cached and cleared like the decisions. */
+export async function impactFor({ store, logger }, days) {
+  const cache = cacheFor(store);
+  const key = `impact:${days}`;
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < DECISION_TTL_MS) return hit.value;
+  const { list, since, warnings } = await trapDayRows({ store, logger }, days, { requireCoords: false });
+  const value = { days, since, generated_at: new Date().toISOString(), ...estimateImpact(list), warnings };
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+/**
+ * Computes every trap's decision in the background (at startup / after a demo
+ * reset) so the dashboard's first load is fast even on a slow database link.
+ */
+export async function warmDecisions({ store, logger }) {
+  const started = Date.now();
+  try {
+    const devices = await store.listDevices();
+    // A few at a time: a burst of parallel queries is slower on a slow link
+    for (let i = 0; i < devices.length; i += 3) {
+      await Promise.all(devices.slice(i, i + 3).map((d) => trapDecision({ store }, d.id).catch(() => null)));
+    }
+    await impactFor({ store, logger }, 30).catch(() => null);
+    logger?.info('decisions_warmed', { traps: devices.length, ms: Date.now() - started });
+  } catch (err) {
+    logger?.warn('decisions_warm_failed', { error: err.message });
+  }
+}
+
 export async function trapDecision({ store }, deviceId) {
-  const fetchSince = isoDay(new Date(Date.now() - (MAX_DAYS - 1) * 86_400_000));
+  const decisionCache = cacheFor(store);
+  const hit = decisionCache.get(deviceId);
+  if (hit && Date.now() - hit.at < DECISION_TTL_MS) return hit.value;
+  const value = await computeTrapDecision({ store }, deviceId);
+  decisionCache.set(deviceId, { at: Date.now(), value });
+  if (decisionCache.size > 1000) decisionCache.delete(decisionCache.keys().next().value);
+  return value;
+}
+
+async function computeTrapDecision({ store }, deviceId) {
+  const fetchSince = isoDay(new Date(Date.now() - (DECISION_WINDOW_DAYS - 1) * 86_400_000));
   const byDate = new Map();
   try {
-    for (const o of await store.listObservations({ since: fetchSince })) {
+    for (const o of await store.listObservations({ since: fetchSince, deviceId })) {
       if (o.device_id !== deviceId) continue;
       byDate.set(o.date, { date: o.date, pests: o.pest_count, predators: o.predator_count, confidence: null, simulated: true });
     }
   } catch (err) {
     if (!(err instanceof StoreError)) throw err;
   }
-  const telemetry = await store.listTelemetry({ deviceId, limit: 500, sign: false });
+  const telemetry = await store.listTelemetry({ deviceId, limit: 120, sign: false });
   for (const d of dailySeries(telemetry)) byDate.set(d.date, d);
   const days = [...byDate.values()];
   // The latest real capture decides CHECK TRAP (failed / uncounted photo, or trap gone quiet)
@@ -209,8 +273,7 @@ export function mapRouter({ config, store, logger }) {
   // Impact ESTIMATE vs calendar spraying, over every trap (with or without coordinates)
   router.get('/impact', async (req, res) => {
     const days = Math.min(MAX_DAYS, Math.max(7, Number.parseInt(req.query.days, 10) || 30));
-    const { list, since, warnings } = await trapDayRows({ store, logger }, days, { requireCoords: false });
-    res.json({ days, since, generated_at: new Date().toISOString(), ...estimateImpact(list), warnings });
+    res.json(await impactFor({ store, logger }, days));
   });
 
   // What-if: the SAME engine on hypothetical daily averages (pure computation, nothing stored)
@@ -245,6 +308,7 @@ export function mapRouter({ config, store, logger }) {
   });
 
   router.post('/admin/map-seed', adminLimit, requireAdmin(config), async (req, res) => {
+    invalidateDecision(store); // seeded history changes decisions
     const { traps, observations } = req.body ?? {};
     if (!Array.isArray(traps) || traps.length === 0 || traps.length > MAX_TRAPS) {
       throw new HttpError(400, `"traps" must be an array of 1-${MAX_TRAPS} items`, { code: 'invalid_traps' });
@@ -298,6 +362,7 @@ export function mapRouter({ config, store, logger }) {
   });
 
   router.delete('/admin/map-seed', adminLimit, requireAdmin(config), async (req, res) => {
+    invalidateDecision(store); // seeded history changes decisions
     const removed = await store.deleteSimulatedDevices();
     logger.info('map_seed_removed', { traps: removed.length, request_id: req.id });
     res.json({ removed_traps: removed.length });

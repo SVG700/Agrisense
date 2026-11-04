@@ -11,6 +11,7 @@ import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { DEMO_DAYS, DEMO_TRAPS, clearDemo, resetDemo } from '../services/demoData.js';
+import { invalidateDecision, warmDecisions } from './map.js';
 
 export function demoRouter({ config, store, vision, logger }) {
   const router = Router();
@@ -25,12 +26,16 @@ export function demoRouter({ config, store, vision, logger }) {
     // Synthetic trap images are served by this API, so point them at the host the request reached
     const publicUrl = `${req.protocol}://${req.get('host')}`;
     const result = await resetDemo({ store, vision, config, publicUrl });
+    invalidateDecision(store);
+    warmDecisions({ store, logger }); // background: the dashboard is fast right after a reset
     logger.info('demo_reset', { captures: result.captures, ms: Date.now() - started });
     res.status(201).json(result);
   });
 
   router.delete('/admin/demo', adminLimit, requireAdmin(config), async (req, res) => {
-    res.json(await clearDemo({ store }));
+    const result = await clearDemo({ store });
+    invalidateDecision(store);
+    res.json(result);
   });
 
   return router;

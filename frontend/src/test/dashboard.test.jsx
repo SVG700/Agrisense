@@ -617,3 +617,28 @@ describe('EN / ಕನ್ನಡ', () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe('Trap cards with a slow database', () => {
+  test('a new devices array on every poll does not restart the requests (cards still fill in)', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            calls++;
+            setTimeout(() => resolve({ ok: true, status: 200, json: () => Promise.resolve({ decision: 'WAIT', label: 'WAIT', avg_pests: 3, reason: 'ok', window: { days: 3 } }) }), 60);
+          })
+      )
+    );
+    const { default: TrapCards } = await import('../components/TrapCards.jsx');
+    const { rerender } = render(<TrapCards devices={[{ ...DEVICE }]} activeId={DEVICE.id} />);
+    // Poll faster than the answer: same trap, new array objects
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      rerender(<TrapCards devices={[{ ...DEVICE }]} activeId={DEVICE.id} />);
+    }
+    await waitFor(() => expect(screen.getByTestId('trap-card').querySelector('[data-decision="WAIT"]')).toBeTruthy());
+    expect(calls).toBe(1);
+  });
+});

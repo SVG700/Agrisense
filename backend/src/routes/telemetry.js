@@ -14,6 +14,7 @@ import { DEMO_DEVICE_ID } from '../config.js';
 import { requireDevice } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { dailySeries, evaluateDecision, splitCounts, withTrapCheck } from '../services/decision.js';
+import { invalidateDecision } from './map.js';
 import {
   HttpError,
   batteryLevel,
@@ -222,6 +223,8 @@ export function telemetryRouter({ config, store, vision, advisor, telegram, logg
           },
         },
       });
+
+      invalidateDecision(store, deviceId);
 
       // Telegram alert when the advice changes (fire-and-forget: never delays or fails ingestion)
       if (telegram && !duplicate) {
