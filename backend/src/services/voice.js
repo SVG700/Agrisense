@@ -9,7 +9,41 @@
 import { createHash } from 'node:crypto';
 import { classifyGeminiError, createGeminiClient } from './advisor.js';
 
-const MAX_CACHE = 40;
+const MAX_CACHE = 60;
+
+/** Gemini's prebuilt voices (name -> character). Only these are accepted from the dashboard. */
+export const VOICES = {
+  Kore: 'Firm, clear',
+  Aoede: 'Breezy, warm',
+  Sulafat: 'Warm',
+  Charon: 'Calm, informative',
+  Puck: 'Upbeat',
+  Achird: 'Friendly',
+  Vindemiatrix: 'Gentle',
+  Gacrux: 'Mature',
+  Iapetus: 'Clear',
+  Despina: 'Smooth',
+  Sadaltager: 'Knowledgeable',
+  Zephyr: 'Bright',
+  Leda: 'Youthful',
+  Orus: 'Firm',
+  Fenrir: 'Excitable',
+  Callirrhoe: 'Easy-going',
+  Autonoe: 'Bright',
+  Enceladus: 'Breathy',
+  Umbriel: 'Easy-going',
+  Algieba: 'Smooth',
+  Erinome: 'Clear',
+  Algenib: 'Gravelly',
+  Rasalgethi: 'Informative',
+  Laomedeia: 'Upbeat',
+  Achernar: 'Soft',
+  Alnilam: 'Firm',
+  Schedar: 'Even',
+  Pulcherrima: 'Forward',
+  Zubenelgenubi: 'Casual',
+  Sadachbia: 'Lively',
+};
 const COOLDOWN_MS = 60_000; // after Gemini says 429, wait before asking again
 // How the voice should sound: a calm field advisor, not a news reader
 const STYLE = {
@@ -50,12 +84,19 @@ export function createVoice({ config, client, logger }) {
   let coolUntil = 0;
 
   return {
-    describe: () => ({ state: configured ? 'configured' : 'not_configured', provider: configured ? 'gemini' : null, model: configured ? v.model : null, voice: configured ? v.voice : null }),
+    describe: () => ({
+      state: configured ? 'configured' : 'not_configured',
+      provider: configured ? 'gemini' : null,
+      model: configured ? v.model : null,
+      voice: configured ? v.voice : null, // the default
+      voices: Object.entries(VOICES).map(([name, style]) => ({ name, style })),
+    }),
 
     /** @returns {Promise<{ok: true, wav: Buffer, cached: boolean} | {ok: false, code, message}>} */
-    async speak({ text, lang = 'en' }) {
+    async speak({ text, lang = 'en', voice: chosen }) {
+      const voiceName = chosen && VOICES[chosen] ? chosen : v.voice;
       if (!configured) return { ok: false, code: 'not_configured', message: 'Add GEMINI_API_KEY to backend/.env for the natural voice' };
-      const key = createHash('sha1').update(`${v.model}|${v.voice}|${lang}|${text}`).digest('hex');
+      const key = createHash('sha1').update(`${v.model}|${voiceName}|${lang}|${text}`).digest('hex');
       const hit = cache.get(key);
       if (hit) {
         cache.delete(key); // refresh LRU position
@@ -72,7 +113,7 @@ export function createVoice({ config, client, logger }) {
           contents: [{ role: 'user', parts: [{ text: `${STYLE[lang] ?? STYLE.en}\n\n${text}` }] }],
           config: {
             responseModalities: ['AUDIO'],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: v.voice } } },
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
           },
         });
         const part = res?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);

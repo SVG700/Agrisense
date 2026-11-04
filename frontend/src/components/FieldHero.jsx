@@ -11,6 +11,7 @@ import {
   Droplets,
   Leaf,
   Lightbulb,
+  Mic,
   Pause,
   Play,
   Plus,
@@ -526,10 +527,10 @@ async function decode(blob) {
   }
 }
 
-function fetchPart(chunk, lang) {
-  const key = `${lang}|${chunk}`;
+function fetchPart(chunk, lang, voiceName) {
+  const key = `${voiceName ?? 'default'}|${lang}|${chunk}`;
   if (!voiceParts.has(key)) {
-    const p = api.voice(chunk, lang).then(async (blob) => ({ url: URL.createObjectURL(blob), ...(await decode(blob)) }));
+    const p = api.voice(chunk, lang, voiceName).then(async (blob) => ({ url: URL.createObjectURL(blob), ...(await decode(blob)) }));
     p.catch(() => voiceParts.delete(key)); // let a later press retry
     voiceParts.set(key, p);
   }
@@ -561,6 +562,7 @@ function ListenCard({ capture, decision }) {
   const [rate, setRate] = useState(1);
   const [parts, setParts] = useState([]); // resolved parts, by index
   const [mode, setMode] = useState('natural'); // natural | browser
+  const [voiceName, setVoiceName] = useState(readVoice);
   const [note, setNote] = useState(null);
   const audio = useRef(null);
   const run = useRef(0); // bumps on stop/restart so stale playback chains end
@@ -591,7 +593,7 @@ function ListenCard({ capture, decision }) {
     setProgress(0);
     setMode('natural');
     setNote(null);
-  }, [text, t.lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [text, t.lang, voiceName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Starts generating every piece (first one first); resolves when the first is ready. */
   const prepare = () => {
@@ -599,7 +601,7 @@ function ListenCard({ capture, decision }) {
     // One after another (not in parallel) to stay inside the per-minute voice quota
     let prev = Promise.resolve();
     const promises = chunks.map((c, i) => {
-      const p = prev.then(() => fetchPart(c, t.lang));
+      const p = prev.then(() => fetchPart(c, t.lang, voiceName));
       prev = p.catch(() => {});
       p.then((part) => setParts((prev) => {
         const next = [...prev];
@@ -701,9 +703,9 @@ function ListenCard({ capture, decision }) {
   // cached clip per new advice), so pressing play starts at once
   useEffect(() => {
     if (!chunks.length) return undefined;
-    const id = setTimeout(() => fetchPart(chunks[0], t.lang).catch(() => {}), 1500);
+    const id = setTimeout(() => fetchPart(chunks[0], t.lang, voiceName).catch(() => {}), 1500);
     return () => clearTimeout(id);
-  }, [chunks, t.lang]);
+  }, [chunks, t.lang, voiceName]);
 
   return (
     <Card aria-labelledby="listen-title" className="flex flex-col">
@@ -715,6 +717,14 @@ function ListenCard({ capture, decision }) {
           <p className="text-xs text-slate-500">
             {t('card.listen')} · <span className="font-medium text-[#8a6a00] [:root[data-theme=dark]_&]:text-butter">{mode === 'browser' ? t('card.browserVoice') : t('card.naturalVoice')}</span>
           </p>
+          <VoicePicker
+            value={voiceName}
+            lang={t.lang}
+            onChange={(v) => {
+              setVoiceName(v);
+              writeVoice(v);
+            }}
+          />
         </div>
         <motion.button
           type="button"
@@ -771,6 +781,137 @@ function ListenCard({ capture, decision }) {
       </div>
       {note && <p className="mt-2 text-[11px] text-slate-500">{note}</p>}
     </Card>
+  );
+}
+
+const VOICE_KEY = 'agrisense.voice';
+function readVoice() {
+  try {
+    return localStorage.getItem(VOICE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+function writeVoice(v) {
+  try {
+    v ? localStorage.setItem(VOICE_KEY, v) : localStorage.removeItem(VOICE_KEY);
+  } catch {
+    /* not remembered */
+  }
+}
+
+/** Choose the Gemini voice; each voice can be previewed with one short line. */
+function VoicePicker({ value, lang, onChange }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [list, setList] = useState(null); // {voice: default, voices: [{name, style}]}
+  const [previewing, setPreviewing] = useState(null);
+  const [err, setErr] = useState(null);
+  const player = useRef(null);
+  const box = useRef(null);
+
+  useEffect(() => {
+    if (!open || list) return;
+    api.voices().then(setList).catch(() => setList({ voice: null, voices: [] }));
+  }, [open, list]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => box.current && !box.current.contains(e.target) && setOpen(false);
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+      player.current?.pause();
+    };
+  }, [open]);
+
+  const current = value ?? list?.voice ?? 'Kore';
+  const preview = async (name) => {
+    haptic();
+    player.current?.pause();
+    setPreviewing(name);
+    setErr(null);
+    try {
+      const part = await fetchPart(t('card.previewLine'), lang, name);
+      const a = new Audio(part.url);
+      a.onended = () => setPreviewing(null);
+      player.current = a;
+      await a.play();
+    } catch (e) {
+      setPreviewing(null);
+      setErr(e.status === 429 ? t('card.voiceBusy') : e.message);
+    }
+  };
+
+  return (
+    <div ref={box} className="relative mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-butter-soft px-2.5 text-xs font-medium text-[#6b5200] transition-colors hover:bg-[#f6e3a1] [:root[data-theme=dark]_&]:text-butter"
+      >
+        <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+        {t('card.voice')}: {current}
+        <ChevronRight className={`h-3 w-3 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={SPRING}
+            className="absolute left-0 top-10 z-30 w-72 origin-top-left overflow-hidden rounded-2xl bg-surface shadow-[var(--elev-4)] ring-1 ring-line"
+          >
+            <p className="border-b border-line px-4 py-2.5 text-[11px] text-slate-500">{t('card.voiceHelp')}</p>
+            <ul role="listbox" aria-label={t('card.voice')} className="max-h-72 overflow-y-auto p-1.5">
+              {!list && <li className="px-3 py-3 text-sm text-slate-500">…</li>}
+              {list?.voices.map((v) => {
+                const selected = v.name === current;
+                return (
+                  <li key={v.name} className={`flex items-center gap-2 rounded-xl px-2 py-1 ${selected ? 'bg-butter-soft' : 'hover:bg-slate-50'}`}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      onClick={() => {
+                        haptic();
+                        onChange(v.name === list.voice ? null : v.name);
+                        setOpen(false);
+                      }}
+                      className="flex min-h-10 flex-1 flex-col items-start justify-center text-left"
+                    >
+                      <span className="text-sm font-medium text-ink">
+                        {v.name}
+                        {v.name === list.voice && <span className="ml-1.5 text-[10px] font-normal text-slate-500">({t('card.default')})</span>}
+                      </span>
+                      <span className="text-[11px] text-slate-500">{v.style}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => preview(v.name)}
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-600 hover:bg-slate-100"
+                      aria-label={`${t('card.preview')} ${v.name}`}
+                    >
+                      {previewing === v.name ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {err && <p className="border-t border-line px-4 py-2 text-[11px] text-rose-700">{err}</p>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 

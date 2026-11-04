@@ -53,10 +53,10 @@ async function request(path, { method = 'GET', body, signal, admin = false } = {
 }
 
 /** Natural (Gemini) voice for a text: resolves to an audio Blob (WAV). */
-async function voice(text, lang = 'en', signal) {
+async function voice(text, lang = 'en', voiceName, signal) {
   let res;
   try {
-    res = await fetch(`${BASE}/api/voice`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang }) });
+    res = await fetch(`${BASE}/api/voice`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, ...(voiceName ? { voice: voiceName } : {}) }) });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
     throw new ApiError('Cannot reach the Agrisense API - is the backend running?');
@@ -71,6 +71,7 @@ async function voice(text, lang = 'en', signal) {
 export const api = {
   health: () => request('/api/health'),
   voice,
+  voices: () => request('/api/voice'),
   devices: () => request('/api/devices'),
   telemetry: (deviceId, limit = 50) =>
     request(`/api/telemetry?limit=${limit}${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`),

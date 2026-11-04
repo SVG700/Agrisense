@@ -54,6 +54,11 @@ describe('voice', () => {
     assert.equal(client.calls.length, 1); // replay is free
     await voice.speak({ text: 'Spray the east rows.', lang: 'kn' });
     assert.equal(client.calls.length, 2); // another language is a new clip
+    await voice.speak({ text: 'Spray the east rows.', lang: 'en', voice: 'Aoede' });
+    assert.equal(client.calls.length, 3); // another voice too
+    assert.equal(client.calls[2].config.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Aoede');
+    await voice.speak({ text: 'Spray the east rows.', lang: 'en', voice: 'NotAVoice' });
+    assert.equal(client.calls.length, 3); // unknown names fall back to the default (cached)
   });
 
   test('POST /api/voice returns audio/wav; errors are clear; length is capped', async () => {
@@ -64,6 +69,9 @@ describe('voice', () => {
       assert.equal(res.headers.get('content-type'), 'audio/wav');
       assert.equal(Buffer.from(await res.arrayBuffer()).toString('ascii', 0, 4), 'RIFF');
       assert.equal((await app.request('POST', '/api/voice', { body: { text: '' } })).status, 422);
+      assert.equal((await app.request('POST', '/api/voice', { body: { text: 'Hi', voice: 'Evil' } })).status, 422);
+      const list = (await app.request('GET', '/api/voice')).body;
+      assert.ok(list.voices.some((v) => v.name === 'Aoede' && v.style));
       assert.equal((await app.request('POST', '/api/voice', { body: { text: 'x'.repeat(1300) } })).status, 413);
     } finally {
       await app.close();

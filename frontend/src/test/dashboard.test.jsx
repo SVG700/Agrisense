@@ -882,3 +882,34 @@ describe('Natural voice', () => {
     expect(screen.getByText(/Natural voice/)).toBeTruthy();
   });
 });
+
+describe('Voice picker', () => {
+  test('choosing a voice is remembered and used for the next playback', async () => {
+    localStorage.removeItem('agrisense.voice');
+    const { HeroCards } = await import('../components/FieldHero.jsx');
+    const voices = { voice: 'Kore', voices: [{ name: 'Kore', style: 'Firm, clear' }, { name: 'Aoede', style: 'Breezy, warm' }] };
+    const fetchMock = vi.fn((url, opts) => {
+      if (String(url).endsWith('/api/voice') && opts?.method === 'POST') return Promise.resolve({ ok: true, status: 200, blob: () => Promise.resolve(new Blob(['RIFF'])) });
+      if (String(url).endsWith('/api/voice')) return jsonResponse(voices);
+      return jsonResponse({ switches: { trap_light: { on: true } } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:voice' }));
+    vi.stubGlobal('Audio', function FakeAudio() {
+      this.play = () => Promise.resolve();
+      this.pause = () => {};
+    });
+    const c = capture({ detection: { ...capture().detection, ai_advisory: { risk_level: 'High', summary: 'Pressure is high. Spray tonight.', mitigation_strategy: [] } } });
+    render(<HeroCards device={DEVICE} capture={c} telemetry={[c]} decision={null} events={[]} onSeeAll={() => {}} onSelectCapture={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Voice: Kore/ }));
+    fireEvent.click(await screen.findByRole('option', { name: /Aoede/ }));
+    expect(localStorage.getItem('agrisense.voice')).toBe('Aoede');
+    expect(screen.getByRole('button', { name: /Voice: Aoede/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Read the advice aloud' }));
+    await waitFor(() => {
+      const posts = fetchMock.mock.calls.filter(([u, o]) => String(u).endsWith('/api/voice') && o?.method === 'POST').map(([, o]) => JSON.parse(o.body));
+      expect(posts.some((b) => b.voice === 'Aoede')).toBe(true);
+    });
+    localStorage.removeItem('agrisense.voice');
+  });
+});
