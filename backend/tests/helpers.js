@@ -11,6 +11,7 @@ import { createVision } from '../src/services/vision.js';
 import { createAdvisor } from '../src/services/advisor.js';
 import { createWeather } from '../src/services/weather.js';
 import { createTelegram } from '../src/services/telegram.js';
+import { createTelegramBot } from '../src/services/telegramBot.js';
 import { createApp } from '../src/app.js';
 
 export const DEVICE = '11111111-1111-4111-8111-111111111111';
@@ -36,7 +37,9 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
   // No real network in tests: weather fails fast unless a fake is given
   const weather = createWeather({ config, logger, http: weatherHttp ?? { get: async () => { throw new Error('offline'); } } });
   const telegram = createTelegram({ config, store, weather, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } });
-  const app = createApp({ config, store, vision, advisor, weather, telegram, voice, logger });
+  // The photo bot is created but not started (tests drive it with bot.handle)
+  const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, logger, http: telegramHttp ?? { post: async () => { throw new Error('offline'); }, get: async () => { throw new Error('offline'); } } }) : null;
+  const app = createApp({ config, store, vision, advisor, weather, telegram, telegramBot, voice, logger });
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -57,7 +60,7 @@ export async function startApp({ env = {}, store, visionHttp, llmClient, weather
     return { status: res.status, body: json, headers: res.headers };
   }
 
-  return { base, store, config, telegram, request, close: () => new Promise((r) => server.close(r)) };
+  return { base, store, config, telegram, telegramBot, request, close: () => new Promise((r) => server.close(r)) };
 }
 
 /** Fake axios-like client for the vision provider. */

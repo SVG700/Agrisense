@@ -88,6 +88,19 @@ All optional. Nothing is required for the demo.
 | `WEATHER_ENABLED`, `WEATHER_DEFAULT_LAT`, `WEATHER_DEFAULT_LON`, `WEATHER_DEFAULT_LABEL`, `WEATHER_CACHE_MINUTES`, `WEATHER_TIMEOUT_MS` | Open-Meteo (no key) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | **Both needed** to switch Telegram on |
 | `TELEGRAM_LANGUAGE`, `TELEGRAM_ALERTS`, `TELEGRAM_SUMMARY_TIME`, `TELEGRAM_TIMEZONE`, `TELEGRAM_TIMEOUT_MS`, `DASHBOARD_URL` | Telegram options (`both`, on, 07:00, Asia/Kolkata) |
+| `TELEGRAM_PHOTO_BOT`, `TELEGRAM_BOT_ACCESS`, `TELEGRAM_BOT_MAX_PER_HOUR`, `TELEGRAM_BOT_DEFAULT_DAYS` | Photo bot (on, `chats` = only TELEGRAM_CHAT_ID, 20/h, 7 days) |
+| `GEMINI_TTS_MODEL`, `GEMINI_TTS_VOICE`, `VOICE_MAX_CHARS` | Natural voice for the AI advice (defaults are fine) |
+
+### Telegram photo bot - demo
+
+1. **Put the laptop on mobile data** (the venue Wi-Fi blocks Telegram). The Admin page's
+   *Photo bot* card turns to **Listening for photos** within a few seconds - no restart needed.
+2. On the phone, open the bot and send a photo of a yellow sticky card, caption `7`
+   (days it hung). Within ~10-20 s the bot replies with the traffic-light decision, insects
+   counted and per day, predators, why, and 3 things to do - then the photo with every insect marked.
+3. Commands: `/days 7` (default days for this chat), `/lang en|kn|both`, `/help`.
+4. A phone that is not in `TELEGRAM_CHAT_ID` gets a polite refusal with its chat id - add it
+   (comma-separated) and restart to let that farmer use the bot.
 
 ## 5. What you need to do by hand
 

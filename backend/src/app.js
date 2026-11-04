@@ -24,7 +24,7 @@ import { errorHandler, notFound } from './middleware/errors.js';
 const REQUEST_ID_RE = /^[\w-]{8,64}$/;
 
 /**
- * @param {{config, store, vision, advisor, weather?, telegram?, controls?, logger}} deps
+ * @param {{config, store, vision, advisor, weather?, telegram?, telegramBot?, controls?, logger}} deps
  */
 export function createApp(deps) {
   const { config, store, vision, advisor, weather, telegram, logger } = deps;

@@ -23,6 +23,7 @@ import { LOW_BATTERY, RISK_STYLES, timeAgo, totalOf } from '../lib/pests.js';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import TelegramCard from './TelegramCard.jsx';
+import PhotoBotCard from './PhotoBotCard.jsx';
 import HardwareControls from './HardwareControls.jsx';
 import { SystemStatusCard } from './SystemStatus.jsx';
 
@@ -85,6 +86,9 @@ export default function AdminPanel({ devices, activeDeviceId, health, adminAuthR
         </Item>
         <Item>
           <TelegramCard log={pushLog} />
+        </Item>
+        <Item>
+          <PhotoBotCard log={pushLog} />
         </Item>
         <Item>
           <DemoControl onChanged={onIngested} log={pushLog} />

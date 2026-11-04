@@ -97,6 +97,8 @@ export const api = {
   telegramTest: () => request('/api/admin/telegram/test', { method: 'POST', admin: true }),
   telegramSummary: () => request('/api/admin/telegram/summary', { method: 'POST', admin: true }),
   telegramChats: () => request('/api/admin/telegram/chats', { admin: true }),
+  telegramBot: () => request('/api/admin/telegram/bot', { admin: true }),
+  setTelegramBot: (enabled) => request('/api/admin/telegram/bot', { method: 'POST', body: { enabled }, admin: true }),
   resetDemo: () => request('/api/admin/demo/reset', { method: 'POST', admin: true }),
   clearDemo: () => request('/api/admin/demo', { method: 'DELETE', admin: true }),
   // Trap-box hardware (fan, trap light, Raspberry Pi)

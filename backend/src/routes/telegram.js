@@ -5,13 +5,15 @@
  *   POST /api/admin/telegram/test      send a short "connected" message
  *   POST /api/admin/telegram/summary   send the trap summary now
  *   GET  /api/admin/telegram/chats     chats that messaged the bot (to find TELEGRAM_CHAT_ID)
+ *   GET  /api/admin/telegram/bot       photo bot status (listening?, checks, access)
+ *   POST /api/admin/telegram/bot       {enabled: true|false} start / stop the photo bot
  */
 import { Router } from 'express';
 import { requireAdmin } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { HttpError } from '../utils/validate.js';
 
-export function telegramRouter({ config, telegram }) {
+export function telegramRouter({ config, telegram, telegramBot }) {
   const router = Router();
   const adminLimit = rateLimit({ name: 'admin', windowMs: config.rateLimit.windowMs, max: config.rateLimit.adminMax });
   router.use('/admin/telegram', adminLimit, requireAdmin(config));
@@ -28,7 +30,17 @@ export function telegramRouter({ config, telegram }) {
   router.get('/admin/telegram/preview', async (req, res) => res.json({ text: await telegram.buildSummary() }));
   router.post('/admin/telegram/test', async (req, res) => result(res, await telegram.sendTest()));
   router.post('/admin/telegram/summary', async (req, res) => result(res, await telegram.sendSummary()));
+  router.get('/admin/telegram/bot', (req, res) => res.json(telegramBot?.describe() ?? { enabled: false, state: 'off' }));
+  router.post('/admin/telegram/bot', (req, res) => {
+    if (!telegramBot) throw new HttpError(409, 'Telegram is not set up - add TELEGRAM_BOT_TOKEN to backend/.env', { code: 'telegram_not_configured' });
+    if (typeof req.body?.enabled !== 'boolean') throw new HttpError(422, '"enabled" must be true or false', { code: 'invalid_enabled' });
+    if (req.body.enabled) telegramBot.start();
+    else telegramBot.stop();
+    res.json(telegramBot.describe());
+  });
   router.get('/admin/telegram/chats', async (req, res) => {
+    // While the photo bot polls it receives every message, so it knows the chats
+    if (telegramBot?.isRunning()) return res.json({ ok: true, chats: telegramBot.chats(), bot: telegramBot.me() });
     const r = await telegram.findChats();
     if (!r.ok && r.code === 'not_configured') {
       throw new HttpError(409, 'Add TELEGRAM_BOT_TOKEN to backend/.env first', { code: 'telegram_not_configured' });

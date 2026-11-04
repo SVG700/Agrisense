@@ -163,6 +163,14 @@ export function loadConfig(env = process.env) {
       timezone: str('TELEGRAM_TIMEZONE', 'Asia/Kolkata'),
       dashboardUrl: str('DASHBOARD_URL'),
       timeoutMs: int('TELEGRAM_TIMEOUT_MS', 10_000, 500, 30_000),
+      // Photo bot: farmers send a trap photo to the bot and get the count + advice back
+      bot: {
+        enabled: !['0', 'false', 'no', 'off'].includes(str('TELEGRAM_PHOTO_BOT', 'true').toLowerCase()),
+        access: str('TELEGRAM_BOT_ACCESS', 'chats').toLowerCase() === 'anyone' ? 'anyone' : 'chats', // chats = only TELEGRAM_CHAT_ID
+        maxPerHour: int('TELEGRAM_BOT_MAX_PER_HOUR', 20, 1, 500),
+        defaultDays: int('TELEGRAM_BOT_DEFAULT_DAYS', 7, 1, 30),
+        pollTimeoutSec: int('TELEGRAM_BOT_POLL_SECONDS', 25, 1, 50),
+      },
     },
 
     // Open-Meteo (free, no key): spray window + degree-days. Never blocks anything.

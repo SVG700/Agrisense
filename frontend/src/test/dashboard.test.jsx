@@ -928,3 +928,24 @@ describe('Live weather by location', () => {
     localStorage.removeItem('agrisense.place');
   });
 });
+
+describe('Photo bot card', () => {
+  test('shows the bot status and counters, and stops it', async () => {
+    const PhotoBotCard = (await import('../components/PhotoBotCard.jsx')).default;
+    let running = true;
+    const status = () => ({ enabled: true, running, state: running ? 'listening' : 'stopped', bot: 'agrisense_bot', checks: 4, refused: 1, access: 'chats', allowed_chats: 1, max_per_hour: 20, default_days: 7, last_poll_at: new Date().toISOString() });
+    const fetchMock = vi.fn((url, opts) => {
+      if (opts?.method === 'POST') running = JSON.parse(opts.body).enabled;
+      return jsonResponse(status());
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PhotoBotCard />);
+    expect(await screen.findByText('Listening for photos')).toBeTruthy();
+    expect(screen.getByText('@agrisense_bot')).toBeTruthy();
+    expect(screen.getByText('4')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Stop photo bot/ }));
+    expect(await screen.findByRole('button', { name: /Start photo bot/ })).toBeTruthy();
+    const post = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST');
+    expect(JSON.parse(post[1].body)).toEqual({ enabled: false });
+  });
+});
