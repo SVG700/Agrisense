@@ -102,25 +102,3 @@ export const ECONOMICS_CONFIG = Object.freeze({
   maxWeeklyLossPct: Number(ec.max_weekly_loss_pct ?? 15),
   horizonDays: Number(ec.horizon_days ?? 7),
 });
-
-const lc = raw.lifecycle ?? {};
-export const LIFECYCLE_CONFIG = Object.freeze({
-  stages: Object.freeze({
-    hatch: Number(lc.stages?.hatch ?? 90),
-    secondInstar: Number(lc.stages?.second_instar ?? 125),
-    thirdInstar: Number(lc.stages?.third_instar ?? 165),
-    adult: Number(lc.stages?.adult ?? DEGREE_DAY_CONFIG.generationDegreeDays),
-  }),
-  humidRh: Number(lc.humid_rh ?? 70),
-  humidFactor: Number(lc.humid_factor ?? 1.1),
-  dryRh: Number(lc.dry_rh ?? 40),
-  dryFactor: Number(lc.dry_factor ?? 0.85),
-  spikeRisePts: Number(lc.spike_rise_pts ?? 15),
-  spikeHighRh: Number(lc.spike_high_rh ?? 80),
-  spikeLowRh: Number(lc.spike_low_rh ?? 65),
-  spikeLeadHours: Number(lc.spike_lead_hours ?? 24),
-  spikeLagHours: Number(lc.spike_lag_hours ?? 12),
-  crawlerFallbackHours: Number(lc.crawler_fallback_hours ?? 48),
-  preferredStartHour: Number(lc.preferred_start_hour ?? 6),
-  preferredEndHour: Number(lc.preferred_end_hour ?? 8),
-});

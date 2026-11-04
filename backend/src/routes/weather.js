@@ -3,7 +3,6 @@
  *   GET /api/weather?device_id=<uuid>   forecast at the trap (or the default farm location)
  *   GET /api/weather?lat=..&lon=..      forecast at a point (phone check / map)
  *   GET /api/weather/now?lat=..&lon=..  live temperature + humidity there (5-min cache)
- *   GET /api/lifecycle?device_id=..     pest lifecycle forecast -> WHEN to treat (targeted timing)
  *   GET /api/places?q=..                address / village search -> [{label, lat, lon}]
  *   GET /api/places/reverse?lat=..&lon=..  place name for a point ("Use my location")
  *
@@ -14,9 +13,6 @@
 import { Router } from 'express';
 import { HttpError, isUuid } from '../utils/validate.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { dailySeries } from '../services/decision.js';
-import { predictLifecycle } from '../services/lifecycle.js';
-import { trapDecision } from './map.js';
 
 const coord = (v, min, max) => {
   const n = Number(v);
@@ -56,23 +52,6 @@ export function weatherRouter({ config, store, weather }) {
       ? { lat: config.weather.defaultLat, lon: config.weather.defaultLon, label: config.weather.defaultLabel }
       : { ...point(req), label: typeof req.query.label === 'string' ? req.query.label.slice(0, 120) : null };
     res.json(await weather.now(p));
-  });
-
-  router.get('/lifecycle', async (req, res) => {
-    const { device_id: deviceId } = req.query;
-    if (!isUuid(deviceId)) throw new HttpError(400, '"device_id" must be a UUID', { code: 'invalid_device_id' });
-    const d = await store.getDevice(deviceId);
-    if (!d) throw new HttpError(404, 'Unknown trap', { code: 'unknown_device' });
-    const at = d.latitude != null && d.longitude != null
-      ? { lat: d.latitude, lon: d.longitude, label: d.name }
-      : { lat: config.weather.defaultLat, lon: config.weather.defaultLon, label: config.weather.defaultLabel, default: true };
-    const [forecast, decision, rows] = await Promise.all([
-      weather.forecast(at),
-      trapDecision({ store }, deviceId),
-      store.listTelemetry({ deviceId, limit: 120, sign: false }),
-    ]);
-    if (!forecast) return res.json({ available: false, reason: 'Weather forecast unreachable right now - timing will return when it is back.', location: at });
-    res.json({ ...predictLifecycle(forecast, { decision, days: dailySeries(rows) }), location: at, fetched_at: forecast.fetched_at, stale: forecast.stale });
   });
 
   router.get('/places', placeLimit, async (req, res) => {

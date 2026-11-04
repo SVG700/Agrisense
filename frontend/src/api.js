@@ -79,9 +79,6 @@ export const api = {
     return request(`/api/economics?${q}`);
   },
   crops: () => request('/api/economics/crops'),
-  // Pest lifecycle forecast -> targeted treatment timing; Telegram reminder 1 h before
-  lifecycle: (deviceId) => request(`/api/lifecycle?device_id=${encodeURIComponent(deviceId)}`),
-  remind: (payload) => request('/api/admin/telegram/remind', { method: 'POST', body: payload, admin: true }),
   // Live weather at a place (null = the farm's default location) and place search
   weatherNow: (p) =>
     request(p ? `/api/weather/now?lat=${p.lat}&lon=${p.lon}&label=${encodeURIComponent(p.label ?? '')}` : '/api/weather/now'),

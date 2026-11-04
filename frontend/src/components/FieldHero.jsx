@@ -306,12 +306,12 @@ function TrapRail({ devices, activeId, onSelect, onAdd }) {
 /*  Right half: the reference's card grid                                     */
 /* ========================================================================== */
 
-export function HeroCards({ device, capture, telemetry, decision, events, onSeeAll, onSelectCapture, weather, economics, timing }) {
+export function HeroCards({ device, capture, telemetry, decision, events, onSeeAll, onSelectCapture, weather, economics }) {
   return (
     <div className="grid gap-4 sm:grid-cols-[1.75fr_1fr]">
       <TrapHealthCard device={device} capture={capture} weather={weather} onSeeAll={() => onSeeAll('glance')} />
       <PressureCard telemetry={telemetry} decision={decision} />
-      <ListenCard capture={capture} decision={decision} economics={economics} timing={timing} />
+      <ListenCard capture={capture} decision={decision} economics={economics} />
       <GuideCard />
       <RecentUpdates events={events} onSeeAll={() => onSeeAll('timeline')} onSelectCapture={onSelectCapture} className="sm:col-span-2" />
     </div>
@@ -564,7 +564,7 @@ function toBars(parts) {
   return Array.from({ length: BARS }, (_, i) => all[Math.floor((i / BARS) * all.length)] / top);
 }
 
-function ListenCard({ capture, decision, economics, timing }) {
+function ListenCard({ capture, decision, economics }) {
   const t = useT();
   const adv = capture?.detection?.ai_advisory;
   const text = useMemo(() => {
@@ -577,10 +577,8 @@ function ListenCard({ capture, decision, economics, timing }) {
         : economics?.kind === 'at_risk'
           ? t('econ.saySpray', { v: Math.round(economics.headline_inr), n: economics.settings.horizon_days, s: Math.round(economics.spray_cost_inr) })
           : '';
-    // ...and when to act (English sentence from the lifecycle forecast; skipped in Kannada)
-    const when = t.lang === 'en' && timing ? timing : '';
-    return [decision ? decisionReason(t.lang, decision) : '', when, money, adv.summary ?? '', ...steps].filter(Boolean).join(' ').slice(0, 1200);
-  }, [adv, decision, t.lang, economics?.kind, economics?.headline_inr, timing]); // eslint-disable-line react-hooks/exhaustive-deps
+    return [decision ? decisionReason(t.lang, decision) : '', money, adv.summary ?? '', ...steps].filter(Boolean).join(' ').slice(0, 1200);
+  }, [adv, decision, t.lang, economics?.kind, economics?.headline_inr]); // eslint-disable-line react-hooks/exhaustive-deps
   const chunks = useMemo(() => (text ? splitForSpeech(text) : []), [text]);
   const speechOK = typeof window !== 'undefined' && 'speechSynthesis' in window;
 

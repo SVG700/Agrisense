@@ -16,7 +16,6 @@ import axios from 'axios';
 import { TEXT, moneyLine } from './telegram.js';
 import { MAX_DAYS_HUNG, runPhoneCheck } from './phoneCheck.js';
 import { decodeImage } from '../utils/validate.js';
-import { predictLifecycle } from './lifecycle.js';
 
 const API = 'https://api.telegram.org';
 const MAX_AGE_S = 10 * 60; // ignore photos older than this (e.g. sent while the backend was off)
@@ -81,7 +80,7 @@ export function parseDays(caption) {
 }
 
 /** The reply text for one check, in one language. */
-export function resultText(lang, out, timing = null) {
+export function resultText(lang, out) {
   const T = BOT_TEXT[lang];
   const d = out.decision;
   const label = TEXT[lang].decision[d.decision] ?? d.decision;
@@ -95,7 +94,6 @@ export function resultText(lang, out, timing = null) {
   if (d.reason) lines.push('', `<b>${T.why}:</b> ${esc(d.reason)}`);
   const money = moneyLine(lang, d);
   if (money) lines.push('', money);
-  if (timing) lines.push('', `⏱ ${esc(timing)}`);
   const steps = (out.advisory?.mitigation_strategy?.length ? out.advisory.mitigation_strategy : [out.advisory?.recommendation]).filter(Boolean).slice(0, 3);
   if (steps.length) lines.push('', `<b>${T.todo}:</b>`, ...steps.map((s, i) => `${i + 1}. ${esc(s)}`));
   if (out.vision.status === 'simulated' || out.vision.fallback) lines.push('', T.simulated);
@@ -106,7 +104,7 @@ export function resultText(lang, out, timing = null) {
 /**
  * @param {{config, vision, advisor, http?, logger?}} deps
  */
-export function createTelegramBot({ config, vision, advisor, weather, http = axios, logger }) {
+export function createTelegramBot({ config, vision, advisor, http = axios, logger }) {
   const tg = config.telegram;
   const bot = tg.bot;
   const enabledByConfig = Boolean(tg.token && bot.enabled);
@@ -210,19 +208,7 @@ export function createTelegramBot({ config, vision, advisor, weather, http = axi
       await send(chatId, textFor(chatId, (l) => BOT_TEXT[l].working), { reply_to_message_id: msg.message_id });
       const daysHung = parseDays(msg.caption) ?? prefs.get(chatId)?.days ?? bot.defaultDays;
       const out = await runPhoneCheck({ config, vision, advisor }, { image: got.image, daysHung, source: 'Telegram photo' });
-      // When to act: lifecycle forecast at the farm's default location; the card's catch dates the egg cohort
-      let timing = null;
-      try {
-        const forecast = await weather?.forecast?.({ lat: config.weather.defaultLat, lon: config.weather.defaultLon });
-        if (forecast && out.per_day) {
-          const mid = new Date(Date.now() - (daysHung / 2) * 86_400_000).toISOString().slice(0, 10);
-          timing = predictLifecycle(forecast, { decision: out.decision, days: [{ date: mid, pests: out.per_day.pests }] }).headline;
-        }
-      } catch {
-        /* reply without timing */
-      }
-      const langs = langsFor(chatId);
-      await send(chatId, langs.map((l, k) => resultText(l, out, k === 0 ? timing : null)).join('\n\n— — —\n\n'), { reply_to_message_id: msg.message_id });
+      await send(chatId, langsFor(chatId).map((l) => resultText(l, out)).join('\n\n— — —\n\n'), { reply_to_message_id: msg.message_id });
       if (out.annotated_image) await sendPhoto(chatId, out.annotated_image, textFor(chatId, (l) => BOT_TEXT[l].caption));
       status.checks++;
       logger?.info('telegram_photo_check', { decision: out.decision.decision, vision: out.vision.status, ms: Date.now() - started });

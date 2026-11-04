@@ -25,8 +25,6 @@ import { buildEvents } from '../lib/events.js';
 import { useLiveWeather } from '../lib/place.js';
 import { useEconomics } from '../lib/economics.js';
 import EconomicsCard from './EconomicsCard.jsx';
-import TimingCard from './TimingCard.jsx';
-import { useLifecycle } from '../lib/lifecycle.js';
 import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -84,7 +82,6 @@ export default function FarmerDashboard({
   const [vision, setVision] = useState(null); // {x, y} press point while Live Vision is open
   const weather = useLiveWeather();
   const economics = useEconomics(device?.id, telemetry.at(-1)?.id, device?.name);
-  const lifecycle = useLifecycle(device?.id, telemetry.at(-1)?.id);
   const outside = weather.data?.available ? weather.data : null;
 
   const latest = telemetry.at(-1) ?? null;
@@ -155,7 +152,6 @@ export default function FarmerDashboard({
   const selectCapture = (id) => setSelectedId(id === latest?.id ? null : id);
 
   const sections = {
-    timing: <TimingCard device={device} data={lifecycle} />,
     economics: <EconomicsCard device={device} economics={economics} />,
     glance: (
       <section aria-labelledby="glance-title" className="flex flex-col gap-4">
@@ -315,7 +311,7 @@ export default function FarmerDashboard({
             onOpenVision={setVision}
             visionOpen={Boolean(vision)}
           />
-          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} weather={weather} economics={economics.data} timing={lifecycle?.available ? lifecycle.headline : null} />
+          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} weather={weather} economics={economics.data} />
         </div>
         <LiveVision open={Boolean(vision)} origin={vision} onClose={() => setVision(null)} device={device} capture={capture} layoutId={VISION_LAYOUT_ID} />
       </LayoutGroup>

@@ -310,13 +310,6 @@ export function createWeather({ config, http = axios, logger }) {
   return {
     describe: () => ({ state: w.enabled ? 'configured' : 'disabled', provider: w.enabled ? 'open-meteo' : null }),
 
-    /** The parsed hourly forecast (14 past + 7 next days) for the lifecycle model, or null. */
-    async forecast({ lat, lon }) {
-      if (!w.enabled) return null;
-      const got = await forecastFor(lat, lon);
-      return got ? { ...got.forecast, fetched_at: new Date(got.at).toISOString(), stale: got.stale } : null;
-    },
-
     /** Live temperature / humidity at a point. Never throws. */
     async now({ lat, lon, label }) {
       const base = { source: 'open-meteo', location: { lat, lon, label } };
