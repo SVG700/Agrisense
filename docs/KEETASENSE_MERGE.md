@@ -126,16 +126,37 @@ All optional. Nothing is required for the demo.
    (`PATCH /api/device/location`) for the map and per-trap weather.
 9. **When happy:** merge `feature/keetasense-merge` into `main` (ask me and I'll do it).
 
-## 6. #14 - Raspberry Pi gaps (not built)
+## 6. #14 - Raspberry Pi
 
-**Trap-box controls (backend ready, Pi side not built).** The Admin page switches the fan and trap
+### Trap-box agent (built and tested on the Pi 5 + ov5647 camera)
+
+`edge-simulator/pi_agent.py` is the one program that owns the camera: a trap photo every
+`AGRISENSE_INTERVAL` s (durable queue -> `/api/telemetry`), control polling every 3 s (fan /
+trap light / Capture now / Restart camera / Reboot / Start-Stop stream, each confirmed back), and
+the Live Vision stream (OpenCV: yellow-card mask -> card only -> insect blobs, ~1.5 fps, auto-stops
+after 10 min). Tested live: Fan ON confirmed in < 5 s, Capture now -> "photo sent", stream at 1.5 fps.
+
+Install on the Pi (no sudo): code in `~/agrisense/edge`, a venv `~/agrisense/venv`
+(`python3 -m venv --system-site-packages`, then `pip install requests opencv-python-headless`),
+settings in `~/agrisense/edge/.env` (chmod 600: API URL, device id, device key, pins). Run:
+`../venv/bin/python pi_agent.py` (`--stream` to stream at start, `--frame-test` for one frame).
+Start on boot (sudo once): see `deploy/agrisense-agent.service`.
+
+Still to do on the hardware: aim/focus the camera on the card (fixed-focus ov5647 - the first
+real photos were rejected as blurry), wire the fan / UV light (set `AGRISENSE_FAN_PIN` /
+`AGRISENSE_LIGHT_PIN`, BCM numbers), add a BME280/DHT22 (then `AGRISENSE_SENSOR`), and a
+battery monitor. The API URL points at the laptop's IP on the hotspot - update it if that changes.
+
+### Protocol (for reference)
+
+**Trap-box controls.** The Admin page switches the fan and trap
 light and sends Pi commands (`capture_now`, `restart_camera`, `reboot`). The Pi should poll
 `GET /api/devices/<id>/commands/pending` (device key) every ~30 s, apply the switches, run each
 command, then `POST /api/devices/<id>/commands/ack` with `{command_id, ok, message, switches}`.
 Until it does, the dashboard says "waiting for the Pi". State is kept in memory and resets when
 the backend restarts.
 
-**Live Vision (backend + dashboard ready, Pi side not built).** Pressing the trap photo (or
+**Live Vision.** Pressing the trap photo (or
 "Live Vision") on the dashboard opens the Pi's OpenCV view. While streaming (after a
 `start_stream` command, until `stop_stream`), the Pi should send about 1-2 frames a second:
 

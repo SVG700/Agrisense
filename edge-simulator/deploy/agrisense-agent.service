@@ -1,0 +1,33 @@
+# systemd unit for the AgriSense trap-box agent (pi_agent.py) installed in the
+# pi user's home: ~/agrisense/edge (code + .env, chmod 600) and ~/agrisense/venv
+# (created with --system-site-packages so it sees Picamera2).
+#
+# Install on the Pi (needs your sudo password once):
+#   sudo cp ~/agrisense/edge/deploy/agrisense-agent.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now agrisense-agent
+# Logs:   journalctl -u agrisense-agent -f
+# Stop:   sudo systemctl stop agrisense-agent      (frees the camera)
+
+[Unit]
+Description=AgriSense trap-box agent (captures, controls, Live Vision)
+Wants=network-online.target
+After=network-online.target time-sync.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+SupplementaryGroups=video gpio i2c
+WorkingDirectory=/home/pi/agrisense/edge
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/agrisense/venv/bin/python pi_agent.py --env-file /home/pi/agrisense/edge/.env
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
