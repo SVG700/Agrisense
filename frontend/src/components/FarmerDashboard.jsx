@@ -25,6 +25,7 @@ import { buildEvents } from '../lib/events.js';
 import { useLiveWeather } from '../lib/place.js';
 import { useEconomics } from '../lib/economics.js';
 import EconomicsCard from './EconomicsCard.jsx';
+import ForecastCard from './ForecastCard.jsx';
 import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -152,6 +153,7 @@ export default function FarmerDashboard({
   const selectCapture = (id) => setSelectedId(id === latest?.id ? null : id);
 
   const sections = {
+    forecast: <ForecastCard />,
     economics: <EconomicsCard device={device} economics={economics} />,
     glance: (
       <section aria-labelledby="glance-title" className="flex flex-col gap-4">

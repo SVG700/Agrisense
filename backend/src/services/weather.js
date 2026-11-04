@@ -38,7 +38,16 @@ export function parseForecast(data) {
     gust: h.wind_gusts_10m?.[i] ?? null,
     day: h.is_day?.[i] === 1,
   }));
-  const days = d.time.map((t, i) => ({ t: t * 1000, tmax: d.temperature_2m_max?.[i] ?? null, tmin: d.temperature_2m_min?.[i] ?? null }));
+  const days = d.time.map((t, i) => ({
+    t: t * 1000,
+    tmax: d.temperature_2m_max?.[i] ?? null,
+    tmin: d.temperature_2m_min?.[i] ?? null,
+    code: d.weather_code?.[i] ?? null,
+    rh: d.relative_humidity_2m_mean?.[i] ?? null,
+    pop: d.precipitation_probability_max?.[i] ?? null,
+    rain: d.precipitation_sum?.[i] ?? null,
+    wind: d.wind_speed_10m_max?.[i] ?? null,
+  }));
   return { hours, days, timezone: data.timezone ?? null, utcOffsetSec: data.utc_offset_seconds ?? 0 };
 }
 
@@ -134,6 +143,49 @@ export function degreeDays(days, now, cfg = DEGREE_DAY_CONFIG) {
   };
 }
 
+/** WMO weather code -> a short label + icon id (https://open-meteo.com/en/docs). */
+export function weatherKind(code) {
+  if (code == null) return { label: '—', icon: 'cloud' };
+  if (code === 0) return { label: 'Clear', icon: 'sun' };
+  if (code <= 2) return { label: 'Partly cloudy', icon: 'cloud-sun' };
+  if (code === 3) return { label: 'Cloudy', icon: 'cloud' };
+  if (code <= 48) return { label: 'Fog', icon: 'fog' };
+  if (code <= 57) return { label: 'Drizzle', icon: 'drizzle' };
+  if (code <= 67) return { label: 'Rain', icon: 'rain' };
+  if (code <= 77) return { label: 'Snow', icon: 'snow' };
+  if (code <= 82) return { label: 'Showers', icon: 'rain' };
+  return { label: 'Thunderstorm', icon: 'storm' };
+}
+
+/**
+ * Today + the next 6 days: weather, temperature range, humidity, rain, wind,
+ * and how many daylight hours pass the spray rules (with the first good hour).
+ */
+export function dailyOutlook(forecast, now = Date.now(), cfg = SPRAY_CONFIG) {
+  const { hours, days } = forecast;
+  const today = days.findIndex((d) => d.t + 86_400_000 > now);
+  if (today < 0) return [];
+  return days.slice(today, today + 7).map((d) => {
+    const idx = [];
+    for (let i = 0; i < hours.length; i++) if (hours[i].t >= d.t && hours[i].t < d.t + 86_400_000 && hours[i].t + 3_600_000 > now) idx.push(i);
+    const good = idx.filter((i) => hourCheck(hours, i, cfg).ok);
+    const kind = weatherKind(d.code);
+    return {
+      date: new Date(d.t).toISOString(),
+      weather: kind.label,
+      icon: kind.icon,
+      temp_max: round1(d.tmax),
+      temp_min: round1(d.tmin),
+      humidity: d.rh == null ? null : Math.round(d.rh),
+      rain_probability: d.pop,
+      rain_mm: round1(d.rain),
+      wind_max_kmh: round1(d.wind),
+      spray_hours: good.length,
+      first_spray_hour: good.length ? new Date(hours[good[0]].t).toISOString() : null,
+    };
+  });
+}
+
 /** Everything the dashboard shows, for one forecast and one moment. */
 export function summarize(forecast, now = Date.now(), cfg = SPRAY_CONFIG) {
   const { hours, days } = forecast;
@@ -156,6 +208,7 @@ export function summarize(forecast, now = Date.now(), cfg = SPRAY_CONFIG) {
       },
     },
     degree_days: degreeDays(days, now),
+    daily: dailyOutlook(forecast, now, cfg),
     next_24h: hours.slice(i, i + 24).map((h, k) => ({
       time: new Date(h.t).toISOString(),
       temp: h.temp,
@@ -287,7 +340,7 @@ export function createWeather({ config, http = axios, logger }) {
           latitude: lat,
           longitude: lon,
           hourly: HOURLY,
-          daily: 'temperature_2m_max,temperature_2m_min',
+          daily: 'temperature_2m_max,temperature_2m_min,weather_code,relative_humidity_2m_mean,precipitation_probability_max,precipitation_sum,wind_speed_10m_max',
           past_days: 14,
           forecast_days: 7,
           timezone: 'auto',

@@ -226,3 +226,35 @@ describe('live conditions and place search', () => {
     }
   });
 });
+
+describe('7-day outlook', () => {
+  test('weather codes map to labels and icons', async () => {
+    const { weatherKind } = await import('../src/services/weather.js');
+    assert.deepEqual(weatherKind(0), { label: 'Clear', icon: 'sun' });
+    assert.equal(weatherKind(63).label, 'Rain');
+    assert.equal(weatherKind(95).icon, 'storm');
+    assert.equal(weatherKind(null).label, '—');
+  });
+
+  test('daily outlook: today + 6 days with temperatures, humidity, rain and good spray hours', async () => {
+    const { dailyOutlook } = await import('../src/services/weather.js');
+    const D = 86_400_000;
+    const start = Date.parse('2026-11-04T00:00:00Z');
+    const days = Array.from({ length: 9 }, (_, k) => ({ t: start + (k - 1) * D, tmax: 29, tmin: 19, code: k % 2 ? 61 : 1, rh: 80, pop: k % 2 ? 90 : 5, rain: k % 2 ? 4 : 0, wind: 12 }));
+    const hours = [];
+    for (let h = -24; h < 8 * 24; h++) {
+      const k = Math.floor((h + 24) / 24);
+      hours.push({ t: start + h * 3_600_000, temp: 25, rh: 70, pop: k % 2 ? 90 : 0, rain: k % 2 ? 1 : 0, wind: 6, gust: 9, day: ((h % 24) + 24) % 24 >= 7 && ((h % 24) + 24) % 24 <= 17 });
+    }
+    const out = dailyOutlook({ hours, days }, start + 2 * 3_600_000);
+    assert.equal(out.length, 7);
+    assert.equal(out[0].date, new Date(start).toISOString());
+    assert.equal(out[0].temp_max, 29);
+    assert.equal(out[0].humidity, 80);
+    // In this data today is rainy and tomorrow is dry
+    assert.equal(out[0].spray_hours, 0, 'a rainy day has no spray hours');
+    assert.equal(out[0].weather, 'Rain');
+    assert.ok(out[1].spray_hours > 0, 'a dry day has spray hours');
+    assert.equal(out[1].weather, 'Partly cloudy');
+  });
+});

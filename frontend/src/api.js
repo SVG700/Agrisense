@@ -98,6 +98,8 @@ export const api = {
   decisionRegions: (maxPests = 150, maxPredators = 30, steps = 50) =>
     request(`/api/decision/regions?max_pests=${maxPests}&max_predators=${maxPredators}&steps=${steps}`),
   weather: (deviceId) => request(`/api/weather${deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : ''}`),
+  // Forecast at a chosen place (null = the farm's default location)
+  weatherAt: (p) => request(p ? `/api/weather?lat=${p.lat}&lon=${p.lon}` : '/api/weather'),
   check: (payload) => request('/api/check', { method: 'POST', body: payload }),
   telegramStatus: () => request('/api/admin/telegram', { admin: true }),
   telegramPreview: () => request('/api/admin/telegram/preview', { admin: true }),

@@ -982,3 +982,20 @@ describe('Economic impact widget', () => {
     expect(screen.getByRole('img', { name: /Spraying costs ₹750; ignoring the warning could cost ₹9,400/ })).toBeTruthy();
   });
 });
+
+describe('7-day forecast', () => {
+  test('lists the days with weather, temperatures, humidity, rain and spray hours; names the best day', async () => {
+    localStorage.removeItem('agrisense.place');
+    const ForecastCard = (await import('../components/ForecastCard.jsx')).default;
+    const day = (k, o = {}) => ({ date: new Date(Date.parse('2026-11-03T18:30:00Z') + k * 86_400_000).toISOString(), weather: 'Showers', icon: 'rain', temp_min: 20, temp_max: 29, humidity: 82, rain_probability: 80, rain_mm: 3.1, wind_max_kmh: 11, spray_hours: 0, first_spray_hour: null, ...o });
+    const daily = [day(0), day(1), day(2), day(3), day(4), day(5, { weather: 'Cloudy', icon: 'cloud', spray_hours: 2, first_spray_hour: '2026-11-09T00:30:00.000Z', rain_probability: 9, rain_mm: 0 }), day(6)];
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ available: true, timezone: 'Asia/Kolkata', location: { label: 'ICAR-IIHR, Hesaraghatta' }, daily })));
+    render(<ForecastCard />);
+    expect(await screen.findByText('Today')).toBeTruthy();
+    expect(screen.getAllByRole('listitem')).toHaveLength(7);
+    expect(screen.getAllByText('Showers').length).toBe(6);
+    expect(screen.getAllByText('82%').length).toBe(7);
+    expect(screen.getByText('2 h good to spray')).toBeTruthy();
+    expect(screen.getByText(/Best day to spray: Mon from 6 AM/)).toBeTruthy();
+  });
+});
