@@ -173,5 +173,49 @@
     "cost_inr_per_acre_per_spray": 1500,
     "_cost_inr_per_acre_per_spray": "Product + labour + equipment per acre per spray, in rupees.",
     "currency": "INR"
+  },
+  "economics": {
+    "_about": "ESTIMATE ONLY - placeholder farm economics to confirm with the IIHR mentor and local farmers. Every value can be overridden per trap from the dashboard.",
+    "default_crop": "tomato",
+    "crops": {
+      "tomato": {
+        "label": "Tomato (polyhouse)",
+        "yield_kg_per_acre": 25000,
+        "price_inr_per_kg": 20
+      },
+      "capsicum": {
+        "label": "Capsicum (polyhouse)",
+        "yield_kg_per_acre": 18000,
+        "price_inr_per_kg": 45
+      },
+      "cucumber": {
+        "label": "Cucumber (polyhouse)",
+        "yield_kg_per_acre": 28000,
+        "price_inr_per_kg": 18
+      },
+      "chilli": {
+        "label": "Chilli (open field)",
+        "yield_kg_per_acre": 6000,
+        "price_inr_per_kg": 60
+      },
+      "brinjal": {
+        "label": "Brinjal (open field)",
+        "yield_kg_per_acre": 12000,
+        "price_inr_per_kg": 25
+      }
+    },
+    "_crops": "Marketable yield per acre per season and the farm-gate price.",
+    "acres_per_trap": 0.5,
+    "spray_cost_inr_per_acre": 1500,
+    "_spray_cost_inr_per_acre": "Pesticide product + labour + equipment for one spray of one acre.",
+    "biocontrol_cost_inr_per_acre": 900,
+    "_biocontrol_cost_inr_per_acre": "One release of natural enemies (e.g. Encarsia / Macrolophus) for one acre.",
+    "predator_value_inr_per_acre": 1200,
+    "_predator_value_inr_per_acre": "What it would cost to rebuild a working predator population a spray would kill (re-release + lost control). Counted only when predators are on the card.",
+    "weekly_loss_pct_at_threshold": 2,
+    "_weekly_loss_pct_at_threshold": "Crop value lost per week if pests stay at the action level and nothing is done; scales with pests/day ÷ action level.",
+    "max_weekly_loss_pct": 15,
+    "horizon_days": 7,
+    "_horizon_days": "The window the projection covers (until the next check)."
   }
 }

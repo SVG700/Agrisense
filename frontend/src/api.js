@@ -72,6 +72,13 @@ export const api = {
   health: () => request('/api/health'),
   voice,
   voices: () => request('/api/voice'),
+  // Economic impact of a trap's current decision (estimate) + crop presets
+  economics: (deviceId, s = {}) => {
+    const q = new URLSearchParams({ device_id: deviceId });
+    for (const [k, v] of Object.entries(s)) if (v !== undefined && v !== null && v !== '') q.set(k, v);
+    return request(`/api/economics?${q}`);
+  },
+  crops: () => request('/api/economics/crops'),
   // Live weather at a place (null = the farm's default location) and place search
   weatherNow: (p) =>
     request(p ? `/api/weather/now?lat=${p.lat}&lon=${p.lon}&label=${encodeURIComponent(p.label ?? '')}` : '/api/weather/now'),

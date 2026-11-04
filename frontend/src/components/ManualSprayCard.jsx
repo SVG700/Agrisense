@@ -4,13 +4,14 @@ import { Droplets, Send, TriangleAlert } from 'lucide-react';
 import { api } from '../api.js';
 import { EASE } from '../lib/motion.jsx';
 import { useT } from '../lib/i18n.jsx';
+import { inr } from '../lib/economics.js';
 
 /**
  * "Manual spray": one button that logs a spray for this trap and sends a
  * Telegram message to the farm group (POST /api/actions with notify: true).
  * Asks for confirmation first, and warns when the current advice is not SPRAY.
  */
-export default function ManualSprayCard({ device, decision, onChanged }) {
+export default function ManualSprayCard({ device, decision, economics, onChanged }) {
   const t = useT();
   const [step, setStep] = useState('idle'); // idle | confirm | sending
   const [note, setNote] = useState('');
@@ -79,7 +80,14 @@ export default function ManualSprayCard({ device, decision, onChanged }) {
             {notAdvised && (
               <p className="flex gap-2 text-sm text-amber-900">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {t('spray.warn', { advice: t(`decision.${advice}`) })}
+                <span>
+                  {t('spray.warn', { advice: t(`decision.${advice}`) })}
+                  {economics?.settings && (
+                    <b className="block">
+                      {t('spray.costWarn', { cost: inr(economics.settings.spray_cost_inr_per_acre * economics.settings.acres) })}
+                    </b>
+                  )}
+                </span>
               </p>
             )}
             <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">

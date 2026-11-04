@@ -85,3 +85,20 @@ export const IMPACT_CONFIG = Object.freeze({
   costPerAcrePerSpray: Number(im.cost_inr_per_acre_per_spray ?? 1500),
   currency: String(im.currency ?? 'INR'),
 });
+
+const ec = raw.economics ?? {};
+export const ECONOMICS_CONFIG = Object.freeze({
+  defaultCrop: String(ec.default_crop ?? 'tomato'),
+  crops: Object.freeze(
+    Object.fromEntries(
+      Object.entries(ec.crops ?? {}).map(([id, c]) => [id, Object.freeze({ id, label: String(c.label ?? id), yieldKgPerAcre: Number(c.yield_kg_per_acre), priceInrPerKg: Number(c.price_inr_per_kg) })])
+    )
+  ),
+  acresPerTrap: Number(ec.acres_per_trap ?? 0.5),
+  sprayCostPerAcre: Number(ec.spray_cost_inr_per_acre ?? 1500),
+  biocontrolCostPerAcre: Number(ec.biocontrol_cost_inr_per_acre ?? 900),
+  predatorValuePerAcre: Number(ec.predator_value_inr_per_acre ?? 1200),
+  weeklyLossPctAtThreshold: Number(ec.weekly_loss_pct_at_threshold ?? 2),
+  maxWeeklyLossPct: Number(ec.max_weekly_loss_pct ?? 15),
+  horizonDays: Number(ec.horizon_days ?? 7),
+});

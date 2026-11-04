@@ -51,12 +51,14 @@ export const pageTransition = {
  * Counts from the previous value to the new one (from 0 on first mount).
  * Non-numeric values (e.g. "—", "Not counted") render as-is.
  */
-export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.8 }) {
+export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.8, grouping = false }) {
   const ref = useRef(null);
   const prev = useRef(0);
   const reduce = useReducedMotion();
   const numeric = typeof value === 'number' && Number.isFinite(value);
-  const format = (n) => `${n.toFixed(decimals)}${suffix}`;
+  // grouping: Indian digit grouping (e.g. 2,50,000) for money
+  const format = (n) =>
+    `${grouping ? new Intl.NumberFormat('en-IN', { maximumFractionDigits: decimals, minimumFractionDigits: decimals }).format(n) : n.toFixed(decimals)}${suffix}`;
 
   useEffect(() => {
     if (!numeric || !ref.current) return undefined;
@@ -75,7 +77,7 @@ export function AnimatedNumber({ value, decimals = 0, suffix = '', duration = 0.
     });
     return () => controls.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, numeric, reduce, decimals, suffix, duration]);
+  }, [value, numeric, reduce, decimals, suffix, duration, grouping]);
 
   if (!numeric) return <span>{value}</span>;
   // Final value is rendered immediately (SSR/tests/reduced-motion); the effect animates the text in place.

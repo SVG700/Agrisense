@@ -13,7 +13,7 @@
  *   - the token sits in the URL path, so errors are reduced to codes before logging
  */
 import axios from 'axios';
-import { TEXT } from './telegram.js';
+import { TEXT, moneyLine } from './telegram.js';
 import { MAX_DAYS_HUNG, runPhoneCheck } from './phoneCheck.js';
 import { decodeImage } from '../utils/validate.js';
 
@@ -92,6 +92,8 @@ export function resultText(lang, out) {
     lines.push('', `<b>${T.retake}</b>`, ...(out.quality.advice ?? []).map((a) => `• ${esc(a)}`));
   }
   if (d.reason) lines.push('', `<b>${T.why}:</b> ${esc(d.reason)}`);
+  const money = moneyLine(lang, d);
+  if (money) lines.push('', money);
   const steps = (out.advisory?.mitigation_strategy?.length ? out.advisory.mitigation_strategy : [out.advisory?.recommendation]).filter(Boolean).slice(0, 3);
   if (steps.length) lines.push('', `<b>${T.todo}:</b>`, ...steps.map((s, i) => `${i + 1}. ${esc(s)}`));
   if (out.vision.status === 'simulated' || out.vision.fallback) lines.push('', T.simulated);

@@ -949,3 +949,36 @@ describe('Photo bot card', () => {
     expect(JSON.parse(post[1].body)).toEqual({ enabled: false });
   });
 });
+
+describe('Economic impact widget', () => {
+  const settings = { crop: 'tomato', crop_label: 'Tomato (polyhouse)', acres: 1.6, horizon_days: 7, spray_cost_inr_per_acre: 1500 };
+  const econ = (data) => ({ data, settings: {}, setSettings: () => {}, reset: () => {} });
+
+  test('WAIT: "Chemical spray avoided" with the rupees saved today and the breakdown', async () => {
+    const EconomicsCard = (await import('../components/EconomicsCard.jsx')).default;
+    const data = {
+      kind: 'saved', decision: 'WAIT', headline_inr: 2400, estimate: true, settings,
+      lines: [{ id: 'spray', label: 'Chemical spray not needed (product + labour)', inr: 2400 }],
+      why: 'Pests are below the action level.',
+    };
+    render(<EconomicsCard device={DEVICE} economics={econ(data)} />);
+    expect(screen.getByText('Chemical spray avoided')).toBeTruthy();
+    expect(screen.getByText('saved today')).toBeTruthy();
+    expect(screen.getByText('Chemical spray not needed (product + labour)')).toBeTruthy();
+    expect(screen.getByText('Estimate')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Tomato · 1.6 acres/ })).toBeTruthy();
+  });
+
+  test('SPRAY: projected loss if ignored, compared with the spray cost', async () => {
+    const EconomicsCard = (await import('../components/EconomicsCard.jsx')).default;
+    const data = {
+      kind: 'at_risk', decision: 'SPRAY', headline_inr: 9400, spray_cost_inr: 750, net_benefit_inr: 8650, return_per_rupee: 12.5, loss_pct: 3.8, estimate: true, settings,
+      lines: [{ id: 'loss', label: 'Loss at 1.9x the action level', inr: -9400 }, { id: 'spray', label: 'Cost of spraying now', inr: -750 }],
+    };
+    render(<EconomicsCard device={DEVICE} economics={econ(data)} />);
+    expect(screen.getByText('Projected yield loss if ignored')).toBeTruthy();
+    expect(screen.getByText(/over the next 7 days \(3.8% of the crop\)/)).toBeTruthy();
+    expect(screen.getByText(/Every ₹1 spent on spraying protects ₹12.5/)).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Spraying costs ₹750; ignoring the warning could cost ₹9,400/ })).toBeTruthy();
+  });
+});

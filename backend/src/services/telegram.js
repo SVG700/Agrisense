@@ -13,6 +13,17 @@
  */
 import axios from 'axios';
 import { trapDecision } from '../routes/map.js';
+import { economicsSettings, evaluateEconomics } from './economics.js';
+
+const inr = (n) => `₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n)}`;
+
+/** "💰 Chemical spray avoided: ₹1,350 saved today (estimate)" for one language, or null. */
+export function moneyLine(lang, decision, settings = economicsSettings()) {
+  const e = evaluateEconomics(decision, settings);
+  if (e.kind === 'saved') return TEXT[lang].moneySaved(inr(e.headline_inr));
+  if (e.kind === 'at_risk') return TEXT[lang].moneyAtRisk(inr(e.headline_inr), e.settings.horizon_days, inr(e.spray_cost_inr));
+  return null;
+}
 
 const API = 'https://api.telegram.org';
 const MAX_LEN = 3900; // Telegram limit is 4096; keep a margin for HTML
@@ -42,6 +53,8 @@ export const TEXT = {
     became: (trap, now) => `${trap}: advice is now ${now}`,
     open: 'Open dashboard',
     test: 'AgriSense is connected. Trap alerts and a daily summary will arrive here.',
+    moneySaved: (v) => `💰 Chemical spray avoided: <b>${v} saved today</b> (estimate)`,
+    moneyAtRisk: (v, days, spray) => `💸 If ignored: about <b>${v}</b> of crop at risk over ${days} days - spraying costs ${spray} (estimate)`,
     sprayTitle: 'Manual spray started',
     sprayLine: (trap, advice) => `${trap}: spraying now (advice was ${advice}).`,
     sprayNote: 'Note',
@@ -65,6 +78,8 @@ export const TEXT = {
     became: (trap, now) => `${trap}: ಈಗಿನ ಸಲಹೆ ${now}`,
     open: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ತೆರೆಯಿರಿ',
     test: 'ಅಗ್ರಿಸೆನ್ಸ್ ಸಂಪರ್ಕಗೊಂಡಿದೆ. ಬಲೆ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ದೈನಂದಿನ ಸಾರಾಂಶ ಇಲ್ಲಿ ಬರುತ್ತವೆ.',
+    moneySaved: (v) => `💰 ರಾಸಾಯನಿಕ ಸಿಂಪಡಣೆ ತಪ್ಪಿತು: <b>ಇಂದು ${v} ಉಳಿತಾಯ</b> (ಅಂದಾಜು)`,
+    moneyAtRisk: (v, days, spray) => `💸 ನಿರ್ಲಕ್ಷಿಸಿದರೆ: ${days} ದಿನಗಳಲ್ಲಿ ಸುಮಾರು <b>${v}</b> ಬೆಳೆ ನಷ್ಟದ ಅಪಾಯ - ಸಿಂಪಡಣೆಯ ವೆಚ್ಚ ${spray} (ಅಂದಾಜು)`,
     sprayTitle: 'ಕೈಯಾರೆ ಸಿಂಪಡಣೆ ಪ್ರಾರಂಭವಾಗಿದೆ',
     sprayLine: (trap, advice) => `${trap}: ಈಗ ಸಿಂಪಡಿಸಲಾಗುತ್ತಿದೆ (ಸಲಹೆ: ${advice}).`,
     sprayNote: 'ಟಿಪ್ಪಣಿ',
@@ -143,6 +158,8 @@ export function alertText({ name, previous, decision, languages, dashboardUrl })
     // The engine's reason is English; the Kannada block shows the numbers instead
     if (lang === 'en' && decision.reason) lines.push(esc(decision.reason));
     else if (decision.avg_pests != null) lines.push(trapLine(lang, name, decision));
+    const money = moneyLine(lang, decision);
+    if (money) lines.push(money);
     return lines.join('\n');
   });
   if (dashboardUrl) blocks.push(`🔗 <a href="${esc(dashboardUrl)}">${TEXT[languages[0]].open}</a>`);

@@ -23,6 +23,8 @@ import { HeroCards, TrapStage, VISION_LAYOUT_ID } from './FieldHero.jsx';
 import { LayoutGroup } from 'framer-motion';
 import { buildEvents } from '../lib/events.js';
 import { useLiveWeather } from '../lib/place.js';
+import { useEconomics } from '../lib/economics.js';
+import EconomicsCard from './EconomicsCard.jsx';
 import { useT } from '../lib/i18n.jsx';
 import WeatherCard from './WeatherCard.jsx';
 import WhatIfCard from './WhatIfCard.jsx';
@@ -79,6 +81,7 @@ export default function FarmerDashboard({
   const sectionRefs = useRef({});
   const [vision, setVision] = useState(null); // {x, y} press point while Live Vision is open
   const weather = useLiveWeather();
+  const economics = useEconomics(device?.id, telemetry.at(-1)?.id, device?.name);
   const outside = weather.data?.available ? weather.data : null;
 
   const latest = telemetry.at(-1) ?? null;
@@ -149,6 +152,7 @@ export default function FarmerDashboard({
   const selectCapture = (id) => setSelectedId(id === latest?.id ? null : id);
 
   const sections = {
+    economics: <EconomicsCard device={device} economics={economics} />,
     glance: (
       <section aria-labelledby="glance-title" className="flex flex-col gap-4">
         <SectionHead id="glance-title" label={t('section.glance')}>
@@ -231,7 +235,7 @@ export default function FarmerDashboard({
           </div>
           <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
             <AdvisoryCard advisory={det?.ai_advisory} />
-            <ManualSprayCard device={device} decision={latestDecision} onChanged={loadActions} />
+            <ManualSprayCard device={device} decision={latestDecision} economics={economics.data} onChanged={loadActions} />
             <WeatherCard deviceId={device?.id} decision={latestDecision} />
           </div>
         </div>
@@ -307,7 +311,7 @@ export default function FarmerDashboard({
             onOpenVision={setVision}
             visionOpen={Boolean(vision)}
           />
-          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} weather={weather} />
+          <HeroCards device={device} capture={capture} telemetry={telemetry} decision={decision} events={events} onSeeAll={seeSection} onSelectCapture={selectCapture} weather={weather} economics={economics.data} />
         </div>
         <LiveVision open={Boolean(vision)} origin={vision} onClose={() => setVision(null)} device={device} capture={capture} layoutId={VISION_LAYOUT_ID} />
       </LayoutGroup>
