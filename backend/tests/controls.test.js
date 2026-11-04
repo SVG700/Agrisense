@@ -81,3 +81,55 @@ describe('hardware controls', () => {
     assert.equal(c.describe(DEVICE).pi.online, false);
   });
 });
+
+describe('Live Vision frames from the Pi', () => {
+  const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64)]).toString('base64');
+
+  test('the Pi pushes a frame with stages and boxes; the dashboard reads it back', async () => {
+    const app = await startApp({ env });
+    try {
+      await app.request('POST', '/api/telemetry', { body: { temperature: 25 }, headers: admin });
+      const none = (await app.request('GET', `/api/devices/${DEVICE}/vision/frame`)).body;
+      assert.equal(none.frame, null);
+      assert.equal(none.streaming, false);
+
+      const body = {
+        image_base64: JPEG,
+        stages: [{ name: 'Threshold', image_base64: JPEG }],
+        boxes: [{ x: 0.1, y: 0.2, width: 0.05, height: 0.05, label: 'whitefly', confidence: 0.9 }, { x: 2, y: 0, width: 0.1, height: 0.1 }],
+        fps: 12.5,
+        width: 1280,
+        height: 960,
+        pipeline: ['undistort', 'HSV yellow mask', 'contours'],
+      };
+      assert.equal((await app.request('POST', `/api/devices/${DEVICE}/vision/frame`, { body })).status, 401); // needs the device key
+      const put = await app.request('POST', `/api/devices/${DEVICE}/vision/frame`, { body, headers: pi });
+      assert.equal(put.status, 201);
+
+      const got = (await app.request('GET', `/api/devices/${DEVICE}/vision/frame`)).body;
+      assert.equal(got.streaming, true);
+      assert.match(got.frame.image, /^data:image\/jpeg;base64,/);
+      assert.equal(got.frame.stages[0].name, 'Threshold');
+      assert.equal(got.frame.boxes.length, 1); // the out-of-range box is dropped
+      assert.equal(got.frame.fps, 12.5);
+      assert.deepEqual(got.frame.pipeline, ['undistort', 'HSV yellow mask', 'contours']);
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('bad frames are refused; live view can be started as a Pi command', async () => {
+    const app = await startApp({ env });
+    try {
+      await app.request('POST', '/api/telemetry', { body: { temperature: 25 }, headers: admin });
+      const post = (b) => app.request('POST', `/api/devices/${DEVICE}/vision/frame`, { body: b, headers: pi });
+      assert.equal((await post({ image_base64: 'not-base64!' })).status, 400);
+      assert.equal((await post({ image_base64: Buffer.from('hello world, not an image').toString('base64') })).status, 415);
+      assert.equal((await post({ image_base64: JPEG, stages: [{ name: '<script>', image_base64: JPEG }] })).status, 422);
+      const cmd = await app.request('POST', `/api/devices/${DEVICE}/commands`, { body: { command: 'start_stream' }, headers: admin });
+      assert.equal(cmd.status, 201);
+    } finally {
+      await app.close();
+    }
+  });
+});

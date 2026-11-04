@@ -12,7 +12,8 @@
 import { randomUUID } from 'node:crypto';
 
 export const SWITCHES = ['fan', 'trap_light'];
-export const COMMANDS = ['capture_now', 'restart_camera', 'reboot'];
+export const COMMANDS = ['capture_now', 'restart_camera', 'reboot', 'start_stream', 'stop_stream'];
+const FRAME_FRESH_MS = 10_000; // a live-view frame older than this counts as "not streaming"
 const DEFAULTS = { fan: false, trap_light: true };
 const ONLINE_MS = 2 * 60_000; // the Pi counts as online if it polled in the last 2 minutes
 const KEEP_COMMANDS = 20;
@@ -23,7 +24,7 @@ export function createControls({ now = () => Date.now() } = {}) {
   const entry = (deviceId) => {
     if (!byDevice.has(deviceId)) {
       const switches = Object.fromEntries(SWITCHES.map((k) => [k, { on: DEFAULTS[k], updated_at: null, applied: null }]));
-      byDevice.set(deviceId, { switches, commands: [], lastSeen: null });
+      byDevice.set(deviceId, { switches, commands: [], lastSeen: null, frame: null });
     }
     return byDevice.get(deviceId);
   };
@@ -71,6 +72,24 @@ export function createControls({ now = () => Date.now() } = {}) {
         switches: Object.fromEntries(SWITCHES.map((k) => [k, e.switches[k].on])),
         commands: e.commands.filter((c) => c.status === 'pending').map(({ id, command, created_at }) => ({ id, command, created_at })),
       };
+    },
+
+    /**
+     * Pi: latest live-view frame from its OpenCV pipeline (kept in memory, one per trap).
+     * frame = {image, stages: [{name, image}], boxes, fps, width, height, pipeline}
+     */
+    setFrame(deviceId, frame) {
+      const e = entry(deviceId);
+      e.lastSeen = now();
+      e.frame = { ...frame, received_at: iso(now()), seq: (e.frame?.seq ?? 0) + 1 };
+      return { ok: true, seq: e.frame.seq };
+    },
+
+    /** Dashboard: the latest frame and whether the Pi is streaming right now. */
+    getFrame(deviceId) {
+      const e = entry(deviceId);
+      const age = e.frame ? now() - Date.parse(e.frame.received_at) : null;
+      return { frame: e.frame, age_ms: age, streaming: age !== null && age < FRAME_FRESH_MS };
     },
 
     /** Pi: confirms a command (or a switch state) was carried out. */
