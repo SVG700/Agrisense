@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { LOW_BATTERY_THRESHOLD, SENSOR_LIMITS, integrationFlags } from './config.js';
 import { telemetryRouter } from './routes/telemetry.js';
 import { devicesRouter, deviceAdminRouter } from './routes/devices.js';
+import { batteryAdminRouter } from './routes/batteryAdmin.js';
 import { mapRouter } from './routes/map.js';
 import { demoRouter } from './routes/demo.js';
 import { checkRouter } from './routes/check.js';
@@ -25,7 +26,8 @@ import { errorHandler, notFound } from './middleware/errors.js';
 const REQUEST_ID_RE = /^[\w-]{8,64}$/;
 
 /**
- * @param {{config, store, vision, advisor, weather?, telegram?, telegramBot?, controls?, logger}} deps
+ * @param {{config, store, vision, phoneVision?, advisor, weather?, telegram?, telegramBot?, controls?, logger}} deps
+ *   phoneVision: model for phone-check photos (AgroPest-12); null = use `vision`
  */
 export function createApp(deps) {
   const { config, store, vision, advisor, weather, telegram, logger } = deps;
@@ -82,7 +84,7 @@ export function createApp(deps) {
       mode: config.demoMode ? 'demo' : 'standard',
       store: store.kind,
       integrations: integrationFlags(config),
-      services: { vision: vision.describe(), advisor: advisor.describe(), weather: weather?.describe() ?? { state: 'disabled' }, telegram: telegram?.describe() ?? { state: 'not_configured' } },
+      services: { vision: vision.describe(), phone_vision: deps.phoneVision ? deps.phoneVision.describe() : null, advisor: advisor.describe(), weather: weather?.describe() ?? { state: 'disabled' }, telegram: telegram?.describe() ?? { state: 'not_configured' } },
       auth: {
         device: config.auth.deviceKeys.length ? 'required' : 'disabled',
         admin: config.auth.adminKey ? 'required' : 'disabled',
@@ -114,6 +116,7 @@ export function createApp(deps) {
   });
 
   app.use('/api/telemetry', telemetryRouter(deps));
+  app.use('/api', batteryAdminRouter(deps)); // battery-only portal login (before /api/devices)
   app.use('/api/devices', devicesRouter(deps));
   app.use('/api/device', deviceAdminRouter(deps));
   app.use('/api', mapRouter(deps));

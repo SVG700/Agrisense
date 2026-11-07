@@ -212,3 +212,47 @@ describe('Telegram API + alerts', () => {
     }
   });
 });
+
+describe('Telegram on a slow connection', () => {
+  // First message confirmed, the next one times out (what a phone hotspot does with a long summary)
+  const slowTelegram = (okFirst) => {
+    const sent = [];
+    return {
+      sent,
+      post: async (url, body) => {
+        if (sent.length >= okFirst) throw Object.assign(new Error('timeout of 20000ms exceeded'), { code: 'ECONNABORTED' });
+        sent.push(body);
+        return { data: { ok: true } };
+      },
+      get: async () => ({ data: { ok: true, result: [] } }),
+    };
+  };
+
+  test('some parts confirmed, a later one times out: reported as partly sent, not "not accepted"', async () => {
+    const tg = slowTelegram(1);
+    const app = await startApp({ env: { ...env, TELEGRAM_CHAT_ID: '987654321,123456789' }, telegramHttp: tg });
+    try {
+      const r = await app.request('POST', '/api/admin/telegram/test', { headers: admin });
+      assert.equal(r.status, 200);
+      assert.equal(r.body.partial, true);
+      assert.equal(r.body.messages, 1);
+      assert.equal(r.body.total, 2);
+      assert.match(r.body.warning, /Sent 1 of 2 message\(s\); the rest was slow to answer and may still arrive/);
+      assert.equal(tg.sent.length, 1); // a timed-out message is never re-sent (it may have arrived)
+    } finally {
+      await app.close();
+    }
+  });
+
+  test('nothing confirmed because Telegram was slow: 504 that says it may still arrive', async () => {
+    const app = await startApp({ env, telegramHttp: slowTelegram(0) });
+    try {
+      const r = await app.request('POST', '/api/admin/telegram/test', { headers: admin });
+      assert.equal(r.status, 504);
+      assert.match(r.body.error, /did not answer within 20 s - the message may still arrive/);
+      assert.equal(r.body.code, 'telegram_timeout');
+    } finally {
+      await app.close();
+    }
+  });
+});

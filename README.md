@@ -342,7 +342,7 @@ Admin tab at runtime and kept in `sessionStorage`.
 
 ### Edge (`edge-simulator/.env`, or `/etc/agrisense/edge.env` on the Pi)
 
-`AGRISENSE_MODE`, `AGRISENSE_API_URL`, `AGRISENSE_DEVICE_ID` (a UUID), `AGRISENSE_DEVICE_KEY` (one of the
+`AGRISENSE_MODE`, `AGRISENSE_BASE_URL` (see `agrisense.json`), `AGRISENSE_DEVICE_ID` (a UUID), `AGRISENSE_DEVICE_KEY` (one of the
 backend's `DEVICE_API_KEYS`), `AGRISENSE_INTERVAL`, `AGRISENSE_DATA_DIR`, `AGRISENSE_MAX_PENDING`,
 `AGRISENSE_KEEP_SENT_HOURS`, `AGRISENSE_SENSOR` (`bme280`, `dht22` or `none`), `AGRISENSE_I2C_BUS`,
 `AGRISENSE_BME280_ADDRESS`, `AGRISENSE_DHT_PIN`, `AGRISENSE_RESOLUTION`. See
@@ -597,7 +597,7 @@ sudo ln -s /opt/agrisense/src/edge-simulator /opt/agrisense/edge-simulator
 sudo python3 -m venv --system-site-packages /opt/agrisense/venv     # sees apt's picamera2
 sudo /opt/agrisense/venv/bin/pip install -r /opt/agrisense/edge-simulator/requirements-pi.txt
 sudo cp /opt/agrisense/edge-simulator/.env.example /etc/agrisense/edge.env
-sudo nano /etc/agrisense/edge.env      # set AGRISENSE_API_URL, DEVICE_ID, DEVICE_KEY, SENSOR, INTERVAL=300
+sudo nano /etc/agrisense/edge.env      # set AGRISENSE_BASE_URL, DEVICE_ID, DEVICE_KEY, SENSOR, INTERVAL=300
 sudo chown root:agrisense /etc/agrisense/edge.env && sudo chmod 640 /etc/agrisense/edge.env
 
 # One-off hardware self-test (photo + reading, no upload)

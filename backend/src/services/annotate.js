@@ -1,10 +1,10 @@
 /**
  * Draws the detections onto the trap photo (JPEG data URL) so a farmer can
- * see exactly what was counted: pests in red, predators in green.
+ * see exactly what was counted: pests in red, predators in green, beneficials (bees, earthworms) in blue.
  * The overlay is an SVG composited by sharp; labels come from the class config.
  */
 import sharp from 'sharp';
-import { CLASSES, PREDATOR_IDS } from './pestConfig.js';
+import { BENEFICIAL_IDS, CLASSES, PREDATOR_IDS } from './pestConfig.js';
 
 const MAX_WIDTH = 1280;
 const SHORT = { whitefly: 'WF', macrolophus: 'MR', nesidiocoris: 'NC' };
@@ -28,7 +28,7 @@ export async function annotateImage(buffer, boxes, { banner } = {}) {
   const font = Math.max(11, Math.round(W / 70));
 
   const shapes = boxes.map((b) => {
-    const color = PREDATOR_IDS.has(b.label) ? '#22c55e' : '#ef4444';
+    const color = PREDATOR_IDS.has(b.label) ? '#22c55e' : BENEFICIAL_IDS.has(b.label) ? '#38bdf8' : '#ef4444';
     const x = b.x * W;
     const y = b.y * H;
     const text = `${labelOf(b.label)} ${Math.round(b.confidence * 100)}%`;

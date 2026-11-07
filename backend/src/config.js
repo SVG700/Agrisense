@@ -23,6 +23,8 @@ export const SENSOR_LIMITS = {
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const VISION_PROVIDERS = ['roboflow', 'generic'];
+// Model groups in config/pests.json the phone model may report (inference-service profiles)
+const PHONE_CLASS_GROUPS = ['agropest12', 'pest29'];
 const ADVISOR_PROVIDERS = ['auto', 'gemini', 'claude', 'none'];
 
 export const ROBOFLOW_DEFAULT_URL = 'https://serverless.roboflow.com';
@@ -108,6 +110,13 @@ export function loadConfig(env = process.env) {
         .map((k) => k.trim())
         .filter(Boolean),
       adminKey: str('ADMIN_API_KEY'),
+      // Battery-only portal (/battery-admin): its login can change trap battery levels and nothing else.
+      // Off until BATTERY_ADMIN_PASSWORD is set.
+      batteryAdmin: {
+        id: str('BATTERY_ADMIN_ID', 'battery-admin'),
+        password: str('BATTERY_ADMIN_PASSWORD'),
+        sessionHours: int('BATTERY_ADMIN_SESSION_HOURS', 12, 1, 168),
+      },
     },
 
     rateLimit: {
@@ -148,6 +157,29 @@ export function loadConfig(env = process.env) {
       qualityCheck: !['0', 'false', 'no', 'off'].includes(str('VISION_QUALITY_CHECK', 'true').toLowerCase()),
     }),
 
+    // Second model for phone and Telegram photos: the AgroPest-12 YOLOv8s inference service
+    // (inference-service/). Unset PHONE_VISION_URL = phone photos use the main vision provider, as before.
+    // Trap captures from the Pi always use the main provider above.
+    phoneVision: url('PHONE_VISION_URL')
+      ? {
+          provider: 'generic',
+          url: url('PHONE_VISION_URL'),
+          apiKey: str('PHONE_VISION_API_KEY'),
+          keySource: str('PHONE_VISION_API_KEY') ? 'PHONE_VISION_API_KEY' : null,
+          modelId: str('PHONE_VISION_MODEL_ID') || str('PHONE_VISION_CLASS_GROUP', 'agropest12').toLowerCase(),
+          minConfidence: Number(str('PHONE_VISION_MIN_CONFIDENCE', '0.25')),
+          // CPU inference on a large phone photo can take a few seconds
+          timeoutMs: int('PHONE_VISION_TIMEOUT_MS', 30_000, 1000, 120_000),
+          tiles: 1, // field photos: one whole-image pass at the model's own input size
+          tileOverlap: 0,
+          // Never invent counts for a farmer's photo: if the model is down the check says so
+          demoFallback: false,
+          qualityCheck: !['0', 'false', 'no', 'off'].includes(str('VISION_QUALITY_CHECK', 'true').toLowerCase()),
+          // class ids in config/pests.json reported by this model: agropest12 | pest29 (experimental)
+          classGroup: str('PHONE_VISION_CLASS_GROUP', 'agropest12').toLowerCase(),
+        }
+      : null,
+
     // Telegram summaries + alerts (English + Kannada). Off until TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set.
     telegram: {
       token: str('TELEGRAM_BOT_TOKEN'),
@@ -162,7 +194,8 @@ export function loadConfig(env = process.env) {
       summaryTime: str('TELEGRAM_SUMMARY_TIME', '07:00'),
       timezone: str('TELEGRAM_TIMEZONE', 'Asia/Kolkata'),
       dashboardUrl: str('DASHBOARD_URL'),
-      timeoutMs: int('TELEGRAM_TIMEOUT_MS', 10_000, 500, 30_000),
+      // 20 s: phone hotspots and busy networks can take several seconds per Telegram message
+      timeoutMs: int('TELEGRAM_TIMEOUT_MS', 20_000, 500, 30_000),
       // Photo bot: farmers send a trap photo to the bot and get the count + advice back
       bot: {
         enabled: !['0', 'false', 'no', 'off'].includes(str('TELEGRAM_PHOTO_BOT', 'true').toLowerCase()),
@@ -226,6 +259,14 @@ export function loadConfig(env = process.env) {
   if (!Number.isFinite(ov) || ov < 0 || ov > 0.5) errors.push('VISION_TILE_OVERLAP must be between 0 and 0.5');
   const mc = config.vision.minConfidence;
   if (!Number.isFinite(mc) || mc < 0 || mc > 1) errors.push('VISION_MIN_CONFIDENCE must be between 0 and 1');
+  const pmc = config.phoneVision?.minConfidence;
+  if (config.phoneVision && (!Number.isFinite(pmc) || pmc < 0 || pmc > 1)) errors.push('PHONE_VISION_MIN_CONFIDENCE must be between 0 and 1');
+  const ba = config.auth.batteryAdmin;
+  if (ba.password && ba.password.length < 10) errors.push('BATTERY_ADMIN_PASSWORD must be at least 10 characters');
+  if (!/^[\w.@-]{3,40}$/.test(ba.id)) errors.push('BATTERY_ADMIN_ID must be 3-40 letters, digits or . _ - @');
+  if (config.phoneVision && !PHONE_CLASS_GROUPS.includes(config.phoneVision.classGroup)) {
+    errors.push(`PHONE_VISION_CLASS_GROUP must be one of: ${PHONE_CLASS_GROUPS.join(', ')}`);
+  }
   if (!EFFORTS.includes(config.claude.effort)) errors.push(`CLAUDE_EFFORT must be one of: ${EFFORTS.join(', ')}`);
   if (!/^[a-z0-9][a-z0-9.-]{2,80}$/i.test(config.claude.model)) errors.push('CLAUDE_MODEL is not a valid model id');
   if (!/^[a-z0-9][a-z0-9.-]{2,80}$/i.test(config.gemini.model)) errors.push('GEMINI_MODEL is not a valid model id');

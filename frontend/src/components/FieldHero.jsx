@@ -313,7 +313,7 @@ export function HeroCards({ device, capture, telemetry, decision, events, onSeeA
       <PressureCard telemetry={telemetry} decision={decision} />
       <ListenCard capture={capture} decision={decision} economics={economics} />
       <GuideCard />
-      <RecentUpdates events={events} onSeeAll={() => onSeeAll('timeline')} onSelectCapture={onSelectCapture} className="sm:col-span-2" />
+      <RecentUpdates events={events} onSeeAll={() => onSeeAll('log')} onSelectCapture={onSelectCapture} className="sm:col-span-2" />
     </div>
   );
 }

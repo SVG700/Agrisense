@@ -24,6 +24,48 @@
       "port": 5173
     },
     {
+      "name": "frontend-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "frontend",
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5174"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "inference",
+      "runtimeExecutable": "inference-service/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "service:app",
+        "--app-dir",
+        "inference-service",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8800"
+      ],
+      "port": 8800
+    },
+    {
+      "name": "naroz",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../Samhith/Naroz ai",
+        "start"
+      ],
+      "port": 3000
+    },
+    {
       "name": "frontend-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

@@ -4,9 +4,26 @@
  * Errors are thrown as ApiError(message, {status, code}). The admin key is
  * entered by the operator in the Admin tab and kept in sessionStorage only -
  * it is never part of the build (no VITE_* secret).
+ *
+ * Every call goes to `${AGRISENSE_BASE_URL}/api/<endpoint>` (see lib/baseUrl.js; the address
+ * itself lives in the repo-root agrisense.json).
  */
-const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+import { AGRISENSE_BASE_URL } from './lib/baseUrl.js';
+import { checkConnection } from './lib/connection.js';
+
+const BASE = AGRISENSE_BASE_URL;
 const ADMIN_KEY_STORAGE = 'agrisense.adminKey';
+
+// One health check per 10 s at most, so dashboard polling never floods a host that is down
+let lastCheck = { at: 0, promise: null };
+async function unreachable(url) {
+  if (!lastCheck.promise || Date.now() - lastCheck.at > 10_000) lastCheck = { at: Date.now(), promise: checkConnection(BASE) };
+  const result = await lastCheck.promise;
+  const message = result.ok
+    ? `The request to ${url} failed, although the health check at ${result.url} answered: the connection dropped, try again.`
+    : result.message;
+  return new ApiError(message, { code: result.ok ? 'network_error' : result.cause });
+}
 
 export class ApiError extends Error {
   constructor(message, { status = 0, code = 'network_error' } = {}) {
@@ -32,21 +49,28 @@ export function setAdminKey(key) {
   }
 }
 
-async function request(path, { method = 'GET', body, signal, admin = false } = {}) {
+async function request(path, { method = 'GET', body, signal, admin = false, token } = {}) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
   const key = admin ? getAdminKey() : '';
   if (key) headers.Authorization = `Bearer ${key}`;
+  if (token) headers.Authorization = `Bearer ${token}`; // battery-portal session
 
   let res;
+  const url = `${BASE}${path}`; // path is the existing endpoint, e.g. /api/telemetry
   try {
-    res = await fetch(`${BASE}${path}`, { method, signal, headers, body: body ? JSON.stringify(body) : undefined });
+    res = await fetch(url, { method, signal, headers, body: body ? JSON.stringify(body) : undefined });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    throw new ApiError('Cannot reach the Agrisense API - is the backend running?');
+    throw await unreachable(url);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // An AgriSense 404 always carries a code; a bare 404 means another app is answering at that address
+    if (res.status === 404 && !data.code) {
+      const err = await unreachable(url);
+      if (err.code !== 'network_error') throw err;
+    }
     throw new ApiError(data.error ?? `Request failed (${res.status})`, { status: res.status, code: data.code ?? 'http_error' });
   }
   return data;
@@ -59,7 +83,7 @@ async function voice(text, lang = 'en', voiceName, signal) {
     res = await fetch(`${BASE}/api/voice`, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang, ...(voiceName ? { voice: voiceName } : {}) }) });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    throw new ApiError('Cannot reach the Agrisense API - is the backend running?');
+    throw await unreachable(`${BASE}/api/voice`);
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -119,6 +143,11 @@ export const api = {
   createDevice: (name) => request('/api/devices', { method: 'POST', body: { name }, admin: true }),
   setBattery: (device_id, battery_level) =>
     request('/api/device/battery', { method: 'PATCH', body: { device_id, battery_level }, admin: true }),
+  // Battery-only portal (/battery-admin): its own login, can change battery levels and nothing else
+  batteryLogin: (id, password) => request('/api/battery-admin/login', { method: 'POST', body: { id, password } }),
+  batteryDevices: (token) => request('/api/battery-admin/devices', { token }),
+  batterySet: (token, deviceId, battery_level) =>
+    request(`/api/battery-admin/devices/${encodeURIComponent(deviceId)}/battery`, { method: 'PATCH', body: { battery_level }, token }),
   // Dashboard captures are always labelled as simulated readings
   ingest: (payload) =>
     request('/api/telemetry', { method: 'POST', body: { data_source: 'dashboard', ...payload }, admin: true }),

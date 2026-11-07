@@ -184,12 +184,18 @@ export function createTelegram({ config, store, weather, http = axios, logger })
   const errorCode = (err) =>
     err?.response?.status ? `telegram_http_${err.response.status}` : err?.code === 'ECONNABORTED' ? 'telegram_timeout' : 'telegram_unreachable';
 
+  // A long summary goes out as several messages (and to every chat). Each one Telegram confirms is
+  // counted, so a later part timing out on a slow connection is reported as "partly sent", not as
+  // "nothing was accepted". A timed-out part is NOT retried: Telegram often delivers it anyway,
+  // and a retry would duplicate it.
   async function send(text) {
     if (!configured) return { ok: false, code: 'not_configured' };
+    const parts = chunk(text);
+    const total = parts.length * tg.chatIds.length;
     let sent = 0;
     try {
       for (const chatId of tg.chatIds) {
-        for (const part of chunk(text)) {
+        for (const part of parts) {
           await http.post(
             `${API}/bot${tg.token}/sendMessage`,
             { chat_id: chatId, text: part, parse_mode: 'HTML', disable_web_page_preview: true },
@@ -198,12 +204,12 @@ export function createTelegram({ config, store, weather, http = axios, logger })
           sent++;
         }
       }
-      lastResult = { ok: true, at: new Date().toISOString(), messages: sent };
+      lastResult = { ok: true, at: new Date().toISOString(), messages: sent, total };
       return lastResult;
     } catch (err) {
       const code = errorCode(err);
-      logger?.warn('telegram_failed', { code, description: err?.response?.data?.description });
-      lastResult = { ok: false, at: new Date().toISOString(), code, description: err?.response?.data?.description ?? null, messages: sent };
+      logger?.warn('telegram_failed', { code, description: err?.response?.data?.description, confirmed: sent, total });
+      lastResult = { ok: false, at: new Date().toISOString(), code, description: err?.response?.data?.description ?? null, messages: sent, total };
       return lastResult;
     }
   }

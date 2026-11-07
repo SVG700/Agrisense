@@ -8,7 +8,7 @@ Vision OpenCV stream. See agrisense_edge/agent.py.
     python pi_agent.py --stream             # start streaming Live Vision straight away
     python pi_agent.py --frame-test         # one OpenCV frame to the dashboard, then exit
 
-Settings (env or flags): AGRISENSE_API_URL, AGRISENSE_DEVICE_ID, AGRISENSE_DEVICE_KEY,
+Settings (env or flags): AGRISENSE_BASE_URL, AGRISENSE_DEVICE_ID, AGRISENSE_DEVICE_KEY,
 AGRISENSE_INTERVAL (s), AGRISENSE_POLL (s), AGRISENSE_STREAM_FPS, AGRISENSE_STREAM_MINUTES,
 AGRISENSE_FAN_PIN / AGRISENSE_LIGHT_PIN (BCM numbers, blank = not wired), AGRISENSE_SENSOR.
 """
@@ -21,6 +21,7 @@ import sys
 import requests
 
 from agrisense_edge.agent import Agent, Camera, Outputs
+from agrisense_edge.base_url import normalize, resolve_base_url
 from agrisense_edge.queue_store import CaptureQueue
 from agrisense_edge.uploader import Uploader
 from simulator import load_env_file
@@ -42,7 +43,7 @@ def main(argv=None):
     load_env_file(known.env_file)
 
     p = argparse.ArgumentParser(description="AgriSense trap-box agent", parents=[pre])
-    p.add_argument("--url", default=env("AGRISENSE_API_URL", "http://localhost:4000"))
+    p.add_argument("--url", default=None, help="AgriSense base URL (default: AGRISENSE_BASE_URL)")
     p.add_argument("--device-id", default=env("AGRISENSE_DEVICE_ID"))
     p.add_argument("--device-key", default=env("AGRISENSE_DEVICE_KEY"))
     p.add_argument("--interval", type=float, default=float(env("AGRISENSE_INTERVAL", "300")))
@@ -57,8 +58,10 @@ def main(argv=None):
     p.add_argument("--frame-test", action="store_true", help="send one Live Vision frame and exit")
     p.add_argument("--log-level", default=env("AGRISENSE_LOG_LEVEL", "INFO"))
     args = p.parse_args(argv)
+    args.url = normalize(args.url) if args.url else resolve_base_url()
     logging.basicConfig(level=args.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     log = logging.getLogger("agrisense.pi")
+    log.info("AgriSense base URL: %s (API at %s/api)", args.url, args.url)
     if not args.device_id:
         p.error("AGRISENSE_DEVICE_ID is required")
 

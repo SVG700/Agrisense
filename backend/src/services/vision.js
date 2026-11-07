@@ -32,7 +32,7 @@ import { annotateImage } from './annotate.js';
 import { assessQuality } from './imageQuality.js';
 import { splitCounts } from './decision.js';
 import { generateTrap, parseMockTrapUrl, SPECIES, TRAP_HEIGHT, TRAP_WIDTH } from './mockTrap.js';
-import { canonicalLabel } from './pestConfig.js';
+import { canonicalLabel, classIdsOfGroup } from './pestConfig.js';
 import { dedupeBoxes, mapLimit, mapTileBox, tileGrid } from './tiling.js';
 
 /** Classes the default Roboflow sticky-trap model reports (always listed, even at 0). */
@@ -155,7 +155,8 @@ export function createVision({ config, http = axios, logger }) {
   const v = config.vision;
   const configured = Boolean(v.url);
 
-  const known = v.provider === 'roboflow' ? ROBOFLOW_CLASSES : Object.keys(SPECIES);
+  // Species always listed in the counts (even at 0): the model group's classes from config/pests.json when set
+  const known = v.classGroup ? classIdsOfGroup(v.classGroup) : v.provider === 'roboflow' ? ROBOFLOW_CLASSES : Object.keys(SPECIES);
   const tiled = v.provider === 'roboflow' && v.tiles > 1;
 
   async function callProvider({ imageUrl, image }) {
@@ -247,6 +248,8 @@ export function createVision({ config, http = axios, logger }) {
   }
 
   return {
+    /** Counting threshold of this instance (phone photos may use a different model and threshold). */
+    minConfidence: v.minConfidence,
     describe: () => ({
       state: configured ? 'configured' : 'not_configured',
       provider: configured ? v.provider : null,
@@ -317,6 +320,16 @@ export function createVision({ config, http = axios, logger }) {
         let found;
         if (image && tiled) {
           found = await detectTiled(image);
+        } else if (image && v.provider === 'generic') {
+          // Upright (EXIF) and at most MAX_SEND_SIDE px: keeps the JSON body small; boxes come back
+          // relative to this copy, which has the same aspect ratio as the photo the farmer sees.
+          const upright = await sharp(image.buffer, { failOn: 'error' })
+            .rotate()
+            .resize({ width: MAX_SEND_SIDE, height: MAX_SEND_SIDE, fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+          const data = await callProvider({ image: { buffer: upright, contentType: 'image/jpeg' } });
+          found = { ...normalizeResponse(v.provider, data), resolved: data?.model, experimental: data?.experimental === true };
         } else {
           const data = await callProvider({ imageUrl, image });
           found = { ...normalizeResponse(v.provider, data), resolved: data?.resolved_model };
@@ -328,7 +341,10 @@ export function createVision({ config, http = axios, logger }) {
             status: 'ok',
             source: 'yolo',
             provider: v.provider,
-            model: v.modelId || found.resolved || null,
+            // generic services report what they actually loaded (e.g. "UNVERIFIED:..." for a wrong model)
+            model: (v.provider === 'generic' && found.resolved) || v.modelId || found.resolved || null,
+            // the service says its model is experimental (low accuracy): the UI labels every result
+            experimental: Boolean(found.experimental),
             boxes: found.boxes,
             rejected: found.rejected,
             image: found.image,

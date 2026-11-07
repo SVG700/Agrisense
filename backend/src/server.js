@@ -1,7 +1,12 @@
 /**
  * Agrisense AI - API entry point: validate config, wire dependencies, listen.
  */
+import { setDefaultResultOrder } from 'node:dns';
 import { loadConfig } from './config.js';
+
+// Try IPv4 addresses first: on phone hotspots without working IPv6, connecting to IPv6 first
+// (e.g. api.telegram.org) costs seconds before falling back, enough to time Telegram sends out.
+setDefaultResultOrder('ipv4first');
 import { createLogger } from './utils/logger.js';
 import { createStore } from './db/index.js';
 import { createVision } from './services/vision.js';
@@ -24,11 +29,13 @@ for (const w of warnings) logger.warn('config_notice', { notice: w });
 
 const store = await createStore({ config, logger });
 const vision = createVision({ config, logger });
+// Phone check + Telegram photos: the AgroPest-12 inference service when PHONE_VISION_URL is set
+const phoneVision = config.phoneVision ? createVision({ config: { ...config, vision: config.phoneVision }, logger }) : null;
 const advisor = createAdvisor({ config, logger });
 const weather = createWeather({ config, logger });
 const telegram = createTelegram({ config, store, weather, logger });
-const telegramBot = config.telegram.token ? createTelegramBot({ config, vision, advisor, logger }) : null;
-const app = createApp({ config, store, vision, advisor, weather, telegram, telegramBot, logger });
+const telegramBot = config.telegram.token ? createTelegramBot({ config, vision: phoneVision ?? vision, advisor, logger }) : null;
+const app = createApp({ config, store, vision, phoneVision, advisor, weather, telegram, telegramBot, logger });
 telegram.startScheduler();
 // Photo bot: long-polls Telegram for trap photos (no public URL needed)
 if (telegramBot && config.telegram.bot.enabled) telegramBot.start();
@@ -41,6 +48,7 @@ const server = app.listen(config.port, () => {
     mode: config.demoMode ? 'demo' : 'standard',
     store: store.kind,
     vision: vision.describe(),
+    phone_vision: phoneVision ? phoneVision.describe() : 'same as vision',
     advisor: advisor.describe(),
     device_auth: config.auth.deviceKeys.length ? 'required' : 'disabled',
     admin_auth: config.auth.adminKey ? 'required' : 'disabled',

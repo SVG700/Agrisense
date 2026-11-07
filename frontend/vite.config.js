@@ -1,12 +1,34 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 /**
+ * AGRISENSE_BASE_URL: the one address all API calls use (`${AGRISENSE_BASE_URL}/api/...`).
+ * Comes from the AGRISENSE_BASE_URL environment variable / frontend/.env when set, else from the
+ * repo-root agrisense.json. Read once when Vite starts, so restart `npm run dev` after changing it.
+ */
+function agrisenseBaseUrl(mode) {
+  const fromEnv = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'AGRISENSE_').AGRISENSE_BASE_URL;
+  let value = fromEnv;
+  if (!value) {
+    const file = new URL('../agrisense.json', import.meta.url);
+    try {
+      value = JSON.parse(readFileSync(file, 'utf8')).AGRISENSE_BASE_URL;
+    } catch (err) {
+      throw new Error(`AGRISENSE_BASE_URL is not set and ${fileURLToPath(file)} could not be read: ${err.message}`);
+    }
+  }
+  const url = String(value ?? '').trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+  if (!/^https?:\/\/[^/]+$/.test(url)) throw new Error(`AGRISENSE_BASE_URL must look like http://<ip>:<port> (got "${value}")`);
+  return url;
+}
+
+/**
  * Content-Security-Policy for the BUILT dashboard (`vite preview` here; static
  * hosts use public/_headers). Not applied to `vite dev`, which needs inline scripts.
- * img-src allows https: for Supabase signed URLs; localhost is added for local previews.
+ * img-src allows https: for Supabase signed URLs; the AgriSense host is added so the API can be reached.
  */
 const csp = (extra = '') =>
   [
@@ -25,8 +47,12 @@ const csp = (extra = '') =>
     "frame-ancestors 'none'",
   ].join('; ');
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const base = agrisenseBaseUrl(mode);
+  return {
   plugins: [react(), tailwindcss()],
+  // api.js reads this via lib/baseUrl.js
+  define: { __AGRISENSE_BASE_URL__: JSON.stringify(base) },
   resolve: {
     // kepler.gl imports Node's `assert`; Vite stubs Node built-ins in the browser (see src/map/shims/assert.js)
     alias: [{ find: /^assert$/, replacement: fileURLToPath(new URL('./src/map/shims/assert.js', import.meta.url)) }],
@@ -34,20 +60,18 @@ export default defineConfig({
   preview: {
     port: 4173,
     headers: {
-      'Content-Security-Policy': csp(' http://localhost:* http://127.0.0.1:*'),
+      'Content-Security-Policy': csp(` ${base}`),
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
     },
   },
   server: {
     port: 5173,
-    // Proxy API calls in dev so the browser never deals with CORS
-    proxy: {
-      '/api': { target: process.env.VITE_API_PROXY ?? 'http://localhost:4000', changeOrigin: true },
-    },
+    // No /api proxy: the browser calls AGRISENSE_BASE_URL directly (the host proxies /api to its backend)
   },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
   },
+  };
 });

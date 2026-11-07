@@ -12,7 +12,9 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { MAX_DAYS_HUNG, runPhoneCheck } from '../services/phoneCheck.js';
 import { HttpError, decodeImage, optionalReading } from '../utils/validate.js';
 
-export function checkRouter({ config, vision, advisor, logger }) {
+export function checkRouter({ config, vision: trapVision, phoneVision, advisor, logger }) {
+  // Phone photos go to the phone model (AgroPest-12) when one is configured, else the trap model
+  const vision = phoneVision ?? trapVision;
   const router = Router();
 
   router.post(

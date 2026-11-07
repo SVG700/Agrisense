@@ -1,0 +1,4 @@
+{
+  "_about": "The ONE place for the AgriSense address the clients on this laptop use (website, demo tools, edge simulator). Now: http://localhost:4000 = this laptop only, independent of the Wi-Fi IP. To let other devices use the site, set it to http://<this laptop's Wi-Fi IP>:4000 and add that site's origin to CORS_ORIGINS in backend/.env. Plain http, no /api, no trailing slash. An AGRISENSE_BASE_URL environment variable overrides it.",
+  "AGRISENSE_BASE_URL": "http://localhost:4000"
+}

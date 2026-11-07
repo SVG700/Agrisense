@@ -20,7 +20,7 @@ SPRAY / BIOCONTROL / WAIT decision with its own rule (single source of truth).
 Usage (stdlib only, Python 3.9+):
     python demo/seed.py --dry-run                 # print the generated data, send nothing
     python demo/seed.py --out map-seed.json       # write the payload to a file
-    python demo/seed.py                           # POST to http://localhost:4000 (needs the admin key)
+    python demo/seed.py                           # POST to AGRISENSE_BASE_URL (agrisense.json; needs that host's admin key)
     python demo/seed.py --reset                   # delete previous simulated traps first
     python demo/seed.py --remove                  # only delete simulated traps
 
@@ -152,9 +152,27 @@ def call(method, url, admin_key=None, body=None, timeout=30):
         return exc.code, payload
 
 
+def normalize_base_url(url):
+    """No trailing slash and no trailing /api, so `${base}/api/...` never doubles up."""
+    url = url.strip().rstrip("/")
+    return url[: -len("/api")] if url.lower().endswith("/api") else url
+
+
+def agrisense_base_url():
+    """AGRISENSE_BASE_URL env var, else the repo-root agrisense.json (the one place the address lives)."""
+    value = os.environ.get("AGRISENSE_BASE_URL", "").strip()
+    cfg = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agrisense.json")
+    if not value and os.path.isfile(cfg):
+        with open(cfg, encoding="utf-8") as f:
+            value = str(json.load(f).get("AGRISENSE_BASE_URL", "")).strip()
+    if not value:
+        sys.exit("AGRISENSE_BASE_URL is not set and agrisense.json was not found")
+    return normalize_base_url(value)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Seed SIMULATED trap history for the Pest Surveillance Map")
-    p.add_argument("--url", default=os.environ.get("AGRISENSE_API_URL", "http://localhost:4000"))
+    p.add_argument("--url", default=None, help="AgriSense base URL (default: AGRISENSE_BASE_URL / agrisense.json)")
     p.add_argument("--admin-key", default=os.environ.get("AGRISENSE_ADMIN_KEY") or os.environ.get("ADMIN_API_KEY"))
     p.add_argument("--days", type=int, default=14)
     p.add_argument("--seed", type=int, default=42, help="random seed (same seed = same data)")
@@ -163,7 +181,7 @@ def main(argv=None):
     p.add_argument("--reset", action="store_true", help="delete existing simulated traps before seeding")
     p.add_argument("--remove", action="store_true", help="only delete simulated traps, then exit")
     args = p.parse_args(argv)
-    base = args.url.rstrip("/")
+    base = normalize_base_url(args.url) if args.url else agrisense_base_url()
 
     if args.remove:
         status, body = call("DELETE", base + "/api/admin/map-seed", args.admin_key)

@@ -70,7 +70,6 @@ export const SECTIONS = [
   { id: 'forecast', label: '7-day forecast' },
   { id: 'economics', label: 'Economic impact (₹)' },
   { id: 'glance', label: 'Today at a glance' },
-  { id: 'timeline', label: 'Daily timeline' },
   { id: 'detections', label: 'Live detections & AI advisor' },
   { id: 'traps', label: 'All traps & impact' },
   { id: 'log', label: 'Action log & recent captures' },

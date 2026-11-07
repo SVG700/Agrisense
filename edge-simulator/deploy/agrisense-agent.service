@@ -25,7 +25,9 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=/home/pi/agrisense/venv/bin/python pi_agent.py --env-file /home/pi/agrisense/edge/.env
 KillSignal=SIGTERM
 TimeoutStopSec=30
-Restart=on-failure
+# always: the agent exits cleanly on SIGTERM, so a stray `pkill` must not leave the trap offline.
+# `systemctl stop agrisense-agent` still stops it for good (systemd never restarts a unit it stopped).
+Restart=always
 RestartSec=15
 NoNewPrivileges=true
 

@@ -26,7 +26,9 @@ export default function TelegramCard({ log }) {
     setBusy(kind);
     try {
       const r = await fn();
-      ok?.(r);
+      // partly sent on a slow connection: say exactly what was confirmed
+      if (r?.partial) log?.(`Telegram ${kind}: ${r.warning}`, 'warn');
+      else ok?.(r);
     } catch (err) {
       log?.(`Telegram ${kind}: ${err.status === 401 || err.status === 403 ? 'admin key required - enter it above' : err.message}`, 'error');
     } finally {

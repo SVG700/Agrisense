@@ -1,0 +1,13 @@
+# AgriSense inference service (AgroPest-12 YOLOv8s). CPU-only is enough (~0.1 s per photo).
+# Install torch from the CPU index first so pip does not pull the large CUDA build:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0 torchvision==0.29.2
+#   pip install -r requirements.txt
+ultralytics==8.4.202
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pillow==13.0.0
+numpy==2.5.4
+opencv-python-headless>=4.8
+onnxruntime>=1.20  # runs .onnx weights (the experimental pest29 model)
+onnx>=1.17
+httpx  # only for the tests (fastapi.testclient)

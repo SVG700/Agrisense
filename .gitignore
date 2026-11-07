@@ -29,3 +29,7 @@ venv/
 logs/
 .DS_Store
 Thumbs.db
+
+# Model weights (large; copied in by hand - see inference-service/weights/README.md)
+inference-service/weights/*.pt
+*.onnx

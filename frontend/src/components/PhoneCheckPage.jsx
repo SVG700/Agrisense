@@ -4,6 +4,7 @@ import { Bug, Camera, ImagePlus, Loader2, Minus, Plus, RotateCcw, ScanSearch, Sh
 import { api } from '../api.js';
 import { decisionStyle } from '../lib/decision.js';
 import { EASE } from '../lib/motion.jsx';
+import { pestMeta } from '../lib/pests.js';
 import Badge from './Badge.jsx';
 import DecisionBadge from './DecisionBadge.jsx';
 import { decisionReason, useT } from '../lib/i18n.jsx';
@@ -178,6 +179,9 @@ function CheckResult({ result }) {
   const d = result.decision;
   const style = decisionStyle(d?.decision);
   const counts = result.counts ?? {};
+  // The sticky-trap model reports whitefly / MR / NC; the AgroPest-12 phone model reports field-pest species
+  const trapModel = 'whitefly' in counts;
+  const found = Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
   const fallback = result.vision?.fallback;
   const q = result.quality;
   const adv = result.advisory;
@@ -204,6 +208,13 @@ function CheckResult({ result }) {
       </div>
       {d?.reason && <p className="text-sm leading-relaxed text-slate-800">{decisionReason(t.lang, d)}</p>}
 
+      {result.vision?.experimental && (
+        <div role="note" data-testid="experimental-model" className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-500/30">
+          <Badge tone="warn">{t('check.experimental')}</Badge>
+          {t('check.experimentalNote')}
+        </div>
+      )}
+
       {(fallback || result.vision?.status === 'simulated') && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-500/30">
           <Badge tone="warn">{t('simulatedData')}</Badge>
@@ -214,10 +225,34 @@ function CheckResult({ result }) {
 
       {result.counts && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label={t('check.whiteflies')} value={counts.whitefly ?? result.totals?.pests ?? 0} />
-          <Stat label={t('check.predators')} value={result.totals?.predators ?? 0} sub={`MR ${counts.macrolophus ?? 0} · NC ${counts.nesidiocoris ?? 0}`} />
+          {trapModel ? (
+            <Stat label={t('check.whiteflies')} value={counts.whitefly ?? result.totals?.pests ?? 0} />
+          ) : (
+            <Stat label={t('check.pests')} value={result.totals?.pests ?? 0} />
+          )}
+          <Stat
+            label={t('check.predators')}
+            value={result.totals?.predators ?? 0}
+            sub={trapModel ? `MR ${counts.macrolophus ?? 0} · NC ${counts.nesidiocoris ?? 0}` : found.filter(([k]) => pestMeta(k).predator).map(([k, n]) => `${pestMeta(k).name} ${n}`).join(' · ') || null}
+          />
           <Stat label={t('check.pestsPerDay')} value={result.per_day?.pests ?? '—'} sub={lo !== undefined ? t('check.range', { lo, hi }) : t('check.over', { n: result.days_hung })} />
           <Stat label={t('check.perPredator')} value={d?.no_predators ? t('check.noPredators') : d?.pests_per_predator ?? '—'} />
+        </div>
+      )}
+
+      {result.counts && !trapModel && (
+        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="species-found">
+          <span className="text-slate-500">{t('check.species')}</span>
+          {found.length ? (
+            found.map(([k, n]) => (
+              <Badge key={k} tone={pestMeta(k).beneficial || pestMeta(k).predator ? 'good' : 'muted'}>
+                {pestMeta(k).name} {n}
+                {pestMeta(k).beneficial ? ` · ${t('check.beneficial')}` : pestMeta(k).neutral ? ` · ${t('check.notPest')}` : ''}
+              </Badge>
+            ))
+          ) : (
+            <span className="text-slate-600">{t('check.noneFound')}</span>
+          )}
         </div>
       )}
 

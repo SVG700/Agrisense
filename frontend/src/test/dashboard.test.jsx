@@ -1,7 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App.jsx';
-import TrapCanvas, { sanitizeBoxes } from '../components/TrapCanvas.jsx';
 import AdvisoryCard from '../components/AdvisoryCard.jsx';
 import AdminPanel from '../components/AdminPanel.jsx';
 import FarmerDashboard from '../components/FarmerDashboard.jsx';
@@ -39,7 +38,9 @@ describe('App', () => {
   test('renders a useful error when the backend is unreachable', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
     render(<App />);
-    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('Cannot reach the Agrisense API'));
+    // the health check names the exact cause and the URL it tried (here nothing answers at all)
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/Cannot reach the AgriSense API at http:\/\/[^ ]+\/api\/health: connection refused/);
     expect(screen.getByText('Offline')).toBeTruthy();
   });
 
@@ -105,62 +106,6 @@ describe('DecisionBadge', () => {
     expect(screen.getByText('CHECK TRAP')).toBeTruthy();
     expect(screen.getByText(/Last counted advice/)).toBeTruthy();
     expect(screen.getByText('SPRAY')).toBeTruthy();
-  });
-});
-
-describe('TrapCanvas', () => {
-  test('bounding boxes use normalized source-image coordinates and are clipped to the frame', () => {
-    render(<TrapCanvas capture={capture()} />);
-    fireEvent.load(screen.getByAltText('Sticky trap'));
-    const rects = screen.getAllByTestId('bbox');
-    expect(rects).toHaveLength(2);
-    expect(rects[0].getAttribute('x')).toBe('0.1');
-    expect(rects[0].getAttribute('y')).toBe('0.2');
-    expect(Number(rects[1].getAttribute('x')) + Number(rects[1].getAttribute('width'))).toBeLessThanOrEqual(1);
-    // Frame uses the image aspect ratio so the 0..1 viewBox maps 1:1 onto the picture
-    expect(parseFloat(screen.getByTestId('trap-frame').style.aspectRatio)).toBeCloseTo(800 / 600);
-  });
-
-  test('a re-signed URL for the same stored image does not remount or reload the picture', () => {
-    const first = capture({ image_path: 'captures/d/a.png', image_url: 'https://x.supabase.co/sign/a.png?token=1' });
-    const { rerender } = render(<TrapCanvas capture={first} />);
-    const img = screen.getByAltText('Sticky trap');
-    fireEvent.load(img);
-    rerender(<TrapCanvas capture={{ ...first, image_url: 'https://x.supabase.co/sign/a.png?token=2' }} />);
-    const after = screen.getByAltText('Sticky trap');
-    expect(after).toBe(img); // same DOM node
-    expect(after.getAttribute('src')).toBe('https://x.supabase.co/sign/a.png?token=1');
-    expect(after.className).toContain('opacity-100');
-    expect(screen.getAllByTestId('bbox').length).toBeGreaterThan(0);
-  });
-
-  test('sanitizeBoxes drops malformed boxes', () => {
-    expect(sanitizeBoxes([{ x: 'a', y: 0, width: 1, height: 1, confidence: 1 }, { x: 2, y: 2, width: 1, height: 1, confidence: 1 }])).toEqual([]);
-    expect(sanitizeBoxes(null)).toEqual([]);
-  });
-
-  test('empty detections from a real model are shown as zero, not an error', () => {
-    const c = capture();
-    c.detection = { ...c.detection, bounding_boxes: [], pest_counts: {}, vision_meta: { status: 'ok' } };
-    render(<TrapCanvas capture={c} />);
-    fireEvent.load(screen.getByAltText('Sticky trap'));
-    expect(screen.getByText('The model found no insects on this trap.')).toBeTruthy();
-    expect(screen.queryAllByTestId('bbox')).toHaveLength(0);
-  });
-
-  test('failed detection is labelled and draws nothing', () => {
-    const c = capture();
-    c.detection = { ...c.detection, bounding_boxes: [], vision_meta: { status: 'failed', error: { code: 'timeout' } } };
-    render(<TrapCanvas capture={c} />);
-    fireEvent.load(screen.getByAltText('Sticky trap'));
-    expect(screen.getAllByText(/Detection failed/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/timeout/)).toBeTruthy();
-  });
-
-  test('broken image shows a message instead of crashing', () => {
-    render(<TrapCanvas capture={capture()} />);
-    fireEvent.error(screen.getByAltText('Sticky trap'));
-    expect(screen.getByText(/could not be loaded/)).toBeTruthy();
   });
 });
 
@@ -404,6 +349,78 @@ describe('Phone check', () => {
     const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(sent.days_hung).toBe(5);
     expect(fetchMock.mock.calls[0][0]).toContain('/api/check');
+    ctx.mockRestore();
+    toUrl.mockRestore();
+  });
+
+  test('an AgroPest-12 result lists the species the model found, with beneficials marked', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 4000, height: 3000, close() {} })));
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage() {} });
+    const toUrl = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,AAAA');
+    Element.prototype.scrollIntoView = vi.fn();
+    const zero = { ants: 0, beetles: 0, earwigs: 0, grasshoppers: 0, moths: 0, slugs: 0, snails: 0, earthworms: 0 };
+    vi.stubGlobal('fetch', vi.fn(() =>
+      jsonResponse({
+        days_hung: 7,
+        counts: { ...zero, weevils: 14, caterpillars: 1, wasps: 1, bees: 1 },
+        totals: { pests: 15, predators: 1, beneficial: 1 },
+        per_day: { pests: 2.1, predators: 0.1 },
+        decision: { decision: 'WAIT', label: 'WAIT', reason: 'Average 2.1 pests/day over the 7 days the card hung.', pests_per_predator: 15 },
+        quality: { ok: true, issues: [] },
+        annotated_image: 'data:image/jpeg;base64,BBBB',
+        vision: { status: 'ok', boxes: 17, model: 'agropest12-yolov8s' },
+        stored: false,
+      })
+    ));
+    const { default: PhoneCheckPage } = await import('../components/PhoneCheckPage.jsx');
+    render(<PhoneCheckPage />);
+    fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'field.jpg', { type: 'image/jpeg' })] } });
+    await screen.findByAltText('Sticky trap photo');
+    fireEvent.click(screen.getByRole('button', { name: /Check trap/ }));
+    const res = await screen.findByTestId('check-result');
+    expect(res.textContent).not.toContain('Whiteflies');
+    expect(res.textContent).not.toContain('MR 0');
+    expect(res.textContent).toContain('Wasps (natural enemy) 1');
+    const species = screen.getByTestId('species-found').textContent;
+    expect(species).toContain('Weevils 14');
+    expect(species).toContain('Caterpillars 1');
+    expect(species).toContain('Bees (pollinator) 1 · beneficial');
+    expect(species).not.toContain('Ants'); // zero counts are not listed
+    expect(res.textContent).toContain('agropest12-yolov8s');
+    expect(screen.queryByTestId('experimental-model')).toBeNull();
+    ctx.mockRestore();
+    toUrl.mockRestore();
+  });
+
+  test('a result from the experimental model is clearly labelled, with readable species names', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 4000, height: 3000, close() {} })));
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage() {} });
+    const toUrl = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,AAAA');
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(() =>
+      jsonResponse({
+        days_hung: 1,
+        counts: { helicoverpa_armigera: 2, sirthenea_flavipes: 1, trichoptera: 1, nilaparvata: 0 },
+        totals: { pests: 2, predators: 1, beneficial: 1 },
+        per_day: { pests: 2, predators: 1 },
+        decision: { decision: 'WAIT', label: 'WAIT', reason: 'Average 2 pests/day.', pests_per_predator: 2 },
+        quality: { ok: true, issues: [] },
+        annotated_image: 'data:image/jpeg;base64,BBBB',
+        vision: { status: 'ok', boxes: 4, model: 'pest29-yolo11s-experimental', experimental: true },
+        stored: false,
+      })
+    ));
+    const { default: PhoneCheckPage } = await import('../components/PhoneCheckPage.jsx');
+    render(<PhoneCheckPage />);
+    fireEvent.change(screen.getByTestId('photo-input'), { target: { files: [new File(['x'], 'field.jpg', { type: 'image/jpeg' })] } });
+    await screen.findByAltText('Sticky trap photo');
+    fireEvent.click(screen.getByRole('button', { name: /Check trap/ }));
+    await screen.findByTestId('check-result');
+    expect(screen.getByTestId('experimental-model').textContent).toMatch(/Experimental model.*Check the photo yourself/);
+    const species = screen.getByTestId('species-found').textContent;
+    expect(species).toContain('Cotton bollworm / fruit borer (Helicoverpa armigera) 2');
+    expect(species).toContain('Caddisflies (Trichoptera, not a crop pest) 1 · not a crop pest');
+    expect(species).not.toContain('Brown planthopper');
     ctx.mockRestore();
     toUrl.mockRestore();
   });
@@ -712,14 +729,21 @@ describe('Trap box controls', () => {
   });
 });
 
-describe('Customize, quick actions, timeline, day strip', () => {
+describe('Customize, quick actions, day strip', () => {
   test('a hidden section is not rendered, and the order is followed', () => {
-    const layout = { order: ['log', 'glance', 'timeline', 'detections', 'traps', 'whatif', 'climate'], hidden: ['glance'] };
+    const layout = { order: ['log', 'glance', 'detections', 'traps', 'whatif', 'climate'], hidden: ['glance'] };
     render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} layout={layout} />);
     expect(screen.queryByText('Today at a glance')).toBeNull();
     const log = screen.getByText('Recent Captures');
-    const timeline = screen.getByText('Daily timeline');
-    expect(log.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const species = screen.getByText('Species breakdown');
+    expect(log.compareDocumentPosition(species) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('the dashboard has one trap view (the top one) and no daily timeline', () => {
+    render(<FarmerDashboard device={DEVICE} telemetry={[capture()]} onGoAdmin={() => {}} />);
+    expect(screen.queryByText('Interactive Trap View')).toBeNull();
+    expect(screen.queryByText('Daily timeline')).toBeNull();
+    expect(screen.getAllByRole('button', { name: /Live Vision/ }).length).toBeGreaterThan(0); // top view + OpenCV entry kept
   });
 
   test('day strip steps through captures with the arrow buttons and keys', () => {
@@ -733,19 +757,6 @@ describe('Customize, quick actions, timeline, day strip', () => {
     expect(screen.getByText('Viewing historical capture', { exact: false })).toBeTruthy();
     fireEvent.keyDown(strip, { key: 'ArrowRight' });
     expect(strip.textContent).toMatch(/2\s*\/\s*2/);
-  });
-
-  test('timeline lists the day’s captures and actions in time order', async () => {
-    const DailyTimeline = (await import('../components/DailyTimeline.jsx')).default;
-    const rows = [capture({ id: 'c1', timestamp: '2026-11-03T08:00:00Z' }), capture({ id: 'c2', timestamp: '2026-11-03T12:00:00Z' })];
-    const actions = [{ id: 7, action: 'sprayed', acted_at: '2026-11-03T10:00:00Z', note: 'rows 1-4' }];
-    const onSelect = vi.fn();
-    render(<DailyTimeline telemetry={rows} actions={actions} capture={rows[1]} onSelectCapture={onSelect} />);
-    expect(screen.getByText(/3 events/)).toBeTruthy();
-    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
-    expect(items.findIndex((x) => x.includes('Sprayed'))).toBeGreaterThan(0);
-    fireEvent.click(screen.getAllByRole('button')[0]);
-    expect(onSelect).toHaveBeenCalledWith('c1');
   });
 
   test('quick actions filter as you type and run with Enter', async () => {

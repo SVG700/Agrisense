@@ -14,7 +14,7 @@
  * inside that range. Thresholds live in backend/config/pests.json and are
  * placeholders until confirmed with the ICAR-IIHR mentor.
  */
-import { DECISION_CONFIG, PREDATOR_IDS, canonicalLabel } from './pestConfig.js';
+import { BENEFICIAL_IDS, DECISION_CONFIG, PREDATOR_IDS, canonicalLabel } from './pestConfig.js';
 
 export const DECISIONS = ['SPRAY', 'BIOCONTROL', 'WAIT'];
 
@@ -186,22 +186,28 @@ export function rollingDecisions(days, cfg = DECISION_CONFIG) {
   return sorted.map((d, i) => ({ date: d.date, result: evaluateDecision(sorted.slice(0, i + 1), cfg) }));
 }
 
-/** Splits a capture's per-class counts into pests vs predators (labels mapped through the class config). */
+/**
+ * Splits a capture's per-class counts into pests vs predators (labels mapped through the class config).
+ * Beneficial classes (bees, earthworms) are counted separately and never push toward a spray.
+ */
 export function splitCounts(counts) {
   let pests = 0;
   let predators = 0;
+  let beneficial = 0;
   const byPest = {};
   for (const [label, n] of Object.entries(counts ?? {})) {
     const v = Number(n) || 0;
     const id = canonicalLabel(label);
     if (PREDATOR_IDS.has(id)) predators += v;
+    else if (BENEFICIAL_IDS.has(id)) beneficial += v;
     else {
       pests += v;
       byPest[id] = (byPest[id] ?? 0) + v;
     }
   }
   const dominant = Object.entries(byPest).sort((a, b) => b[1] - a[1])[0];
-  return { pests, predators, dominant: dominant && dominant[1] > 0 ? dominant[0] : null };
+  // `beneficial` only appears when there are some, so existing results keep their exact shape
+  return { pests, predators, ...(beneficial ? { beneficial } : {}), dominant: dominant && dominant[1] > 0 ? dominant[0] : null };
 }
 
 /** Mean confidence of the boxes that were counted in a capture (null if unknown). */

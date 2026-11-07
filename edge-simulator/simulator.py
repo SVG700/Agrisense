@@ -43,6 +43,7 @@ try:
 except ImportError:
     sys.exit("Missing dependency: run `pip install -r requirements.txt` first.")
 
+from agrisense_edge.base_url import normalize, resolve_base_url
 from agrisense_edge.queue_store import CaptureQueue
 from agrisense_edge.simulated import Microclimate, SimulatedBattery, mock_trap_url
 from agrisense_edge.uploader import Uploader
@@ -79,7 +80,7 @@ def parse_args(argv=None):
 
     p = argparse.ArgumentParser(description="Agrisense AI edge collector / simulator", parents=[pre])
     p.add_argument("--mode", choices=["simulator", "hardware"], default=env("AGRISENSE_MODE", "simulator"))
-    p.add_argument("--url", default=env("AGRISENSE_API_URL", "http://localhost:4000"), help="Backend base URL")
+    p.add_argument("--url", default=None, help="AgriSense base URL (default: AGRISENSE_BASE_URL / agrisense.json)")
     p.add_argument("--device-id", default=env("AGRISENSE_DEVICE_ID", DEMO_DEVICE_ID))
     p.add_argument("--device-key", default=env("AGRISENSE_DEVICE_KEY"), help="Device API key (prefer the env var)")
     p.add_argument("--interval", type=float, default=float(env("AGRISENSE_INTERVAL", "5")), help="Seconds between captures")
@@ -104,6 +105,7 @@ def parse_args(argv=None):
     p.add_argument("--resolution", default=env("AGRISENSE_RESOLUTION", "1920x1080"), help="[hardware] WxH")
     p.add_argument("--probe", action="store_true", help="[hardware] test camera + sensor once, no upload")
     args = p.parse_args(argv)
+    args.url = normalize(args.url) if args.url else resolve_base_url()
     if args.interval < 1:
         p.error("--interval must be >= 1 second")
     try:

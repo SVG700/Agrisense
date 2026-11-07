@@ -105,8 +105,432 @@
         "encarsia",
         "parasitoid_wasp"
       ]
+    },
+    {
+      "id": "ants",
+      "category": "pest",
+      "label_en": "Ants",
+      "label_kn": "ಇರುವೆಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Ants",
+        "ant"
+      ]
+    },
+    {
+      "id": "bees",
+      "category": "beneficial",
+      "label_en": "Bees (pollinator)",
+      "label_kn": "ಜೇನುನೊಣಗಳು (ಪರಾಗಸ್ಪರ್ಶಕ)",
+      "group": "agropest12",
+      "aliases": [
+        "Bees",
+        "bee"
+      ]
+    },
+    {
+      "id": "beetles",
+      "category": "pest",
+      "label_en": "Beetles",
+      "label_kn": "ಜೀರುಂಡೆಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Beetles",
+        "beetle"
+      ]
+    },
+    {
+      "id": "caterpillars",
+      "category": "pest",
+      "label_en": "Caterpillars",
+      "label_kn": "ಕಂಬಳಿಹುಳುಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Caterpillars",
+        "caterpillar"
+      ]
+    },
+    {
+      "id": "earthworms",
+      "category": "beneficial",
+      "label_en": "Earthworms (soil helper)",
+      "label_kn": "ಎರೆಹುಳುಗಳು (ಮಣ್ಣಿನ ಮಿತ್ರ)",
+      "group": "agropest12",
+      "aliases": [
+        "Earthworms",
+        "earthworm"
+      ]
+    },
+    {
+      "id": "earwigs",
+      "category": "pest",
+      "label_en": "Earwigs",
+      "label_kn": "ಇಯರ್‌ವಿಗ್ ಕೀಟಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Earwigs",
+        "earwig"
+      ]
+    },
+    {
+      "id": "grasshoppers",
+      "category": "pest",
+      "label_en": "Grasshoppers",
+      "label_kn": "ಮಿಡತೆಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Grasshoppers",
+        "grasshopper"
+      ]
+    },
+    {
+      "id": "moths",
+      "category": "pest",
+      "label_en": "Moths",
+      "label_kn": "ಪತಂಗಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Moths",
+        "moth"
+      ]
+    },
+    {
+      "id": "slugs",
+      "category": "pest",
+      "label_en": "Slugs",
+      "label_kn": "ಚಿಪ್ಪಿಲ್ಲದ ಬಸವನಹುಳುಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Slugs",
+        "slug"
+      ]
+    },
+    {
+      "id": "snails",
+      "category": "pest",
+      "label_en": "Snails",
+      "label_kn": "ಬಸವನಹುಳುಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Snails",
+        "snail"
+      ]
+    },
+    {
+      "id": "wasps",
+      "category": "predator",
+      "label_en": "Wasps (natural enemy)",
+      "label_kn": "ಕಣಜಗಳು (ನೈಸರ್ಗಿಕ ಶತ್ರು ಕೀಟ)",
+      "group": "agropest12",
+      "aliases": [
+        "Wasps",
+        "wasp"
+      ]
+    },
+    {
+      "id": "weevils",
+      "category": "pest",
+      "label_en": "Weevils",
+      "label_kn": "ಮೂತಿಹುಳುಗಳು",
+      "group": "agropest12",
+      "aliases": [
+        "Weevils",
+        "weevil"
+      ]
+    },
+    {
+      "id": "pest_unidentified",
+      "category": "pest",
+      "label_en": "Pest (unidentified)",
+      "label_kn": "ಕೀಟ (ಗುರುತಿಸದ)",
+      "group": "pest29",
+      "aliases": [
+        "pests"
+      ]
+    },
+    {
+      "id": "agrotis",
+      "category": "pest",
+      "label_en": "Cutworm moth (Agrotis)",
+      "label_kn": "ಕತ್ತರಿಸುವ ಹುಳು (Agrotis)",
+      "group": "pest29",
+      "aliases": [
+        "Agrotis"
+      ]
+    },
+    {
+      "id": "athetis_lepigone",
+      "category": "pest",
+      "label_en": "Athetis lepigone (moth)",
+      "label_kn": "Athetis lepigone (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Athetis lepigone"
+      ]
+    },
+    {
+      "id": "athetis_lineosa",
+      "category": "pest",
+      "label_en": "Athetis lineosa (moth)",
+      "label_kn": "Athetis lineosa (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Athetis lineosa"
+      ]
+    },
+    {
+      "id": "chilo_suppressalis",
+      "category": "pest",
+      "label_en": "Rice stem borer (Chilo suppressalis)",
+      "label_kn": "ಭತ್ತದ ಕಾಂಡ ಕೊರಕ (Chilo)",
+      "group": "pest29",
+      "aliases": [
+        "Chilo suppressalis"
+      ]
+    },
+    {
+      "id": "cnaphalocrocis_medinalis",
+      "category": "pest",
+      "label_en": "Rice leaf folder (Cnaphalocrocis medinalis)",
+      "label_kn": "ಭತ್ತದ ಎಲೆ ಮಡಚುವ ಹುಳು",
+      "group": "pest29",
+      "aliases": [
+        "Cnaphalocrocis medinalis Guenee"
+      ]
+    },
+    {
+      "id": "creatonotus_transiens",
+      "category": "pest",
+      "label_en": "Creatonotus transiens (tiger moth)",
+      "label_kn": "Creatonotus transiens (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Creatonotus transiens"
+      ]
+    },
+    {
+      "id": "diaphania_indica",
+      "category": "pest",
+      "label_en": "Cucumber moth (Diaphania indica)",
+      "label_kn": "ಸೌತೆ ಪತಂಗ (Diaphania indica)",
+      "group": "pest29",
+      "aliases": [
+        "Diaphania indica"
+      ]
+    },
+    {
+      "id": "endotricha_consocia",
+      "category": "pest",
+      "label_en": "Endotricha consocia (moth)",
+      "label_kn": "Endotricha consocia (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Endotricha consocia"
+      ]
+    },
+    {
+      "id": "euproctis_sparsa",
+      "category": "pest",
+      "label_en": "Tussock moth (Euproctis sparsa)",
+      "label_kn": "Euproctis sparsa (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Euproctis sparsa"
+      ]
+    },
+    {
+      "id": "gryllidae",
+      "category": "pest",
+      "label_en": "Crickets (Gryllidae)",
+      "label_kn": "ಜೀರುಂಡೆ ಕೀಟಗಳು (Gryllidae)",
+      "group": "pest29",
+      "aliases": [
+        "Gryllidae"
+      ]
+    },
+    {
+      "id": "gryllotalpidae",
+      "category": "pest",
+      "label_en": "Mole crickets (Gryllotalpidae)",
+      "label_kn": "ಮಣ್ಣು ಕೊರೆಯುವ ಜೀರುಂಡೆ (Gryllotalpidae)",
+      "group": "pest29",
+      "aliases": [
+        "Gryllotalpidae"
+      ]
+    },
+    {
+      "id": "helicoverpa_armigera",
+      "category": "pest",
+      "label_en": "Cotton bollworm / fruit borer (Helicoverpa armigera)",
+      "label_kn": "ಕಾಯಿ ಕೊರಕ (Helicoverpa armigera)",
+      "group": "pest29",
+      "aliases": [
+        "Helicoverpa armigera"
+      ]
+    },
+    {
+      "id": "holotrichia_oblita",
+      "category": "pest",
+      "label_en": "White grub beetle (Holotrichia oblita)",
+      "label_kn": "ಬಿಳಿ ಗೊಣ್ಣೆ ಹುಳು (Holotrichia)",
+      "group": "pest29",
+      "aliases": [
+        "Holotrichia oblita Faldermann"
+      ]
+    },
+    {
+      "id": "loxostege_sticticalis",
+      "category": "pest",
+      "label_en": "Beet webworm (Loxostege sticticalis)",
+      "label_kn": "Loxostege sticticalis (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Loxostege sticticalis"
+      ]
+    },
+    {
+      "id": "mamestra_brassicae",
+      "category": "pest",
+      "label_en": "Cabbage moth (Mamestra brassicae)",
+      "label_kn": "ಎಲೆಕೋಸು ಪತಂಗ (Mamestra)",
+      "group": "pest29",
+      "aliases": [
+        "Mamestra brassicae"
+      ]
+    },
+    {
+      "id": "maruca_testulalis",
+      "category": "pest",
+      "label_en": "Legume pod borer (Maruca testulalis)",
+      "label_kn": "ಕಾಳು ಕಾಯಿ ಕೊರಕ (Maruca)",
+      "group": "pest29",
+      "aliases": [
+        "Maruca testulalis Geyer"
+      ]
+    },
+    {
+      "id": "mythimna_separata",
+      "category": "pest",
+      "label_en": "Oriental armyworm (Mythimna separata)",
+      "label_kn": "ಸೈನಿಕ ಹುಳು (Mythimna)",
+      "group": "pest29",
+      "aliases": [
+        "Mythimna separata"
+      ]
+    },
+    {
+      "id": "naranga_aenescens",
+      "category": "pest",
+      "label_en": "Rice green caterpillar moth (Naranga aenescens)",
+      "label_kn": "Naranga aenescens (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Naranga aenescens Moore"
+      ]
+    },
+    {
+      "id": "nilaparvata",
+      "category": "pest",
+      "label_en": "Brown planthopper (Nilaparvata)",
+      "label_kn": "ಕಂದು ಜಿಗಿಹುಳು (Nilaparvata)",
+      "group": "pest29",
+      "aliases": [
+        "Nilaparvata"
+      ]
+    },
+    {
+      "id": "paracymoriza_taiwanalis",
+      "category": "pest",
+      "label_en": "Paracymoriza taiwanalis (moth)",
+      "label_kn": "Paracymoriza taiwanalis (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Paracymoriza taiwanalis"
+      ]
+    },
+    {
+      "id": "sesamia_inferens",
+      "category": "pest",
+      "label_en": "Pink stem borer (Sesamia inferens)",
+      "label_kn": "ಗುಲಾಬಿ ಕಾಂಡ ಕೊರಕ (Sesamia)",
+      "group": "pest29",
+      "aliases": [
+        "Sesamia inferens"
+      ]
+    },
+    {
+      "id": "sirthenea_flavipes",
+      "category": "predator",
+      "label_en": "Assassin bug (Sirthenea flavipes, predator)",
+      "label_kn": "ಹಂತಕ ತಿಗಣೆ (ಪರಭಕ್ಷಕ)",
+      "group": "pest29",
+      "aliases": [
+        "Sirthenea flavipes"
+      ]
+    },
+    {
+      "id": "sogatella_furcifera",
+      "category": "pest",
+      "label_en": "White-backed planthopper (Sogatella furcifera)",
+      "label_kn": "ಬಿಳಿ ಬೆನ್ನಿನ ಜಿಗಿಹುಳು (Sogatella)",
+      "group": "pest29",
+      "aliases": [
+        "Sogatella furcifera"
+      ]
+    },
+    {
+      "id": "spodoptera_exigua",
+      "category": "pest",
+      "label_en": "Beet armyworm (Spodoptera exigua)",
+      "label_kn": "ಬೀಟ್ ಸೈನಿಕ ಹುಳು (Spodoptera exigua)",
+      "group": "pest29",
+      "aliases": [
+        "Spodoptera exigua"
+      ]
+    },
+    {
+      "id": "spoladea_recurvalis",
+      "category": "pest",
+      "label_en": "Beet webworm moth (Spoladea recurvalis)",
+      "label_kn": "Spoladea recurvalis (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Spoladea recurvalis"
+      ]
+    },
+    {
+      "id": "staurophora_celsia",
+      "category": "pest",
+      "label_en": "Staurophora celsia (moth)",
+      "label_kn": "Staurophora celsia (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Staurophora celsia"
+      ]
+    },
+    {
+      "id": "timandra_recompta",
+      "category": "pest",
+      "label_en": "Timandra recompta (moth)",
+      "label_kn": "Timandra recompta (ಪತಂಗ)",
+      "group": "pest29",
+      "aliases": [
+        "Timandra Recompta"
+      ]
+    },
+    {
+      "id": "trichoptera",
+      "category": "neutral",
+      "label_en": "Caddisflies (Trichoptera, not a crop pest)",
+      "label_kn": "ಕ್ಯಾಡಿಸ್ ನೊಣಗಳು (ಬೆಳೆ ಕೀಟವಲ್ಲ)",
+      "group": "pest29",
+      "aliases": [
+        "Trichoptera"
+      ]
     }
   ],
+  "_classes_agropest12": "PLACEHOLDER - to confirm with IIHR mentor. The 12 classes of the AgroPest-12 YOLOv8s model (inference-service/, used for phone and Telegram photos). category: pest = counts toward the action threshold; predator = natural enemy (counts toward the pests-per-predator ratio); beneficial = shown but counted as neither (bees pollinate, earthworms help the soil). Kannada names need a native-speaker review.",
+  "_classes_pest29": "PLACEHOLDER - EXPERIMENTAL model, to confirm with IIHR mentor. The 29 classes of the YOLO11s pest model (fine-tuned on \"pests-hf\", 2026-11-04; mAP@50 0.25 on its own validation set) served by inference-service/ for phone and Telegram photos while the AgroPest-12 weights are unavailable. category neutral = not a crop pest (counted as neither pest nor predator). Kannada names need a native-speaker review; several keep the scientific name.",
   "decision": {
     "action_threshold_per_day": 25,
     "_action_threshold_per_day": "PLACEHOLDER - to confirm with IIHR mentor. Average pests per trap per day (over the rolling window) that triggers action.",

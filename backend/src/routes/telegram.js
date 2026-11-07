@@ -23,6 +23,15 @@ export function telegramRouter({ config, telegram, telegramBot }) {
     if (r.code === 'not_configured') {
       throw new HttpError(409, 'Telegram is not set up - add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to backend/.env', { code: 'telegram_not_configured' });
     }
+    const slow = r.code === 'telegram_timeout';
+    // Some messages were confirmed: it WAS sent, say what is unconfirmed instead of "not accepted"
+    if (r.messages > 0) {
+      const rest = slow ? 'the rest was slow to answer and may still arrive - check Telegram before sending again' : `the rest failed (${r.description ?? r.code})`;
+      return res.json({ ...r, ok: true, partial: true, warning: `Sent ${r.messages} of ${r.total} message(s); ${rest}.` });
+    }
+    if (slow) {
+      throw new HttpError(504, `Telegram did not answer within ${Math.round(config.telegram.timeoutMs / 1000)} s - the message may still arrive; check Telegram before sending again`, { code: r.code });
+    }
     throw new HttpError(502, `Telegram did not accept the message${r.description ? `: ${r.description}` : ''}`, { code: r.code });
   };
 

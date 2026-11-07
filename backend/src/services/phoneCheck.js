@@ -1,6 +1,7 @@
 /**
  * Phone check pipeline, shared by POST /api/check and the Telegram photo bot:
- * quality gate -> Roboflow with tiling -> predator-aware decision -> advisory.
+ * quality gate -> vision (the phone model when PHONE_VISION_URL is set, e.g. AgroPest-12,
+ * otherwise the trap model: Roboflow with tiling) -> predator-aware decision -> advisory.
  *
  * The card collected insects over `daysHung` days, so per-day counts are the
  * totals divided by that, and the decision averages them like a trap's daily
@@ -25,7 +26,7 @@ export async function runPhoneCheck({ config, vision, advisor }, { image, daysHu
   let decision;
   let perDay = null;
   if (result.counts && result.totals) {
-    const counted = result.boxes.filter((b) => b.confidence >= config.vision.minConfidence);
+    const counted = result.boxes.filter((b) => b.confidence >= (vision.minConfidence ?? config.vision.minConfidence));
     const confs = counted.map((b) => b.confidence);
     const confidence = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
     perDay = { pests: result.totals.pests / daysHung, predators: result.totals.predators / daysHung };
@@ -91,6 +92,7 @@ export async function runPhoneCheck({ config, vision, advisor }, { image, daysHu
       status: result.status,
       provider: result.provider,
       model: result.model,
+      experimental: Boolean(result.experimental),
       error: result.error,
       fallback: result.fallback ?? null,
       image: result.image,

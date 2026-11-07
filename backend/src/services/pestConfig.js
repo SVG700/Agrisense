@@ -25,12 +25,16 @@ export function canonicalLabel(label) {
   return byAlias.get(n)?.id ?? n;
 }
 
-/** 'pest' | 'predator'. Unknown classes are treated as pests (conservative). */
+/** 'pest' | 'predator' | 'beneficial' | 'neutral'. Unknown classes are treated as pests (conservative). */
 export function categoryOf(label) {
   return byAlias.get(norm(label))?.category ?? 'pest';
 }
 
 export const PREDATOR_IDS = new Set(CLASSES.filter((c) => c.category === 'predator').map((c) => c.id));
+/** Helpful (bees, earthworms) or neutral (caddisflies) classes: reported, but counted as neither pest nor predator. */
+export const BENEFICIAL_IDS = new Set(CLASSES.filter((c) => c.category === 'beneficial' || c.category === 'neutral').map((c) => c.id));
+/** Class ids a model group reports, e.g. 'agropest12' (the AgroPest-12 inference service). */
+export const classIdsOfGroup = (group) => CLASSES.filter((c) => c.group === group).map((c) => c.id);
 
 const d = raw.decision;
 export const DECISION_CONFIG = Object.freeze({

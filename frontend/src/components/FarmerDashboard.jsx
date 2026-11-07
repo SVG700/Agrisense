@@ -11,13 +11,11 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import TrapCanvas from './TrapCanvas.jsx';
 import AdvisoryCard from './AdvisoryCard.jsx';
 import MicroclimateChart from './MicroclimateChart.jsx';
 import Badge from './Badge.jsx';
 import TrapCards from './TrapCards.jsx';
 import ManualSprayCard from './ManualSprayCard.jsx';
-import DailyTimeline from './DailyTimeline.jsx';
 import LiveVision from './LiveVision.jsx';
 import { HeroCards, TrapStage, VISION_LAYOUT_ID } from './FieldHero.jsx';
 import { LayoutGroup } from 'framer-motion';
@@ -78,7 +76,6 @@ export default function FarmerDashboard({
   // null = follow the latest capture; otherwise a pinned historic capture id
   const [selectedId, setSelectedId] = useState(null);
   useEffect(() => setSelectedId(null), [device?.id]);
-  const trapRef = useRef(null);
   const sectionRefs = useRef({});
   const [vision, setVision] = useState(null); // {x, y} press point while Live Vision is open
   const weather = useLiveWeather();
@@ -93,7 +90,7 @@ export default function FarmerDashboard({
     if (next) setSelectedId(next.id === latest?.id ? null : next.id);
   };
 
-  // Action log for this trap (shared by the log card, the spray button, the timeline and the chart markers)
+  // Action log for this trap (shared by the log card, the spray button, recent updates and the chart markers)
   const [actions, setActions] = useState([]);
   const [actionsUnavailable, setActionsUnavailable] = useState(null);
   const loadActions = async () => {
@@ -224,19 +221,15 @@ export default function FarmerDashboard({
         </Stagger>
       </section>
     ),
-    timeline: <DailyTimeline telemetry={telemetry} actions={actions} capture={capture} onSelectCapture={selectCapture} />,
     detections: (
       <section aria-labelledby="detections-title" className="flex flex-col gap-4">
         <SectionHead id="detections-title" label={t('section.detections')} />
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
-            <div ref={trapRef} className="scroll-mt-24">
-              <TrapCanvas capture={capture} />
-            </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-6">
             <PestBreakdown counts={counts} total={total} known={countsKnown} reason={vState?.help} live={!isHistoric} />
-          </div>
-          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
             <AdvisoryCard advisory={det?.ai_advisory} />
+          </div>
+          <div className="flex min-w-0 flex-col gap-6">
             <ManualSprayCard device={device} decision={latestDecision} economics={economics.data} onChanged={loadActions} />
             <WeatherCard deviceId={device?.id} decision={latestDecision} />
           </div>
