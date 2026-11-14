@@ -10,10 +10,9 @@ The team owns the code and has released it under the Apache License 2.0.
 
 ## Team
 
-<!-- TODO before merging: replace this line with one bullet per team member, e.g.
-- Full Name ([@github-username](https://github.com/github-username)): role
--->
-- [TEAM MEMBER NAMES - TODO]
+- C Parthiv
+- Devaraj
+- Farhan
 
 ## Contributors
 
