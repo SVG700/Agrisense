@@ -56,6 +56,9 @@
     "@luma.gl/constants": "9.3.6",
     "@luma.gl/gltf": "9.3.6",
     "@luma.gl/effects": "9.3.6",
-    "@luma.gl/webgpu": "9.3.6"
+    "@luma.gl/webgpu": "9.3.6",
+    "postcss": "^8.5.32",
+    "fflate": "^0.7.5",
+    "fast-xml-parser": "^5.12.1"
   }
 }
