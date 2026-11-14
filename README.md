@@ -1,5 +1,8 @@
 # 🌱 Agrisense AI: Predictive Insect Monitoring System
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/SVG700/Agrisense/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SVG700/Agrisense/actions/workflows/ci.yml)
+
 Raspberry Pi sticky traps → vision model insect detection → LLM agronomic advisory (Gemini, or Claude) → farmer dashboard.
 
 ```
@@ -28,6 +31,16 @@ are never given made-up detections.
 > Status: the demo is verified locally. Gemini, the vision provider, Supabase and the Raspberry Pi hardware are
 > implemented and tested only against mocks. See [docs/REPORT.md](docs/REPORT.md) and the
 > [live checklist](#real-integration-checklist).
+
+## Open source
+
+Agrisense AI is free and open source under the [Apache License 2.0](LICENSE). Pest monitoring tools
+shouldn't be out of reach for smallholder farmers. Anyone (farmers, researchers, extension workers,
+students, developers) may use, adapt and improve it, including for their own region, crops and languages.
+
+It was built for the **Chip to Crop** agritech hackathon (Presidency University Makerspace × ICAR-IIHR,
+November 2026), where the team placed 3rd. See [AUTHORS.md](AUTHORS.md). Contributions are welcome:
+see [Contributing](#contributing).
 
 ---
 
@@ -693,3 +706,24 @@ Do these in order, each on its own. Use a Supabase **test** project.
   - The SPRAY / BIOCONTROL / WAIT thresholds are illustrative, not validated.
   - The Mapbox satellite style hasn't been tested with a real token.
 - There are no per-user dashboard accounts.
+
+## Contributing
+
+Contributions of every kind are welcome: code, Kannada review, labelled trap images and field reports from
+real farms. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, the branch and pull-request workflow
+and the honesty rule (every result labelled simulated, mocked, hardware or estimate). A good place to start is
+the [good first issues](https://github.com/SVG700/Agrisense/labels/good%20first%20issue).
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report security problems privately as described
+in [SECURITY.md](SECURITY.md), never in a public issue.
+
+## License
+
+Agrisense AI is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Samhith V Gupta and the
+Agrisense team. See [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party
+software, services and models.
+
+**Note on the inference service:** `inference-service/` depends on Ultralytics, which is licensed under
+**AGPL-3.0**. If you distribute that service or run it as a network service, you must comply with AGPL-3.0
+for that component. The rest of the repository is Apache-2.0. Model weights (AgroPest-12, pest29) are not
+included. Their licences are those of their original sources, so check them before use.
