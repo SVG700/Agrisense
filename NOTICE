@@ -1,0 +1,11 @@
+Agrisense AI
+Copyright 2026 Samhith V Gupta and [TEAM MEMBER NAMES - TODO: fill in before merging]
+
+This product includes software developed by the Agrisense contributors.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party software, services and models used by this project, and their
+licences, are listed in THIRD_PARTY_NOTICES.md. In particular, the optional
+inference-service/ component depends on Ultralytics, which is licensed under
+AGPL-3.0; see THIRD_PARTY_NOTICES.md for what that means for that component.
