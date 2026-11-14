@@ -29,7 +29,7 @@ Look for issues labelled
 
 ## Setting up
 
-You need Node.js 20 or later and Python 3.9 or later. Full details, including every
+You need Node.js 22 or later and Python 3.9 or later. Full details, including every
 environment variable, are in the [README](README.md). Everything runs in **demo mode**
 without any keys.
 

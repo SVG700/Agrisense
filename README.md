@@ -47,7 +47,7 @@ see [Contributing](#contributing).
 ## Repository layout
 
 ```
-backend/                Node.js 20+ / Express 5 API
+backend/                Node.js 22+ / Express 5 API
   src/app.js            app factory (DI for tests), security headers, health/ready
   src/server.js         config validation → wiring → listen, graceful shutdown
   src/config.js         env parsing + validation (errors vs. warnings, no secrets printed)
@@ -77,7 +77,7 @@ DECISIONS.md            architecture/engineering decisions (kepler.gl choices, n
 
 | Component | Version |
 |---|---|
-| Node.js | 20 or later (tested on 24.x) |
+| Node.js | 22 or later (tested on 24.x) |
 | Python (edge) | 3.9 or later (Raspberry Pi OS Bookworm ships 3.11) |
 | Supabase | any current project (optional) |
 | Raspberry Pi | Pi 5 + Camera Module (libcamera/Picamera2) + BME280 (I²C) or DHT22 (GPIO) |
@@ -637,7 +637,7 @@ How the service behaves:
 
 The backend and frontend deploy independently. Nothing below has been deployed from this repository.
 
-- **Backend**: any Node 20+ host (Render, Fly.io, Railway or a VM) running `npm ci --omit=dev && npm start`.
+- **Backend**: any Node 22+ host (Render, Fly.io, Railway or a VM) running `npm ci --omit=dev && npm start`.
   - Set `NODE_ENV=production`, `DEVICE_API_KEYS`, `ADMIN_API_KEY`, `CORS_ORIGINS=<dashboard origin>`,
     `PUBLIC_BASE_URL`, the Supabase variables, and `TRUST_PROXY=true` behind the platform proxy.
   - Use `/api/ready` as the health check.
