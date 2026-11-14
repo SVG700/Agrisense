@@ -1,0 +1,75 @@
+name: Field report
+description: For farmers and field testers - tell us how Agrisense did on a real trap
+title: "[Field report]: "
+labels: ["field report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Agrisense in the field! Every report helps make the advice more accurate.
+        You can write in English or ಕನ್ನಡ. Please don't share your exact farm address or phone number: a district or region is enough.
+  - type: input
+    id: region
+    attributes:
+      label: Location (region / district)
+      placeholder: e.g. Kolar, Karnataka
+    validations:
+      required: true
+  - type: input
+    id: crop
+    attributes:
+      label: Crop
+      placeholder: e.g. tomato (greenhouse), chilli (open field)
+    validations:
+      required: true
+  - type: dropdown
+    id: trap-type
+    attributes:
+      label: Trap type
+      options:
+        - Yellow sticky trap
+        - Blue sticky trap
+        - Pheromone trap
+        - Light trap
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: days-hung
+    attributes:
+      label: Days the trap was hung before the photo
+      placeholder: e.g. 3
+    validations:
+      required: true
+  - type: textarea
+    id: photos
+    attributes:
+      label: Photos
+      description: Drag and drop photos of the trap (and the crop if useful). Only share photos you took yourself or have permission to share; they become part of this public issue.
+  - type: textarea
+    id: app-advice
+    attributes:
+      label: What did the app advise?
+      description: The decision (SPRAY / RELEASE BIOCONTROL / WAIT / CHECK TRAP), the insect count, and any advice text. Was the result labelled simulated, experimental or estimate?
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What actually happened?
+      description: What did you or an expert see on the trap and in the field? What did you do, and what happened over the next days?
+    validations:
+      required: true
+  - type: dropdown
+    id: helpful
+    attributes:
+      label: Was the advice right?
+      options:
+        - "Yes"
+        - Partly
+        - "No"
+        - Not sure yet
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else? (weather, sprays applied, app language used)
