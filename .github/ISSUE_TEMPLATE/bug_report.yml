@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in Agrisense doesn't work as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Security problems (leaked keys, auth bypass, advice injection) must not be reported here.** See SECURITY.md.
+        Never paste API keys, tokens or `.env` contents into an issue.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part?
+      options:
+        - Dashboard (frontend)
+        - Backend API
+        - Telegram bot / alerts
+        - Phone check
+        - Pest Surveillance Map
+        - Raspberry Pi agent / edge simulator
+        - Inference service
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the backend in demo mode
+        2. Open http://localhost:5173
+        3. Click ...
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Demo mode (no keys)
+        - With real services (Supabase / Gemini / Roboflow ...)
+        - Raspberry Pi hardware
+        - Not sure
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, browser, Node.js / Python version, commit or branch
+      placeholder: Windows 11, Chrome 140, Node 24, main @ abc1234
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove any keys, tokens or personal data first.
+      render: shell

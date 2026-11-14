@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# No secrets are used: every test runs against mocks and fake models (see README "Automated tests").
+jobs:
+  backend:
+    name: Backend (Node 22)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+
+  frontend:
+    # Node 24: vitest 5 and jsdom 30 need Node >= 22.12 (README: tested on 24.x)
+    name: Frontend (Node 24)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  edge-simulator:
+    name: Edge simulator (Python 3.11)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-simulator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"   # Raspberry Pi OS Bookworm ships 3.11
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+
+  inference-service:
+    # The tests use a fake model: no weights, GPU, PyTorch or Ultralytics needed, so only the
+    # web/image packages the tests import are installed (the full requirements pull ~1 GB of torch).
+    name: Inference service (Python 3.12, fake model)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: inference-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "fastapi==0.162.0" "pillow==13.0.0" httpx
+      - run: python -m unittest -v test_service

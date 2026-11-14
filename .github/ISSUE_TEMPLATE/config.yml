@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/SVG700/Agrisense/security/advisories/new
+    about: Leaked keys, API auth bypass or unsafe advice injection. Report privately; see SECURITY.md. Never in a public issue.
+  - name: Security policy
+    url: https://github.com/SVG700/Agrisense/blob/main/SECURITY.md
+    about: What counts as a security issue and how it is handled.

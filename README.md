@@ -1,5 +1,8 @@
 # 🌱 Agrisense AI: Predictive Insect Monitoring System
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/SVG700/Agrisense/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SVG700/Agrisense/actions/workflows/ci.yml)
+
 Raspberry Pi sticky traps → vision model insect detection → LLM agronomic advisory (Gemini, or Claude) → farmer dashboard.
 
 ```
@@ -29,12 +32,22 @@ are never given made-up detections.
 > implemented and tested only against mocks. See [docs/REPORT.md](docs/REPORT.md) and the
 > [live checklist](#real-integration-checklist).
 
+## Open source
+
+Agrisense AI is free and open source under the [Apache License 2.0](LICENSE). Pest monitoring tools
+shouldn't be out of reach for smallholder farmers. Anyone (farmers, researchers, extension workers,
+students, developers) may use, adapt and improve it, including for their own region, crops and languages.
+
+It was built for the **Chip to Crop** agritech hackathon (Presidency University Makerspace × ICAR-IIHR,
+November 2026), where the team placed 3rd. See [AUTHORS.md](AUTHORS.md). Contributions are welcome:
+see [Contributing](#contributing).
+
 ---
 
 ## Repository layout
 
 ```
-backend/                Node.js 20+ / Express 5 API
+backend/                Node.js 22+ / Express 5 API
   src/app.js            app factory (DI for tests), security headers, health/ready
   src/server.js         config validation → wiring → listen, graceful shutdown
   src/config.js         env parsing + validation (errors vs. warnings, no secrets printed)
@@ -64,7 +77,7 @@ DECISIONS.md            architecture/engineering decisions (kepler.gl choices, n
 
 | Component | Version |
 |---|---|
-| Node.js | 20 or later (tested on 24.x) |
+| Node.js | 22 or later (tested on 24.x) |
 | Python (edge) | 3.9 or later (Raspberry Pi OS Bookworm ships 3.11) |
 | Supabase | any current project (optional) |
 | Raspberry Pi | Pi 5 + Camera Module (libcamera/Picamera2) + BME280 (I²C) or DHT22 (GPIO) |
@@ -624,7 +637,7 @@ How the service behaves:
 
 The backend and frontend deploy independently. Nothing below has been deployed from this repository.
 
-- **Backend**: any Node 20+ host (Render, Fly.io, Railway or a VM) running `npm ci --omit=dev && npm start`.
+- **Backend**: any Node 22+ host (Render, Fly.io, Railway or a VM) running `npm ci --omit=dev && npm start`.
   - Set `NODE_ENV=production`, `DEVICE_API_KEYS`, `ADMIN_API_KEY`, `CORS_ORIGINS=<dashboard origin>`,
     `PUBLIC_BASE_URL`, the Supabase variables, and `TRUST_PROXY=true` behind the platform proxy.
   - Use `/api/ready` as the health check.
@@ -693,3 +706,24 @@ Do these in order, each on its own. Use a Supabase **test** project.
   - The SPRAY / BIOCONTROL / WAIT thresholds are illustrative, not validated.
   - The Mapbox satellite style hasn't been tested with a real token.
 - There are no per-user dashboard accounts.
+
+## Contributing
+
+Contributions of every kind are welcome: code, Kannada review, labelled trap images and field reports from
+real farms. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, the branch and pull-request workflow
+and the honesty rule (every result labelled simulated, mocked, hardware or estimate). A good place to start is
+the [good first issues](https://github.com/SVG700/Agrisense/labels/good%20first%20issue).
+
+Please follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report security problems privately as described
+in [SECURITY.md](SECURITY.md), never in a public issue.
+
+## License
+
+Agrisense AI is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Samhith V Gupta and the
+Agrisense team. See [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party
+software, services and models.
+
+**Note on the inference service:** `inference-service/` depends on Ultralytics, which is licensed under
+**AGPL-3.0**. If you distribute that service or run it as a network service, you must comply with AGPL-3.0
+for that component. The rest of the repository is Apache-2.0. Model weights (AgroPest-12, pest29) are not
+included. Their licences are those of their original sources, so check them before use.
