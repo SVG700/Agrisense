@@ -7,6 +7,10 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-14
+
+First open-source release.
+
 ### Added
 
 - Open-source setup under the **Apache License 2.0**:
@@ -16,7 +20,8 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
   - GitHub Actions CI for the backend, frontend, edge simulator and inference service
   - `license` / `author` / `repository` fields in both `package.json` files
   - README badges plus Open source, Contributing and License sections
-  - `docs/ROADMAP_ISSUES.md` with draft roadmap issues
+  - roadmap issues on GitHub (drafted in `docs/ROADMAP_ISSUES.md`)
+  - Dependabot for npm, pip and GitHub Actions; private vulnerability reporting
 
 ### What exists today
 
@@ -54,4 +59,5 @@ See "Known limitations" in the [README](README.md): no measured detection accura
 decision thresholds are placeholders, the Kannada text is a first draft, and several
 integrations are tested only against mocks.
 
-[Unreleased]: https://github.com/SVG700/Agrisense/commits/main
+[Unreleased]: https://github.com/SVG700/Agrisense/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/SVG700/Agrisense/releases/tag/v0.1.0
