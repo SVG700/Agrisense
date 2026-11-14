@@ -58,7 +58,7 @@ jobs:
         working-directory: edge-simulator
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"   # Raspberry Pi OS Bookworm ships 3.11
       - run: pip install -r requirements.txt
@@ -74,7 +74,7 @@ jobs:
         working-directory: inference-service
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install "fastapi==0.162.0" "pillow==13.0.0" httpx
