@@ -1,6 +1,13 @@
 {
   "name": "agrisense-backend",
   "version": "1.0.0",
+  "license": "Apache-2.0",
+  "author": "Samhith V Gupta (https://github.com/SVG700)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SVG700/Agrisense.git",
+    "directory": "backend"
+  },
   "description": "Agrisense AI - ingestion API, YOLO orchestration and Claude agronomic advisory",
   "type": "module",
   "main": "src/server.js",
