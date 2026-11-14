@@ -4,7 +4,7 @@
 -r requirements.txt
 
 # BME280 over I2C (default, AGRISENSE_SENSOR=bme280). Enable I2C: sudo raspi-config -> Interface Options -> I2C
-smbus2>=0.4
+smbus2>=0.6.1
 RPi.bme280>=0.2.4
 
 # DHT22 over GPIO (AGRISENSE_SENSOR=dht22). Uncomment if you use a DHT22 instead:
