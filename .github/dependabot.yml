@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    ignore:
+      # kepler.gl is pinned to a pre-release and deck.gl / luma.gl are pinned with
+      # `overrides` on purpose (DECISIONS.md D1, D3); upgrade them by hand and re-test the map.
+      - dependency-name: "@kepler.gl/*"
+      - dependency-name: "@deck.gl/*"
+      - dependency-name: "@luma.gl/*"
+      - dependency-name: "maplibre-gl"
+
+  - package-ecosystem: pip
+    directory: /edge-simulator
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: pip
+    directory: /inference-service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
