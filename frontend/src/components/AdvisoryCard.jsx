@@ -218,7 +218,7 @@ function RiskMeter({ risk }) {
       {LEVELS.map((l, i) => (
         <div key={l} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
           <motion.div
-            className={`h-full rounded-full ${RISK_STYLES[risk].dot}`}
+            className={`h-full rounded-full ${RISK_STYLES[risk]?.dot ?? 'bg-slate-400'}`}
             initial={{ width: 0 }}
             animate={{ width: i <= level ? '100%' : 0 }}
             transition={{ duration: 0.4, ease: EASE, delay: 0.2 + i * 0.12 }}

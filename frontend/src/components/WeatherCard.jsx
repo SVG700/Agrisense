@@ -135,7 +135,7 @@ export default function WeatherCard({ deviceId, decision }) {
             <li key={ch.id} className="flex items-start gap-2">
               <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${ch.ok ? 'text-emerald-700' : 'text-rose-700'}`} />
               <span className={ch.ok ? 'text-slate-700' : 'text-rose-700'}>
-                {t.lang === 'en' ? ch.label : t(`weather.${ch.id}${ch.ok ? 'Ok' : 'No'}`, { w: Math.round(c.wind_kmh ?? 0) })}
+                {t.lang === 'en' ? ch.label : t(`weather.${ch.id}${ch.ok ? 'Ok' : 'No'}`, { w: Math.round(c?.wind_kmh ?? 0) })}
               </span>
             </li>
           );
@@ -148,9 +148,9 @@ export default function WeatherCard({ deviceId, decision }) {
       </ul>
 
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <Mini icon={Thermometer} label={t('weather.now')} value={c.temperature != null ? `${Math.round(c.temperature)}°C` : '—'} />
-        <Mini icon={Droplets} label={t('kpi.humidity')} value={c.humidity != null ? `${Math.round(c.humidity)}%` : '—'} />
-        <Mini icon={Wind} label="Wind" value={c.wind_kmh != null ? `${Math.round(c.wind_kmh)} km/h` : '—'} />
+        <Mini icon={Thermometer} label={t('weather.now')} value={c?.temperature != null ? `${Math.round(c.temperature)}°C` : '—'} />
+        <Mini icon={Droplets} label={t('kpi.humidity')} value={c?.humidity != null ? `${Math.round(c.humidity)}%` : '—'} />
+        <Mini icon={Wind} label="Wind" value={c?.wind_kmh != null ? `${Math.round(c.wind_kmh)} km/h` : '—'} />
       </div>
 
       {dd?.days_per_generation && (

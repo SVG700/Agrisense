@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "license": "Apache-2.0",
   "author": "Samhith V Gupta (https://github.com/SVG700)",
+  "contributors": [
+    "C Parthiv <cparthiv12@gmail.com>",
+    "Devaraj",
+    "Farhan"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SVG700/Agrisense.git",
