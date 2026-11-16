@@ -125,7 +125,7 @@ export default function HardwareControls({ device, log }) {
         <div className="flex flex-col gap-5">
           <ul className="grid gap-3 sm:grid-cols-2">
             {Object.entries(SWITCH_INFO).map(([key, info]) => {
-              const s = state.switches[key];
+              const s = state.switches?.[key] ?? { on: false };
               const Icon = info.icon;
               return (
                 <li key={key} className="flex items-start gap-3 rounded-2xl bg-canvas p-4 ring-1 ring-line">
@@ -135,7 +135,7 @@ export default function HardwareControls({ device, log }) {
                       <span id={`sw-${key}`} className="font-medium text-ink">
                         {info.name}
                       </span>
-                      <Switch on={s.on} busy={busy === key} labelledBy={`sw-${key}`} onClick={() => toggle(key)} />
+                      <Switch on={Boolean(s.on)} busy={busy === key} labelledBy={`sw-${key}`} onClick={() => toggle(key)} />
                     </div>
                     <p className="mt-1 text-xs text-slate-500">{info.help}</p>
                     <p className="mt-2 text-xs">

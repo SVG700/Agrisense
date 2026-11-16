@@ -10,7 +10,7 @@ The team owns the code and has released it under the Apache License 2.0.
 
 ## Team
 
-- C Parthiv
+- **C Parthiv** (<cparthiv12@gmail.com>)
 - Devaraj
 - Farhan
 
